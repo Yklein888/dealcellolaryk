@@ -25,7 +25,8 @@ import {
   Search, 
   Wrench,
   CheckCircle,
-  Package
+  Package,
+  Printer
 } from 'lucide-react';
 import { Repair, repairStatusLabels } from '@/types/rental';
 import { useToast } from '@/hooks/use-toast';
@@ -48,6 +49,7 @@ export default function Repairs() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
 
   const [formData, setFormData] = useState({
+    repairNumber: '',
     deviceType: '',
     customerName: '',
     customerPhone: '',
@@ -66,6 +68,7 @@ export default function Repairs() {
 
   const resetForm = () => {
     setFormData({
+      repairNumber: '',
       deviceType: '',
       customerName: '',
       customerPhone: '',
@@ -75,28 +78,122 @@ export default function Repairs() {
   };
 
   const handleSubmit = () => {
-    if (!formData.deviceType || !formData.customerName || !formData.problemDescription) {
+    if (!formData.repairNumber || !formData.deviceType || !formData.customerName || !formData.problemDescription) {
       toast({
         title: 'שגיאה',
-        description: 'יש למלא סוג מכשיר, שם לקוח ותיאור הבעיה',
+        description: 'יש למלא מספר תיקון, סוג מכשיר, שם לקוח ותיאור הבעיה',
         variant: 'destructive',
       });
       return;
     }
 
-    addRepair({
+    const newRepairData = {
       ...formData,
-      status: 'in_lab',
+      status: 'in_lab' as const,
       receivedDate: new Date().toISOString().split('T')[0],
-    });
+    };
+
+    addRepair(newRepairData);
 
     toast({
       title: 'תיקון נוסף',
       description: 'התיקון נוסף למערכת בהצלחה',
     });
 
+    // Print the repair form
+    printRepairForm(newRepairData);
+
     resetForm();
     setIsAddDialogOpen(false);
+  };
+
+  const printRepairForm = (repair: typeof formData & { status: string; receivedDate: string }) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html dir="rtl" lang="he">
+      <head>
+        <meta charset="UTF-8">
+        <title>טופס תיקון #${repair.repairNumber}</title>
+        <style>
+          body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 40px; direction: rtl; }
+          .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
+          .repair-number { font-size: 32px; font-weight: bold; color: #0d9488; margin-bottom: 10px; }
+          .title { font-size: 24px; color: #333; }
+          .field { margin-bottom: 15px; padding: 10px; background: #f5f5f5; border-radius: 8px; }
+          .label { font-weight: bold; color: #555; margin-bottom: 5px; }
+          .value { font-size: 16px; color: #333; }
+          .footer { margin-top: 40px; text-align: center; color: #888; font-size: 12px; }
+          .signature { margin-top: 60px; display: flex; justify-content: space-between; }
+          .signature-box { border-top: 1px solid #333; width: 200px; text-align: center; padding-top: 10px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="repair-number">תיקון מספר: ${repair.repairNumber}</div>
+          <div class="title">טופס קבלת מכשיר לתיקון</div>
+        </div>
+        
+        <div class="field">
+          <div class="label">סוג המכשיר:</div>
+          <div class="value">${repair.deviceType}</div>
+        </div>
+        
+        <div class="field">
+          <div class="label">שם הלקוח:</div>
+          <div class="value">${repair.customerName}</div>
+        </div>
+        
+        <div class="field">
+          <div class="label">טלפון:</div>
+          <div class="value">${repair.customerPhone || 'לא צוין'}</div>
+        </div>
+        
+        <div class="field">
+          <div class="label">תיאור הבעיה:</div>
+          <div class="value">${repair.problemDescription}</div>
+        </div>
+        
+        ${repair.notes ? `
+        <div class="field">
+          <div class="label">הערות:</div>
+          <div class="value">${repair.notes}</div>
+        </div>
+        ` : ''}
+        
+        <div class="field">
+          <div class="label">תאריך קבלה:</div>
+          <div class="value">${new Date(repair.receivedDate).toLocaleDateString('he-IL')}</div>
+        </div>
+        
+        <div class="signature">
+          <div class="signature-box">חתימת הלקוח</div>
+          <div class="signature-box">חתימת המעבדה</div>
+        </div>
+        
+        <div class="footer">מסמך זה הופק אוטומטית ממערכת ניהול ההשכרות</div>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
+  const handlePrintExistingRepair = (repair: Repair) => {
+    printRepairForm({
+      repairNumber: repair.repairNumber,
+      deviceType: repair.deviceType,
+      customerName: repair.customerName,
+      customerPhone: repair.customerPhone,
+      problemDescription: repair.problemDescription,
+      notes: repair.notes || '',
+      status: repair.status,
+      receivedDate: repair.receivedDate,
+    });
   };
 
   const handleStatusChange = (repairId: string, newStatus: Repair['status']) => {
@@ -146,6 +243,15 @@ export default function Repairs() {
             </DialogHeader>
             
             <div className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <Label>מספר תיקון *</Label>
+                <Input
+                  value={formData.repairNumber}
+                  onChange={(e) => setFormData({ ...formData, repairNumber: e.target.value })}
+                  placeholder="לדוגמה: 1001"
+                />
+              </div>
+
               <div className="space-y-2">
                 <Label>סוג המכשיר *</Label>
                 <Select 
@@ -259,8 +365,11 @@ export default function Repairs() {
             >
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-start gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-warning/20">
-                    <Wrench className="h-6 w-6 text-warning" />
+                  {/* Prominent Repair Number Badge */}
+                  <div className="flex flex-col items-center gap-1">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary text-primary-foreground font-bold text-xl shadow-lg">
+                      #{repair.repairNumber}
+                    </div>
                   </div>
                   <div>
                     <div className="flex items-center gap-3 mb-1">
@@ -280,6 +389,14 @@ export default function Repairs() {
                 </div>
 
                 <div className="flex gap-2 md:flex-col">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => handlePrintExistingRepair(repair)}
+                  >
+                    <Printer className="h-4 w-4" />
+                    הדפס
+                  </Button>
                   {repair.status === 'in_lab' && (
                     <Button 
                       variant="success" 
