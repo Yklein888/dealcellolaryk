@@ -100,6 +100,7 @@ const sampleRentals: Rental[] = [
 const sampleRepairs: Repair[] = [
   {
     id: 'rep-1',
+    repairNumber: '1001',
     deviceType: 'סמארטפון',
     customerName: 'רחל גולדברג',
     customerPhone: '053-1112233',
@@ -109,6 +110,7 @@ const sampleRepairs: Repair[] = [
   },
   {
     id: 'rep-2',
+    repairNumber: '1002',
     deviceType: 'מודם',
     customerName: 'אבי שמעון',
     customerPhone: '058-4445566',

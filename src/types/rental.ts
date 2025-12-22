@@ -54,6 +54,7 @@ export interface Rental {
 
 export interface Repair {
   id: string;
+  repairNumber: string;
   deviceType: string;
   customerName: string;
   customerPhone: string;
