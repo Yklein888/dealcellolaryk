@@ -138,6 +138,7 @@ interface RentalContextType {
   returnRental: (id: string) => void;
   addRepair: (repair: Omit<Repair, 'id'>) => void;
   updateRepair: (id: string, repair: Partial<Repair>) => void;
+  deleteRepair: (id: string) => void;
   getAvailableItems: (category?: ItemCategory) => InventoryItem[];
   getUpcomingReturns: () => Rental[];
 }
@@ -255,6 +256,10 @@ export function RentalProvider({ children }: { children: ReactNode }) {
     setRepairs(prev => prev.map(r => r.id === id ? { ...r, ...repair } : r));
   };
 
+  const deleteRepair = (id: string) => {
+    setRepairs(prev => prev.filter(r => r.id !== id));
+  };
+
   const getAvailableItems = (category?: ItemCategory) => {
     return inventory.filter(item => 
       item.status === 'available' && 
@@ -289,6 +294,7 @@ export function RentalProvider({ children }: { children: ReactNode }) {
       returnRental,
       addRepair,
       updateRepair,
+      deleteRepair,
       getAvailableItems,
       getUpcomingReturns,
     }}>
