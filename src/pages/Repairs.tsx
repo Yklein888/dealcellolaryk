@@ -27,7 +27,8 @@ import {
   CheckCircle,
   Package,
   Printer,
-  Download
+  Download,
+  Trash2
 } from 'lucide-react';
 import { Repair, repairStatusLabels } from '@/types/rental';
 import { useToast } from '@/hooks/use-toast';
@@ -43,7 +44,7 @@ const deviceTypes = [
 ];
 
 export default function Repairs() {
-  const { repairs, addRepair, updateRepair } = useRental();
+  const { repairs, addRepair, updateRepair, deleteRepair } = useRental();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -251,6 +252,16 @@ export default function Repairs() {
       title: 'סטטוס עודכן',
       description: `הסטטוס שונה ל-${repairStatusLabels[newStatus]}`,
     });
+  };
+
+  const handleDeleteRepair = (repairId: string, repairNumber: string) => {
+    if (confirm(`האם אתה בטוח שברצונך למחוק את תיקון #${repairNumber}?`)) {
+      deleteRepair(repairId);
+      toast({
+        title: 'תיקון נמחק',
+        description: `תיקון #${repairNumber} נמחק מהמערכת`,
+      });
+    }
   };
 
   const getStatusVariant = (status: Repair['status']) => {
@@ -468,6 +479,14 @@ export default function Repairs() {
                       נאסף
                     </Button>
                   )}
+                  <Button 
+                    variant="destructive" 
+                    size="sm"
+                    onClick={() => handleDeleteRepair(repair.id, repair.repairNumber)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    מחק
+                  </Button>
                 </div>
               </div>
             </div>

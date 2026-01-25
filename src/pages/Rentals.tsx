@@ -71,6 +71,10 @@ export default function Rentals() {
     hasIsraeliNumber: boolean;
   }>>([]);
 
+  // Item selection state
+  const [itemSearchTerm, setItemSearchTerm] = useState('');
+  const [itemCategoryFilter, setItemCategoryFilter] = useState<string>('all');
+
   const filteredRentals = rentals.filter(rental => {
     const matchesSearch = 
       rental.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -81,6 +85,14 @@ export default function Rentals() {
 
   const availableItems = getAvailableItems();
 
+  // Filter available items by search and category
+  const filteredAvailableItems = availableItems.filter(item => {
+    const matchesSearch = item.name.toLowerCase().includes(itemSearchTerm.toLowerCase()) ||
+      categoryLabels[item.category].includes(itemSearchTerm);
+    const matchesCategory = itemCategoryFilter === 'all' || item.category === itemCategoryFilter;
+    return matchesSearch && matchesCategory;
+  });
+
   const resetForm = () => {
     setFormData({
       customerId: '',
@@ -90,6 +102,8 @@ export default function Rentals() {
       notes: '',
     });
     setSelectedItems([]);
+    setItemSearchTerm('');
+    setItemCategoryFilter('all');
   };
 
   const handleAddItem = (inventoryItemId: string) => {
@@ -287,20 +301,69 @@ export default function Rentals() {
               </div>
 
               {/* Item Selection */}
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label>בחר פריטים להשכרה *</Label>
-                <Select onValueChange={handleAddItem}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="הוסף פריט" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableItems.map((item) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {categoryIcons[item.category]} {item.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                
+                {/* Category Filter */}
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Select value={itemCategoryFilter} onValueChange={setItemCategoryFilter}>
+                    <SelectTrigger className="w-full sm:w-48">
+                      <SelectValue placeholder="כל הקטגוריות" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">כל הקטגוריות</SelectItem>
+                      <SelectItem value="sim_american">🇺🇸 סים אמריקאי</SelectItem>
+                      <SelectItem value="sim_european">🇪🇺 סים אירופאי</SelectItem>
+                      <SelectItem value="device_simple">📱 מכשיר פשוט</SelectItem>
+                      <SelectItem value="device_smartphone">📲 סמארטפון</SelectItem>
+                      <SelectItem value="modem">📡 מודם</SelectItem>
+                      <SelectItem value="netstick">📶 נטסטיק</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  
+                  {/* Search Input */}
+                  <div className="relative flex-1">
+                    <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      value={itemSearchTerm}
+                      onChange={(e) => setItemSearchTerm(e.target.value)}
+                      placeholder="חפש מוצר..."
+                      className="pr-10"
+                    />
+                  </div>
+                </div>
+
+                {/* Items List */}
+                <div className="max-h-48 overflow-y-auto border rounded-lg p-2 space-y-1 bg-muted/30">
+                  {filteredAvailableItems.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-4 text-sm">
+                      {availableItems.length === 0 ? 'אין פריטים זמינים' : 'לא נמצאו פריטים'}
+                    </p>
+                  ) : (
+                    filteredAvailableItems.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => handleAddItem(item.id)}
+                        disabled={selectedItems.some(i => i.inventoryItemId === item.id)}
+                        className="w-full flex items-center justify-between p-2 rounded-md hover:bg-muted text-right transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">{categoryIcons[item.category]}</span>
+                          <div>
+                            <p className="font-medium text-foreground text-sm">{item.name}</p>
+                            <p className="text-xs text-muted-foreground">{categoryLabels[item.category]}</p>
+                          </div>
+                        </div>
+                        {selectedItems.some(i => i.inventoryItemId === item.id) ? (
+                          <span className="text-xs text-success">נבחר ✓</span>
+                        ) : (
+                          <Plus className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </button>
+                    ))
+                  )}
+                </div>
               </div>
 
               {/* Selected Items */}
