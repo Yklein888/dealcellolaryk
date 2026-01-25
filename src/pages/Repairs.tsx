@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useRental } from '@/hooks/useRental';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -26,11 +26,12 @@ import {
   Wrench,
   CheckCircle,
   Package,
-  Printer
+  Printer,
+  Download
 } from 'lucide-react';
 import { Repair, repairStatusLabels } from '@/types/rental';
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isToday } from 'date-fns';
 import { he } from 'date-fns/locale';
 
 const deviceTypes = [
@@ -61,10 +62,50 @@ export default function Repairs() {
     const matchesSearch = 
       repair.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       repair.customerPhone.includes(searchTerm) ||
-      repair.deviceType.toLowerCase().includes(searchTerm.toLowerCase());
+      repair.deviceType.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      repair.repairNumber.includes(searchTerm);
     const matchesStatus = filterStatus === 'all' || repair.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
+
+  // Get repairs marked as ready today
+  const todayReadyRepairs = useMemo(() => {
+    return repairs.filter(repair => 
+      repair.status === 'ready' && 
+      repair.completedDate && 
+      isToday(parseISO(repair.completedDate))
+    );
+  }, [repairs]);
+
+  const exportTodayReadyPhones = () => {
+    if (todayReadyRepairs.length === 0) {
+      toast({
+        title: 'אין תיקונים מוכנים היום',
+        description: 'לא נמצאו תיקונים שסומנו כמוכנים היום',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const phones = todayReadyRepairs
+      .map(r => `${r.customerName}: ${r.customerPhone}`)
+      .join('\n');
+    
+    const blob = new Blob([phones], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `ready-repairs-${format(new Date(), 'yyyy-MM-dd')}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: 'הקובץ הורד בהצלחה',
+      description: `${todayReadyRepairs.length} מספרי טלפון יוצאו`,
+    });
+  };
 
   const resetForm = () => {
     setFormData({
@@ -227,16 +268,25 @@ export default function Repairs() {
         title="מעבדת תיקונים" 
         description="ניהול מכשירים שנכנסו לתיקון"
       >
-        <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
-          setIsAddDialogOpen(open);
-          if (!open) resetForm();
-        }}>
-          <DialogTrigger asChild>
-            <Button variant="glow" size="lg">
-              <Plus className="h-5 w-5" />
-              הוסף תיקון
+        <div className="flex flex-col sm:flex-row gap-2">
+          {todayReadyRepairs.length > 0 && (
+            <Button variant="outline" onClick={exportTodayReadyPhones}>
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">ייצא טלפונים מוכנים היום</span>
+              <span className="sm:hidden">ייצא ({todayReadyRepairs.length})</span>
             </Button>
-          </DialogTrigger>
+          )}
+          <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
+            setIsAddDialogOpen(open);
+            if (!open) resetForm();
+          }}>
+            <DialogTrigger asChild>
+              <Button variant="glow" size="lg">
+                <Plus className="h-5 w-5" />
+                <span className="hidden sm:inline">הוסף תיקון</span>
+                <span className="sm:hidden">הוסף</span>
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>הוספת תיקון חדש</DialogTitle>
@@ -321,8 +371,9 @@ export default function Repairs() {
                 </Button>
               </div>
             </div>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        </div>
       </PageHeader>
 
       {/* Filters */}

@@ -18,7 +18,11 @@ const navItems = [
   { path: '/repairs', label: 'תיקונים', icon: Wrench },
 ];
 
-export function AppSidebar() {
+interface AppSidebarProps {
+  onNavigate?: () => void;
+}
+
+export function AppSidebar({ onNavigate }: AppSidebarProps) {
   const location = useLocation();
 
   return (
@@ -44,6 +48,7 @@ export function AppSidebar() {
             <Link
               key={item.path}
               to={item.path}
+              onClick={onNavigate}
               className={cn(
                 'flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200',
                 'hover:bg-sidebar-accent group',
