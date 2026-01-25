@@ -158,7 +158,7 @@ export default function Repairs() {
       <html dir="rtl" lang="he">
       <head>
         <meta charset="UTF-8">
-        <title>טופס תיקון #${repair.repairNumber}</title>
+        <title>טופס תיקון ${repair.repairNumber}</title>
         <style>
           body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 30px; direction: rtl; }
           .repair-number-huge { 
@@ -180,7 +180,7 @@ export default function Repairs() {
         </style>
       </head>
       <body>
-        <div class="repair-number-huge">#${repair.repairNumber}</div>
+        <div class="repair-number-huge">${repair.repairNumber}</div>
         <div class="title">טופס קבלת מכשיר לתיקון</div>
         
         <div class="field">
@@ -255,11 +255,11 @@ export default function Repairs() {
   };
 
   const handleDeleteRepair = (repairId: string, repairNumber: string) => {
-    if (confirm(`האם אתה בטוח שברצונך למחוק את תיקון #${repairNumber}?`)) {
+    if (confirm(`האם אתה בטוח שברצונך למחוק את תיקון ${repairNumber}?`)) {
       deleteRepair(repairId);
       toast({
         title: 'תיקון נמחק',
-        description: `תיקון #${repairNumber} נמחק מהמערכת`,
+        description: `תיקון ${repairNumber} נמחק מהמערכת`,
       });
     }
   };
@@ -430,7 +430,7 @@ export default function Repairs() {
                   {/* Prominent Repair Number Badge */}
                   <div className="flex flex-col items-center gap-1">
                     <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary text-primary-foreground font-bold text-xl shadow-lg">
-                      #{repair.repairNumber}
+                      {repair.repairNumber}
                     </div>
                   </div>
                   <div>
