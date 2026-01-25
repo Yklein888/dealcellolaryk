@@ -159,23 +159,28 @@ export default function Repairs() {
         <meta charset="UTF-8">
         <title>טופס תיקון #${repair.repairNumber}</title>
         <style>
-          body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 40px; direction: rtl; }
-          .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
-          .repair-number { font-size: 32px; font-weight: bold; color: #0d9488; margin-bottom: 10px; }
-          .title { font-size: 24px; color: #333; }
-          .field { margin-bottom: 15px; padding: 10px; background: #f5f5f5; border-radius: 8px; }
+          body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 30px; direction: rtl; }
+          .repair-number-huge { 
+            font-size: 72px; 
+            font-weight: bold; 
+            color: #0d9488; 
+            text-align: center; 
+            padding: 30px;
+            margin-bottom: 20px;
+            border: 4px solid #0d9488;
+            border-radius: 16px;
+            background: #f0fdfa;
+          }
+          .title { font-size: 20px; color: #333; text-align: center; margin-bottom: 25px; }
+          .field { margin-bottom: 12px; padding: 10px; background: #f5f5f5; border-radius: 8px; }
           .label { font-weight: bold; color: #555; margin-bottom: 5px; }
           .value { font-size: 16px; color: #333; }
-          .footer { margin-top: 40px; text-align: center; color: #888; font-size: 12px; }
-          .signature { margin-top: 60px; display: flex; justify-content: space-between; }
-          .signature-box { border-top: 1px solid #333; width: 200px; text-align: center; padding-top: 10px; }
+          .footer { margin-top: 30px; text-align: center; color: #888; font-size: 12px; }
         </style>
       </head>
       <body>
-        <div class="header">
-          <div class="repair-number">תיקון מספר: ${repair.repairNumber}</div>
-          <div class="title">טופס קבלת מכשיר לתיקון</div>
-        </div>
+        <div class="repair-number-huge">#${repair.repairNumber}</div>
+        <div class="title">טופס קבלת מכשיר לתיקון</div>
         
         <div class="field">
           <div class="label">סוג המכשיר:</div>
@@ -207,11 +212,6 @@ export default function Repairs() {
         <div class="field">
           <div class="label">תאריך קבלה:</div>
           <div class="value">${new Date(repair.receivedDate).toLocaleDateString('he-IL')}</div>
-        </div>
-        
-        <div class="signature">
-          <div class="signature-box">חתימת הלקוח</div>
-          <div class="signature-box">חתימת המעבדה</div>
         </div>
         
         <div class="footer">מסמך זה הופק אוטומטית ממערכת ניהול ההשכרות</div>
