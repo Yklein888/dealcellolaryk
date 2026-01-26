@@ -1,5 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
+import { Button } from '@/components/ui/button';
 import { 
   LayoutDashboard, 
   Users, 
@@ -7,7 +9,8 @@ import {
   ShoppingCart, 
   Wrench,
   ChevronRight,
-  Smartphone
+  Smartphone,
+  LogOut
 } from 'lucide-react';
 
 const navItems = [
@@ -24,6 +27,7 @@ interface AppSidebarProps {
 
 export function AppSidebar({ onNavigate }: AppSidebarProps) {
   const location = useLocation();
+  const { user, signOut } = useAuth();
 
   return (
     <aside className="fixed right-0 top-0 z-40 h-screen w-64 bg-sidebar border-l border-sidebar-border">
@@ -73,12 +77,20 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
         })}
       </nav>
 
-      {/* Footer */}
+      {/* User & Logout */}
       <div className="absolute bottom-0 right-0 left-0 p-4 border-t border-sidebar-border">
-        <div className="rounded-lg bg-sidebar-accent p-4">
-          <p className="text-sm font-medium text-foreground">גרסה 1.0</p>
-          <p className="text-xs text-muted-foreground">כל הזכויות שמורות</p>
+        <div className="rounded-lg bg-sidebar-accent p-3 mb-2">
+          <p className="text-xs text-muted-foreground">מחובר כ:</p>
+          <p className="text-sm font-medium text-foreground truncate">{user?.email}</p>
         </div>
+        <Button
+          variant="outline"
+          className="w-full justify-start gap-2 text-muted-foreground hover:text-destructive hover:border-destructive"
+          onClick={signOut}
+        >
+          <LogOut className="h-4 w-4" />
+          התנתק
+        </Button>
       </div>
     </aside>
   );
