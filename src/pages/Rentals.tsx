@@ -29,8 +29,11 @@ import {
   User,
   Package,
   PackagePlus,
-  Phone
+  Phone,
+  CreditCard,
+  Loader2
 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   Rental, 
   RentalItem, 
@@ -83,6 +86,7 @@ export default function Rentals() {
   const [itemSearchTerm, setItemSearchTerm] = useState('');
   const [itemCategoryFilter, setItemCategoryFilter] = useState<string>('all');
   const [callingRentalId, setCallingRentalId] = useState<string | null>(null);
+  const [payingRentalId, setPayingRentalId] = useState<string | null>(null);
 
   // Notify customer about rental return reminder
   const notifyRentalCustomer = async (rental: Rental) => {
@@ -138,6 +142,38 @@ export default function Rentals() {
       });
     } finally {
       setCallingRentalId(null);
+    }
+  };
+
+  // Handle payment via Pelecard
+  const handlePayment = async (rental: Rental) => {
+    setPayingRentalId(rental.id);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('pelecard-pay', {
+        body: { 
+          amount: rental.totalPrice,
+          customerName: rental.customerName,
+          description: `השכרה - ${rental.items.map(i => i.itemName).join(', ')}`
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.url) {
+        window.location.href = data.url;
+      } else if (data?.error) {
+        throw new Error(data.error);
+      }
+    } catch (error) {
+      console.error('Payment error:', error);
+      toast({
+        title: 'שגיאה בתשלום',
+        description: error instanceof Error ? error.message : 'לא ניתן לפתוח דף תשלום',
+        variant: 'destructive',
+      });
+    } finally {
+      setPayingRentalId(null);
     }
   };
 
@@ -762,6 +798,19 @@ export default function Rentals() {
 
                   {rental.status === 'active' && (
                     <div className="flex gap-2">
+                      <Button 
+                        variant="default"
+                        size="sm"
+                        onClick={() => handlePayment(rental)}
+                        disabled={payingRentalId === rental.id}
+                      >
+                        {payingRentalId === rental.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <CreditCard className="h-4 w-4" />
+                        )}
+                        {payingRentalId === rental.id ? 'מעבד...' : 'תשלום'}
+                      </Button>
                       <Button 
                         variant="outline"
                         size="sm"
