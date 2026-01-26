@@ -30,7 +30,8 @@ import {
   Printer,
   Download,
   Trash2,
-  Shield
+  Shield,
+  Phone
 } from 'lucide-react';
 import { Repair, repairStatusLabels } from '@/types/rental';
 import { useToast } from '@/hooks/use-toast';
@@ -51,6 +52,59 @@ export default function Repairs() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [callingRepairId, setCallingRepairId] = useState<string | null>(null);
+
+  const notifyCustomer = async (repair: Repair) => {
+    if (!repair.customerPhone) {
+      toast({
+        title: 'שגיאה',
+        description: 'אין מספר טלפון ללקוח זה',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setCallingRepairId(repair.id);
+
+    try {
+      const message = `שלום ${repair.customerName}, המכשיר שלך מספר ${repair.repairNumber} מוכן לאיסוף. תודה רבה.`;
+      
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/yemot-call`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            phone: repair.customerPhone,
+            message,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast({
+          title: 'ההודעה נשלחה',
+          description: `שיחה יוצאת ל-${repair.customerPhone}`,
+        });
+      } else {
+        throw new Error(data.error || 'שגיאה בשליחת ההודעה');
+      }
+    } catch (error) {
+      console.error('Error calling customer:', error);
+      toast({
+        title: 'שגיאה',
+        description: 'לא ניתן לשלוח הודעה ללקוח',
+        variant: 'destructive',
+      });
+    } finally {
+      setCallingRepairId(null);
+    }
+  };
 
   const [formData, setFormData] = useState({
     repairNumber: '',
@@ -570,14 +624,25 @@ export default function Repairs() {
                     </Button>
                   )}
                   {repair.status === 'ready' && (
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleStatusChange(repair.id, 'collected')}
-                    >
-                      <Package className="h-4 w-4" />
-                      נאסף
-                    </Button>
+                    <>
+                      <Button 
+                        variant="default" 
+                        size="sm"
+                        onClick={() => notifyCustomer(repair)}
+                        disabled={callingRepairId === repair.id}
+                      >
+                        <Phone className="h-4 w-4" />
+                        {callingRepairId === repair.id ? 'מתקשר...' : 'הודע ללקוח'}
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleStatusChange(repair.id, 'collected')}
+                      >
+                        <Package className="h-4 w-4" />
+                        נאסף
+                      </Button>
+                    </>
                   )}
                   <Button 
                     variant="destructive" 
