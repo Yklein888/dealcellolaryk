@@ -89,36 +89,18 @@ export function ImportDialog({ isOpen, onClose }: ImportDialogProps) {
 
     try {
       const arrayBuffer = await file.arrayBuffer();
-      // Read workbook with options to preserve text as-is
-      const workbook = XLSX.read(arrayBuffer, { 
+      const workbook = XLSX.read(arrayBuffer, {
         type: 'array',
-        cellDates: true
+        cellDates: true,
       });
+
       const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-      
-      // Process cells to convert phone numbers from formulas/numbers to text
-      const range = XLSX.utils.decode_range(firstSheet['!ref'] || 'A1');
-      for (let R = range.s.r; R <= range.e.r; ++R) {
-        for (let C = range.s.c; C <= range.e.c; ++C) {
-          const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
-          const cell = firstSheet[cellAddress];
-          if (cell) {
-            // If cell has a formatted value, use it; otherwise convert value to string
-            if (cell.w) {
-              cell.v = cell.w; // Use formatted value
-            } else if (cell.v !== undefined && cell.v !== null) {
-              cell.v = String(cell.v); // Convert to string
-            }
-            cell.t = 's'; // Force text type
-          }
-        }
-      }
-      
-      // Convert to JSON with all values as strings
-      const jsonData = XLSX.utils.sheet_to_json<Record<string, string>>(firstSheet, { 
+
+      // Read raw values so we can normalize phone-like fields reliably
+      const jsonData = XLSX.utils.sheet_to_json<unknown[]>(firstSheet, {
         header: 1,
-        raw: false,
-        defval: ''
+        raw: true,
+        defval: '',
       });
 
       if (jsonData.length < 2) {
@@ -130,16 +112,63 @@ export function ImportDialog({ isOpen, onClose }: ImportDialogProps) {
         return;
       }
 
+      const expandScientific = (value: string): string => {
+        const trimmed = value.trim();
+        if (!/[eE]/.test(trimmed)) return trimmed;
+
+        // Example: 9.72521E+11
+        const match = trimmed.match(/^([+-]?\d*\.?\d+)[eE]([+-]?\d+)$/);
+        if (!match) return trimmed;
+
+        const coeff = match[1];
+        const exp = parseInt(match[2], 10);
+
+        const dotIndex = coeff.indexOf('.');
+        const digits = coeff.replace('.', '').replace(/^\+/, '');
+        const decimals = dotIndex >= 0 ? (coeff.length - dotIndex - 1) : 0;
+        const shift = exp - decimals;
+
+        if (shift >= 0) {
+          return digits + '0'.repeat(shift);
+        }
+
+        // If somehow negative shift occurs, keep a decimal representation (rare for phone fields)
+        const pos = digits.length + shift;
+        if (pos <= 0) return '0.' + '0'.repeat(Math.abs(pos)) + digits;
+        return digits.slice(0, pos) + '.' + digits.slice(pos);
+      };
+
+      const stringifyCell = (v: unknown): string => {
+        if (v === null || v === undefined) return '';
+        if (v instanceof Date) {
+          const y = v.getFullYear();
+          const m = String(v.getMonth() + 1).padStart(2, '0');
+          const d = String(v.getDate()).padStart(2, '0');
+          return `${y}-${m}-${d}`;
+        }
+        if (typeof v === 'number') {
+          // Avoid scientific notation for large numbers
+          const asString = v.toString();
+          const normalized = /[eE]/.test(asString) ? expandScientific(asString) : asString;
+          return normalized.replace(/\.0$/, '');
+        }
+        const s = String(v).trim().replace(/^'+/, '');
+        return /[eE]/.test(s) ? expandScientific(s) : s;
+      };
+
       // First row is headers
-      const headerRow = jsonData[0] as unknown as string[];
-      const dataRows = jsonData.slice(1).map(row => {
-        const rowArray = row as unknown as string[];
-        const obj: Record<string, string> = {};
-        headerRow.forEach((header, index) => {
-          obj[header] = rowArray[index] || '';
-        });
-        return obj;
-      }).filter(row => Object.values(row).some(v => v)); // Filter empty rows
+      const headerRow = (jsonData[0] as unknown[])?.map(h => stringifyCell(h)) as string[];
+      const dataRows = jsonData
+        .slice(1)
+        .map(row => {
+          const rowArray = row as unknown[];
+          const obj: Record<string, string> = {};
+          headerRow.forEach((header, index) => {
+            obj[header] = stringifyCell(rowArray[index]);
+          });
+          return obj;
+        })
+        .filter(row => Object.values(row).some(v => String(v).trim()));
 
       setHeaders(headerRow);
       setData(dataRows);
