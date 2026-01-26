@@ -35,31 +35,24 @@ serve(async (req) => {
       );
     }
 
-    // Get the base URL from environment or use default
-    const baseUrl = Deno.env.get('SUPABASE_URL')?.replace('.supabase.co', '.lovable.app') || 
-                    'https://dealcellolaryk.lovable.app';
+    // Get the published URL for redirects
+    const baseUrl = 'https://dealcellolaryk.lovable.app';
 
     console.log('Initiating Pelecard payment for:', customerName, 'Amount:', amount);
 
-    // Send request to Pelecard API
-    const response = await fetch('https://gateway20.pelecard.biz/PaymentGW/init', {
+    // Send request to Pelecard API - using the correct endpoint from documentation
+    const response = await fetch('https://p1.pelecard.biz/ServicesAPI/PaymentPage', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         terminal: terminal,
         user: user,
         password: password,
-        GoodURL: `${baseUrl}/payment-success`,
-        ErrorURL: `${baseUrl}/payment-error`,
-        Total: Math.round(amount * 100), // Amount in agorot
-        Currency: 1, // 1 = ILS
-        Language: 'HE',
-        CustomerName: customerName || '',
-        FreeTotal: false,
-        LogoUrl: '',
-        ShowConfirmationCheckbox: false,
-        TextOnConfirmationBox: '',
-        HiddenPelecardLogo: false,
+        amount: Math.round(amount * 100), // Amount in agorot
+        currency: "1", // 1 = ILS
+        good_url: `${baseUrl}/payment-success`,
+        error_url: `${baseUrl}/payment-error`,
+        description: description || `תשלום עבור ${customerName}`,
       }),
     });
 
