@@ -40,8 +40,8 @@ serve(async (req) => {
 
     console.log('Initiating Pelecard payment for:', customerName, 'Amount:', amount);
 
-    // Send request to Pelecard API - using the correct endpoint from documentation
-    const response = await fetch('https://p1.pelecard.biz/ServicesAPI/PaymentPage', {
+    // Send request to Pelecard API - using gateway subdomain for stable DNS resolution
+    const response = await fetch('https://gateway.pelecard.biz/ServicesAPI/PaymentPage', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
