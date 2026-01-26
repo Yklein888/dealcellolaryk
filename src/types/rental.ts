@@ -7,6 +7,11 @@ export type ItemCategory =
   | 'modem'
   | 'netstick';
 
+// Bundle types
+export type BundleType = 
+  | 'european_sim_simple'
+  | 'european_sim_smartphone';
+
 export interface InventoryItem {
   id: string;
   category: ItemCategory;
@@ -35,6 +40,7 @@ export interface RentalItem {
   itemName: string;
   pricePerDay?: number;
   hasIsraeliNumber?: boolean;
+  isGeneric?: boolean; // If true, not linked to specific inventory item
 }
 
 export interface Rental {
@@ -92,6 +98,16 @@ export const categoryIcons: Record<ItemCategory, string> = {
   device_smartphone: '📲',
   modem: '📡',
   netstick: '📶',
+};
+
+export const bundleLabels: Record<BundleType, string> = {
+  european_sim_simple: 'סים אירופאי + מכשיר פשוט',
+  european_sim_smartphone: 'סים אירופאי + סמארטפון',
+};
+
+export const bundleIcons: Record<BundleType, string> = {
+  european_sim_simple: '🇪🇺📱',
+  european_sim_smartphone: '🇪🇺📲',
 };
 
 export const repairStatusLabels: Record<Repair['status'], string> = {

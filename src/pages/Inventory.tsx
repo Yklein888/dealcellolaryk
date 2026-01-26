@@ -297,69 +297,55 @@ export default function Inventory() {
 
       {/* Inventory Grid */}
       {filteredInventory.length === 0 ? (
-        <div className="stat-card text-center py-12">
-          <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <p className="text-lg font-medium text-foreground">אין פריטים במלאי</p>
-          <p className="text-muted-foreground">הוסף פריטים חדשים כדי להתחיל</p>
+        <div className="stat-card text-center py-8">
+          <Package className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+          <p className="text-base font-medium text-foreground">אין פריטים במלאי</p>
+          <p className="text-sm text-muted-foreground">הוסף פריטים חדשים כדי להתחיל</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="space-y-2">
           {filteredInventory.map((item) => (
             <div 
               key={item.id}
-              className="stat-card hover:border-primary/30 transition-all duration-200"
+              className="flex items-center justify-between p-3 rounded-lg border border-border bg-card hover:border-primary/30 transition-all duration-200"
             >
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">{categoryIcons[item.category]}</span>
-                  <div>
-                    <p className="font-semibold text-foreground">{item.name}</p>
-                    <p className="text-sm text-muted-foreground">{categoryLabels[item.category]}</p>
+              <div className="flex items-center gap-3 flex-1">
+                <span className="text-xl">{categoryIcons[item.category]}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-medium text-foreground text-sm">{item.name}</p>
+                    <span className="text-xs text-muted-foreground">({categoryLabels[item.category]})</span>
                   </div>
+                  {isSim(item.category) && (
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                      {item.localNumber && <span>מקומי: {item.localNumber}</span>}
+                      {item.israeliNumber && <span>ישראלי: {item.israeliNumber}</span>}
+                      {item.expiryDate && <span>תוקף: {item.expiryDate}</span>}
+                    </div>
+                  )}
                 </div>
+              </div>
+              
+              <div className="flex items-center gap-2">
                 <StatusBadge 
                   status={statusLabels[item.status]} 
                   variant={getStatusVariant(item.status)} 
                 />
-              </div>
-
-              {isSim(item.category) && (
-                <div className="space-y-1 mb-4 text-sm">
-                  {item.localNumber && (
-                    <p className="text-muted-foreground">
-                      מספר מקומי: <span className="text-foreground">{item.localNumber}</span>
-                    </p>
-                  )}
-                  {item.israeliNumber && (
-                    <p className="text-muted-foreground">
-                      מספר ישראלי: <span className="text-foreground">{item.israeliNumber}</span>
-                    </p>
-                  )}
-                  {item.expiryDate && (
-                    <p className="text-muted-foreground">
-                      תוקף: <span className="text-foreground">{item.expiryDate}</span>
-                    </p>
-                  )}
-                </div>
-              )}
-
-              <div className="flex gap-2 pt-3 border-t border-border">
                 <Button 
                   variant="ghost" 
-                  size="sm"
+                  size="icon"
+                  className="h-8 w-8"
                   onClick={() => handleEdit(item)}
                 >
                   <Edit2 className="h-4 w-4" />
-                  עריכה
                 </Button>
                 <Button 
                   variant="ghost" 
-                  size="sm"
-                  className="text-destructive hover:text-destructive"
+                  size="icon"
+                  className="h-8 w-8 text-destructive hover:text-destructive"
                   onClick={() => handleDelete(item.id)}
                 >
                   <Trash2 className="h-4 w-4" />
-                  מחיקה
                 </Button>
               </div>
             </div>
