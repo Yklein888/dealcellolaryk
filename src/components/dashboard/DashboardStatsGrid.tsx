@@ -7,20 +7,33 @@ import {
   Package,
 } from 'lucide-react';
 import { DashboardStats } from '@/types/rental';
-import { InventoryItem, categoryLabels } from '@/types/rental';
+import { InventoryItem } from '@/types/rental';
+import { parseISO, isAfter } from 'date-fns';
 
 interface DashboardStatsGridProps {
   stats: DashboardStats;
   inventory: InventoryItem[];
 }
 
+// Helper function to check if item is truly available (status + valid expiry for SIMs)
+const isItemTrulyAvailable = (item: InventoryItem): boolean => {
+  if (item.status !== 'available') return false;
+  
+  // For SIMs, check expiry date
+  const isSim = item.category === 'sim_american' || item.category === 'sim_european';
+  if (isSim && item.expiryDate) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const expiryDate = parseISO(item.expiryDate);
+    return isAfter(expiryDate, today) || expiryDate.getTime() === today.getTime();
+  }
+  
+  return true;
+};
+
 export function DashboardStatsGrid({ stats, inventory }: DashboardStatsGridProps) {
-  // Calculate available items by category
-  const availableItems = inventory.filter(i => i.status === 'available');
-  const availableByCategory = availableItems.reduce((acc, item) => {
-    acc[item.category] = (acc[item.category] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  // Calculate truly available items (status + valid expiry for SIMs)
+  const availableItems = inventory.filter(isItemTrulyAvailable);
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">

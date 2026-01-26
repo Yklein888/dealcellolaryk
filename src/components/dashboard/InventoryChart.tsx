@@ -1,6 +1,7 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { InventoryItem, categoryLabels, ItemCategory } from '@/types/rental';
 import { Package } from 'lucide-react';
+import { parseISO, isAfter } from 'date-fns';
 
 interface InventoryChartProps {
   inventory: InventoryItem[];
@@ -15,8 +16,25 @@ const COLORS = [
   'hsl(340, 70%, 50%)', // pink
 ];
 
+// Helper function to check if item is truly available (status + valid expiry for SIMs)
+const isItemTrulyAvailable = (item: InventoryItem): boolean => {
+  if (item.status !== 'available') return false;
+  
+  // For SIMs, check expiry date
+  const isSim = item.category === 'sim_american' || item.category === 'sim_european';
+  if (isSim && item.expiryDate) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const expiryDate = parseISO(item.expiryDate);
+    return isAfter(expiryDate, today) || expiryDate.getTime() === today.getTime();
+  }
+  
+  return true;
+};
+
 export function InventoryChart({ inventory }: InventoryChartProps) {
-  const availableItems = inventory.filter(i => i.status === 'available');
+  // Filter only truly available items (status + valid expiry for SIMs)
+  const availableItems = inventory.filter(isItemTrulyAvailable);
   
   // Group by category
   const categoryData = availableItems.reduce((acc, item) => {

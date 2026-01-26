@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useRental } from '@/hooks/useRental';
 import { PageHeader } from '@/components/PageHeader';
-import { StatusBadge } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,8 +21,6 @@ import {
 import { 
   Plus, 
   Search, 
-  Edit2, 
-  Trash2,
   Package,
   Upload
 } from 'lucide-react';
@@ -35,6 +32,7 @@ import {
 } from '@/types/rental';
 import { useToast } from '@/hooks/use-toast';
 import { ImportDialog } from '@/components/inventory/ImportDialog';
+import { InventoryCategorySection } from '@/components/inventory/InventoryCategorySection';
 
 export default function Inventory() {
   const { inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem } = useRental();
@@ -55,6 +53,7 @@ export default function Inventory() {
     notes: '',
   });
 
+  // Filter inventory
   const filteredInventory = inventory.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.localNumber?.includes(searchTerm) ||
@@ -62,6 +61,25 @@ export default function Inventory() {
     const matchesCategory = filterCategory === 'all' || item.category === filterCategory;
     return matchesSearch && matchesCategory;
   });
+
+  // Group filtered inventory by category
+  const inventoryByCategory = filteredInventory.reduce((acc, item) => {
+    if (!acc[item.category]) {
+      acc[item.category] = [];
+    }
+    acc[item.category].push(item);
+    return acc;
+  }, {} as Record<ItemCategory, InventoryItem[]>);
+
+  // Get categories in order
+  const categoryOrder: ItemCategory[] = [
+    'sim_european',
+    'sim_american', 
+    'device_simple',
+    'device_smartphone',
+    'modem',
+    'netstick'
+  ];
 
   const resetForm = () => {
     setFormData({
@@ -124,21 +142,6 @@ export default function Inventory() {
       title: 'פריט נמחק',
       description: 'הפריט הוסר מהמלאי',
     });
-  };
-
-  const getStatusVariant = (status: InventoryItem['status']) => {
-    switch (status) {
-      case 'available': return 'success';
-      case 'rented': return 'info';
-      case 'maintenance': return 'warning';
-      default: return 'default';
-    }
-  };
-
-  const statusLabels: Record<InventoryItem['status'], string> = {
-    available: 'זמין',
-    rented: 'מושכר',
-    maintenance: 'בתחזוקה',
   };
 
   const isSim = (category: ItemCategory) => 
@@ -309,7 +312,7 @@ export default function Inventory() {
         </Select>
       </div>
 
-      {/* Inventory Grid */}
+      {/* Inventory by Category */}
       {filteredInventory.length === 0 ? (
         <div className="stat-card text-center py-8">
           <Package className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
@@ -317,54 +320,23 @@ export default function Inventory() {
           <p className="text-sm text-muted-foreground">הוסף פריטים חדשים כדי להתחיל</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {filteredInventory.map((item, index) => (
-            <div 
-              key={item.id}
-              className="flex items-center justify-between p-3 rounded-lg border border-border bg-card hover:border-primary/30 transition-all duration-200 animate-slide-up"
-              style={{ animationDelay: `${index * 50}ms` }}
-            >
-              <div className="flex items-center gap-3 flex-1">
-                <span className="text-xl">{categoryIcons[item.category]}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-medium text-foreground text-sm">{item.name}</p>
-                    <span className="text-xs text-muted-foreground">({categoryLabels[item.category]})</span>
-                  </div>
-                  {isSim(item.category) && (
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
-                      {item.localNumber && <span>מקומי: {item.localNumber}</span>}
-                      {item.israeliNumber && <span>ישראלי: {item.israeliNumber}</span>}
-                      {item.expiryDate && <span>תוקף: {item.expiryDate}</span>}
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <StatusBadge 
-                  status={statusLabels[item.status]} 
-                  variant={getStatusVariant(item.status)} 
+        <div className="space-y-4">
+          {categoryOrder
+            .filter(cat => inventoryByCategory[cat]?.length > 0)
+            .map((category, index) => (
+              <div 
+                key={category}
+                className="animate-slide-up"
+                style={{ animationDelay: `${index * 100}ms` }}
+              >
+                <InventoryCategorySection
+                  category={category}
+                  items={inventoryByCategory[category]}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
                 />
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => handleEdit(item)}
-                >
-                  <Edit2 className="h-4 w-4" />
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  className="h-8 w-8 text-destructive hover:text-destructive"
-                  onClick={() => handleDelete(item.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
               </div>
-            </div>
-          ))}
+            ))}
         </div>
       )}
     </div>

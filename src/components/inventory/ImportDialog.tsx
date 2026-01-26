@@ -89,20 +89,35 @@ export function ImportDialog({ isOpen, onClose }: ImportDialogProps) {
 
     try {
       const arrayBuffer = await file.arrayBuffer();
-      // Read with cellText to preserve phone numbers as text
+      // Read workbook with options to preserve text as-is
       const workbook = XLSX.read(arrayBuffer, { 
         type: 'array',
-        raw: true,
-        cellText: true,
         cellDates: true
       });
       const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
       
-      // Use rawNumbers: false to prevent formula interpretation
+      // Process cells to convert phone numbers from formulas/numbers to text
+      const range = XLSX.utils.decode_range(firstSheet['!ref'] || 'A1');
+      for (let R = range.s.r; R <= range.e.r; ++R) {
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+          const cell = firstSheet[cellAddress];
+          if (cell) {
+            // If cell has a formatted value, use it; otherwise convert value to string
+            if (cell.w) {
+              cell.v = cell.w; // Use formatted value
+            } else if (cell.v !== undefined && cell.v !== null) {
+              cell.v = String(cell.v); // Convert to string
+            }
+            cell.t = 's'; // Force text type
+          }
+        }
+      }
+      
+      // Convert to JSON with all values as strings
       const jsonData = XLSX.utils.sheet_to_json<Record<string, string>>(firstSheet, { 
         header: 1,
         raw: false,
-        rawNumbers: false,
         defval: ''
       });
 
