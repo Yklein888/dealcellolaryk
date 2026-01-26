@@ -34,7 +34,8 @@ import {
   CreditCard,
   Loader2,
   Trash2,
-  UserPlus
+  UserPlus,
+  Pencil
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -72,6 +73,15 @@ export default function Rentals() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [isQuickAddCustomerOpen, setIsQuickAddCustomerOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingRental, setEditingRental] = useState<Rental | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    startDate: '',
+    endDate: '',
+    deposit: '',
+    notes: '',
+    status: 'active' as Rental['status'],
+  });
 
   const [formData, setFormData] = useState({
     customerId: '',
@@ -447,6 +457,56 @@ export default function Rentals() {
       toast({
         title: 'השכרה נמחקה',
         description: 'ההשכרה נמחקה מהמערכת',
+      });
+    }
+  };
+
+  // Open edit dialog
+  const openEditDialog = (rental: Rental) => {
+    setEditingRental(rental);
+    setEditFormData({
+      startDate: rental.startDate,
+      endDate: rental.endDate,
+      deposit: rental.deposit?.toString() || '',
+      notes: rental.notes || '',
+      status: rental.status,
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  // Handle edit rental
+  const handleEditRental = async () => {
+    if (!editingRental) return;
+
+    try {
+      const { error } = await supabase
+        .from('rentals')
+        .update({
+          start_date: editFormData.startDate,
+          end_date: editFormData.endDate,
+          deposit: editFormData.deposit ? parseFloat(editFormData.deposit) : null,
+          notes: editFormData.notes || null,
+          status: editFormData.status,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', editingRental.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'השכרה עודכנה',
+        description: 'פרטי ההשכרה עודכנו בהצלחה',
+      });
+      setIsEditDialogOpen(false);
+      setEditingRental(null);
+      // Refresh data
+      window.location.reload();
+    } catch (error) {
+      console.error('Error updating rental:', error);
+      toast({
+        title: 'שגיאה',
+        description: 'לא ניתן לעדכן את ההשכרה',
+        variant: 'destructive',
       });
     }
   };
@@ -861,98 +921,110 @@ export default function Rentals() {
           <p className="text-muted-foreground">צור השכרה חדשה כדי להתחיל</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredRentals.map((rental) => (
             <div 
               key={rental.id}
-              className="stat-card hover:border-primary/30 transition-all duration-200 p-4 flex flex-col aspect-square"
+              className={`stat-card hover:border-primary/30 transition-all duration-200 p-5 flex flex-col min-h-[280px] border-r-4 ${
+                rental.status === 'active' ? 'border-r-blue-500' :
+                rental.status === 'overdue' ? 'border-r-red-500' :
+                'border-r-green-500'
+              }`}
             >
-              {/* Header - Status and Delete */}
-              <div className="flex items-center justify-between mb-3">
+              {/* Header - Status, Edit and Delete */}
+              <div className="flex items-center justify-between mb-4">
                 <StatusBadge 
                   status={rentalStatusLabels[rental.status]} 
                   variant={getStatusVariant(rental.status)} 
                 />
-                {rental.status === 'returned' && (
+                <div className="flex gap-1">
                   <Button 
                     variant="ghost"
                     size="icon"
-                    onClick={() => handleDeleteRental(rental.id, rental.customerName)}
-                    className="h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => openEditDialog(rental)}
+                    className="h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/10"
                   >
-                    <Trash2 className="h-3 w-3" />
+                    <Pencil className="h-3.5 w-3.5" />
                   </Button>
-                )}
+                  {rental.status === 'returned' && (
+                    <Button 
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDeleteRental(rental.id, rental.customerName)}
+                      className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
               </div>
 
               {/* Customer */}
-              <div className="flex items-center gap-2 mb-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 shrink-0">
-                  <User className="h-4 w-4 text-primary" />
+              <div className="flex items-center gap-3 mb-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20 shrink-0">
+                  <User className="h-5 w-5 text-primary" />
                 </div>
-                <p className="font-semibold text-sm text-foreground truncate flex-1">{rental.customerName}</p>
+                <p className="font-bold text-base text-foreground truncate flex-1">{rental.customerName}</p>
               </div>
 
               {/* Dates */}
-              <div className="flex items-center gap-1 text-xs text-muted-foreground mb-2">
-                <Calendar className="h-3 w-3" />
-                <span>{format(parseISO(rental.startDate), 'dd/MM', { locale: he })} - {format(parseISO(rental.endDate), 'dd/MM', { locale: he })}</span>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
+                <Calendar className="h-4 w-4" />
+                <span>{format(parseISO(rental.startDate), 'dd/MM/yyyy', { locale: he })} - {format(parseISO(rental.endDate), 'dd/MM/yyyy', { locale: he })}</span>
               </div>
 
               {/* Items */}
-              <div className="flex flex-wrap gap-1 mb-3 flex-1">
-                {rental.items.slice(0, 3).map((item, idx) => (
+              <div className="flex flex-wrap gap-2 mb-4 flex-1">
+                {rental.items.map((item, idx) => (
                   <span 
                     key={idx}
-                    className="inline-flex items-center justify-center w-6 h-6 rounded bg-muted text-sm"
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-muted text-sm"
+                    title={item.itemName}
                   >
                     {categoryIcons[item.itemCategory]}
+                    <span className="text-xs text-muted-foreground truncate max-w-[80px]">{item.itemName}</span>
                   </span>
                 ))}
-                {rental.items.length > 3 && (
-                  <span className="inline-flex items-center justify-center w-6 h-6 rounded bg-muted text-xs text-muted-foreground">
-                    +{rental.items.length - 3}
-                  </span>
-                )}
               </div>
 
               {/* Price */}
-              <div className="text-center mb-3">
-                <p className="text-lg font-bold text-primary">
+              <div className="text-center mb-4 py-2 rounded-lg bg-primary/5">
+                <p className="text-xl font-bold text-primary">
                   {formatPrice(rental.totalPrice, rental.currency)}
                 </p>
               </div>
 
-              {/* Actions */}
+              {/* Actions - Always visible for active/overdue */}
               {(rental.status === 'active' || rental.status === 'overdue') && (
-                <div className="flex justify-center gap-1 mt-auto">
+                <div className="flex justify-center gap-2 mt-auto pt-3 border-t border-border">
                   <Button 
                     variant="default"
-                    size="icon"
+                    size="sm"
                     onClick={() => openPaymentDialog(rental)}
                     disabled={payingRentalId === rental.id}
-                    className="h-8 w-8"
+                    className="flex-1"
                   >
                     {payingRentalId === rental.id ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <CreditCard className="h-4 w-4" />
+                      <>
+                        <CreditCard className="h-4 w-4 ml-1" />
+                        תשלום
+                      </>
                     )}
                   </Button>
                   <Button 
                     variant="outline"
-                    size="icon"
+                    size="sm"
                     onClick={() => notifyRentalCustomer(rental)}
                     disabled={callingRentalId === rental.id}
-                    className="h-8 w-8"
                   >
                     <Phone className="h-4 w-4" />
                   </Button>
                   <Button 
                     variant="outline"
-                    size="icon"
+                    size="sm"
                     onClick={() => handleReturn(rental.id)}
-                    className="h-8 w-8"
                   >
                     <RotateCcw className="h-4 w-4" />
                   </Button>
@@ -962,6 +1034,82 @@ export default function Rentals() {
           ))}
         </div>
       )}
+
+      {/* Edit Rental Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>עריכת השכרה</DialogTitle>
+            <DialogDescription>
+              {editingRental && `עריכת השכרה של ${editingRental.customerName}`}
+            </DialogDescription>
+          </DialogHeader>
+          {editingRental && (
+            <div className="space-y-4 mt-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>תאריך התחלה</Label>
+                  <Input
+                    type="date"
+                    value={editFormData.startDate}
+                    onChange={(e) => setEditFormData({ ...editFormData, startDate: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>תאריך סיום</Label>
+                  <Input
+                    type="date"
+                    value={editFormData.endDate}
+                    onChange={(e) => setEditFormData({ ...editFormData, endDate: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>סטטוס</Label>
+                <Select value={editFormData.status} onValueChange={(value: Rental['status']) => setEditFormData({ ...editFormData, status: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">פעיל</SelectItem>
+                    <SelectItem value="overdue">באיחור</SelectItem>
+                    <SelectItem value="returned">הוחזר</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>פיקדון</Label>
+                <Input
+                  type="number"
+                  value={editFormData.deposit}
+                  onChange={(e) => setEditFormData({ ...editFormData, deposit: e.target.value })}
+                  placeholder="סכום הפיקדון"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>הערות</Label>
+                <Input
+                  value={editFormData.notes}
+                  onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
+                  placeholder="הערות נוספות"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <Button onClick={handleEditRental} className="flex-1">
+                  שמור שינויים
+                </Button>
+                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                  ביטול
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Payment Dialog */}
       <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
