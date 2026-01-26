@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRental } from '@/hooks/useRental';
 import { PageHeader } from '@/components/PageHeader';
 import { StatCard } from '@/components/StatCard';
@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { GlobalSearch } from '@/components/GlobalSearch';
 import { QuickActions } from '@/components/QuickActions';
 import { PriceCalculator } from '@/components/PriceCalculator';
+import { NotificationSettings } from '@/components/NotificationSettings';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { 
   ShoppingCart, 
   Users, 
@@ -22,8 +24,9 @@ import {
   Sparkles,
   TrendingUp,
   Activity,
+  Bell,
 } from 'lucide-react';
-import { format, parseISO, isBefore } from 'date-fns';
+import { format, parseISO, isBefore, differenceInDays } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { Link } from 'react-router-dom';
 import { repairStatusLabels } from '@/types/rental';
@@ -33,6 +36,32 @@ export default function Dashboard() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isQuickActionsOpen, setIsQuickActionsOpen] = useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
+  const { isSubscribed, notifyRentalDue, isSupported } = usePushNotifications();
+
+  // Check for rentals due soon and send notifications
+  useEffect(() => {
+    if (!isSubscribed) return;
+
+    const checkDueRentals = () => {
+      const today = new Date();
+      rentals
+        .filter(r => r.status === 'active')
+        .forEach(rental => {
+          const endDate = parseISO(rental.endDate);
+          const daysUntilDue = differenceInDays(endDate, today);
+          
+          // Notify if due today or tomorrow
+          if (daysUntilDue <= 1 && daysUntilDue >= 0) {
+            notifyRentalDue(rental.customerName, format(endDate, 'dd/MM/yyyy', { locale: he }));
+          }
+        });
+    };
+
+    // Check on mount and every hour
+    checkDueRentals();
+    const interval = setInterval(checkDueRentals, 60 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [isSubscribed, rentals, notifyRentalDue]);
 
   const upcomingReturns = getUpcomingReturns();
   const today = new Date();
@@ -182,6 +211,26 @@ export default function Dashboard() {
             <p className="text-2xl font-bold text-purple-600">{rentals.length}</p>
           </div>
         </div>
+
+        {/* Notification Settings */}
+        {isSupported && (
+          <div className="p-4 rounded-xl bg-gradient-to-l from-primary/10 to-primary/5 border border-primary/20 flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/20">
+              <Bell className="h-6 w-6 text-primary" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm text-muted-foreground">התראות פוש</p>
+              <p className="text-base font-medium text-foreground">
+                {isSubscribed ? 'מופעלות ✓' : 'לא מופעלות'}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Notification Settings Card */}
+      <div className="mb-8">
+        <NotificationSettings />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
