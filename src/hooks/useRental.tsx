@@ -177,6 +177,22 @@ export function RentalProvider({ children }: { children: ReactNode }) {
     fetchData();
   }, []);
 
+  // Helper function to check if item is truly available (status + valid expiry for SIMs)
+  const isItemTrulyAvailable = (item: InventoryItem): boolean => {
+    if (item.status !== 'available') return false;
+    
+    // For SIMs, check expiry date
+    const isSim = item.category === 'sim_american' || item.category === 'sim_european';
+    if (isSim && item.expiryDate) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const expiryDate = parseISO(item.expiryDate);
+      return isAfter(expiryDate, today) || expiryDate.getTime() === today.getTime();
+    }
+    
+    return true;
+  };
+
   const calculateStats = (): DashboardStats => {
     const today = new Date();
     const threeDaysFromNow = addDays(today, 3);
@@ -191,7 +207,8 @@ export function RentalProvider({ children }: { children: ReactNode }) {
       isBefore(parseISO(r.endDate), threeDaysFromNow)
     ).length;
     const repairsInProgress = repairs.filter(r => r.status === 'in_lab').length;
-    const itemsInStock = inventory.filter(i => i.status === 'available').length;
+    // Count only truly available items (with valid expiry for SIMs)
+    const itemsInStock = inventory.filter(isItemTrulyAvailable).length;
 
     return {
       activeRentals,
