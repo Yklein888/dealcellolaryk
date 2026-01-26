@@ -13,7 +13,7 @@ interface StatCardProps {
 }
 
 const variantStyles = {
-  default: 'border-border/50',
+  default: 'border-white/30',
   primary: 'border-primary/30',
   warning: 'border-warning/30',
   success: 'border-success/30',
@@ -21,17 +21,17 @@ const variantStyles = {
 };
 
 const iconVariantStyles = {
-  default: 'bg-muted text-muted-foreground',
-  primary: 'bg-primary/20 text-primary',
-  warning: 'bg-warning/20 text-warning',
-  success: 'bg-success/20 text-success',
-  destructive: 'bg-destructive/20 text-destructive',
+  default: 'bg-muted/50 text-muted-foreground',
+  primary: 'bg-gradient-to-br from-primary/30 to-accent/20 text-primary',
+  warning: 'bg-gradient-to-br from-warning/30 to-orange-400/20 text-warning',
+  success: 'bg-gradient-to-br from-success/30 to-green-400/20 text-success',
+  destructive: 'bg-gradient-to-br from-destructive/30 to-red-400/20 text-destructive',
 };
 
 export function StatCard({ title, value, icon: Icon, trend, variant = 'default' }: StatCardProps) {
   return (
     <div className={cn(
-      'stat-card animate-fade-in card-glow',
+      'stat-card animate-fade-in card-glow group',
       variantStyles[variant]
     )}>
       <div className="flex items-start justify-between">
@@ -48,7 +48,7 @@ export function StatCard({ title, value, icon: Icon, trend, variant = 'default' 
           )}
         </div>
         <div className={cn(
-          'flex h-12 w-12 items-center justify-center rounded-xl',
+          'flex h-12 w-12 items-center justify-center rounded-2xl transition-transform duration-300 group-hover:scale-110',
           iconVariantStyles[variant]
         )}>
           <Icon className="h-6 w-6" />
