@@ -87,6 +87,13 @@ export default function Rentals() {
   const [itemCategoryFilter, setItemCategoryFilter] = useState<string>('all');
   const [callingRentalId, setCallingRentalId] = useState<string | null>(null);
   const [payingRentalId, setPayingRentalId] = useState<string | null>(null);
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [paymentRental, setPaymentRental] = useState<Rental | null>(null);
+  const [paymentFormData, setPaymentFormData] = useState({
+    creditCard: '',
+    creditCardExpiry: '',
+    cvv: '',
+  });
 
   // Notify customer about rental return reminder
   const notifyRentalCustomer = async (rental: Rental) => {
@@ -145,23 +152,49 @@ export default function Rentals() {
     }
   };
 
-  // Handle payment via Pelecard
-  const handlePayment = async (rental: Rental) => {
-    setPayingRentalId(rental.id);
+  // Open payment dialog
+  const openPaymentDialog = (rental: Rental) => {
+    setPaymentRental(rental);
+    setPaymentFormData({ creditCard: '', creditCardExpiry: '', cvv: '' });
+    setIsPaymentDialogOpen(true);
+  };
+
+  // Handle payment via Pelecard (direct charge)
+  const handlePayment = async () => {
+    if (!paymentRental) return;
+    
+    if (!paymentFormData.creditCard || !paymentFormData.creditCardExpiry || !paymentFormData.cvv) {
+      toast({
+        title: 'שגיאה',
+        description: 'יש להזין את כל פרטי הכרטיס',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setPayingRentalId(paymentRental.id);
 
     try {
       const { data, error } = await supabase.functions.invoke('pelecard-pay', {
         body: { 
-          amount: rental.totalPrice,
-          customerName: rental.customerName,
-          description: `השכרה - ${rental.items.map(i => i.itemName).join(', ')}`
+          amount: paymentRental.totalPrice,
+          customerName: paymentRental.customerName,
+          creditCard: paymentFormData.creditCard,
+          creditCardExpiry: paymentFormData.creditCardExpiry,
+          cvv: paymentFormData.cvv,
+          customerId: paymentRental.customerId,
+          description: `השכרה - ${paymentRental.items.map(i => i.itemName).join(', ')}`
         },
       });
 
       if (error) throw error;
 
-      if (data?.url) {
-        window.location.href = data.url;
+      if (data?.success) {
+        toast({
+          title: 'התשלום בוצע בהצלחה',
+          description: `מספר עסקה: ${data.transactionId || 'N/A'}`,
+        });
+        setIsPaymentDialogOpen(false);
       } else if (data?.error) {
         throw new Error(data.error);
       }
@@ -169,7 +202,7 @@ export default function Rentals() {
       console.error('Payment error:', error);
       toast({
         title: 'שגיאה בתשלום',
-        description: error instanceof Error ? error.message : 'לא ניתן לפתוח דף תשלום',
+        description: error instanceof Error ? error.message : 'לא ניתן לבצע תשלום',
         variant: 'destructive',
       });
     } finally {
@@ -801,7 +834,7 @@ export default function Rentals() {
                       <Button 
                         variant="default"
                         size="sm"
-                        onClick={() => handlePayment(rental)}
+                        onClick={() => openPaymentDialog(rental)}
                         disabled={payingRentalId === rental.id}
                       >
                         {payingRentalId === rental.id ? (
@@ -835,6 +868,87 @@ export default function Rentals() {
           ))}
         </div>
       )}
+
+      {/* Payment Dialog */}
+      <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>תשלום עבור השכרה</DialogTitle>
+          </DialogHeader>
+          {paymentRental && (
+            <div className="space-y-4 mt-4">
+              <div className="p-4 rounded-lg bg-muted/50">
+                <p className="font-medium">{paymentRental.customerName}</p>
+                <p className="text-2xl font-bold text-primary">
+                  {formatPrice(paymentRental.totalPrice, paymentRental.currency)}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>מספר כרטיס אשראי</Label>
+                <Input
+                  value={paymentFormData.creditCard}
+                  onChange={(e) => setPaymentFormData({ ...paymentFormData, creditCard: e.target.value })}
+                  placeholder="1234 5678 9012 3456"
+                  maxLength={19}
+                  dir="ltr"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>תוקף (MM/YY)</Label>
+                  <Input
+                    value={paymentFormData.creditCardExpiry}
+                    onChange={(e) => setPaymentFormData({ ...paymentFormData, creditCardExpiry: e.target.value })}
+                    placeholder="0126"
+                    maxLength={4}
+                    dir="ltr"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>CVV</Label>
+                  <Input
+                    value={paymentFormData.cvv}
+                    onChange={(e) => setPaymentFormData({ ...paymentFormData, cvv: e.target.value })}
+                    placeholder="123"
+                    maxLength={4}
+                    type="password"
+                    dir="ltr"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <Button 
+                  onClick={handlePayment} 
+                  className="flex-1"
+                  disabled={payingRentalId === paymentRental.id}
+                >
+                  {payingRentalId === paymentRental.id ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      מעבד תשלום...
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="h-4 w-4 mr-2" />
+                      בצע תשלום
+                    </>
+                  )}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsPaymentDialogOpen(false)}
+                  disabled={payingRentalId === paymentRental.id}
+                >
+                  ביטול
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

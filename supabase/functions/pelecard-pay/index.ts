@@ -8,6 +8,10 @@ const corsHeaders = {
 interface PelecardRequest {
   amount: number;
   customerName: string;
+  creditCard: string;
+  creditCardExpiry: string; // Format: MMYY
+  cvv: string;
+  customerId?: string;
   description?: string;
 }
 
@@ -26,7 +30,15 @@ serve(async (req) => {
       throw new Error('Pelecard credentials not configured');
     }
 
-    const { amount, customerName, description } = await req.json() as PelecardRequest;
+    const { 
+      amount, 
+      customerName, 
+      creditCard,
+      creditCardExpiry,
+      cvv,
+      customerId,
+      description 
+    } = await req.json() as PelecardRequest;
 
     if (!amount || amount <= 0) {
       return new Response(
@@ -35,24 +47,34 @@ serve(async (req) => {
       );
     }
 
-    // Get the published URL for redirects
-    const baseUrl = 'https://dealcellolaryk.lovable.app';
+    if (!creditCard || !creditCardExpiry || !cvv) {
+      return new Response(
+        JSON.stringify({ error: 'Credit card details are required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
-    console.log('Initiating Pelecard payment for:', customerName, 'Amount:', amount);
+    console.log('Initiating Pelecard debit for:', customerName, 'Amount:', amount);
 
-    // Send request to Pelecard API - using gateway subdomain for stable DNS resolution
-    const response = await fetch('https://gateway.pelecard.biz/ServicesAPI/PaymentPage', {
+    // Send request to Pelecard Services API - DebitRegularType for direct charge
+    // Using gateway21 as specified in Pelecard documentation
+    const response = await fetch('https://gateway21.pelecard.biz/services/DebitRegularType', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        terminal: terminal,
+        terminalNumber: terminal,
         user: user,
         password: password,
-        amount: Math.round(amount * 100), // Amount in agorot
+        shopNumber: "001",
+        creditCard: creditCard.replace(/\s/g, ''), // Remove spaces
+        creditCardDateMmYy: creditCardExpiry,
+        token: "",
+        total: Math.round(amount * 100).toString(), // Amount in agorot as string
         currency: "1", // 1 = ILS
-        good_url: `${baseUrl}/payment-success`,
-        error_url: `${baseUrl}/payment-error`,
-        description: description || `תשלום עבור ${customerName}`,
+        cvv2: cvv,
+        id: customerId || "",
+        authorizationNumber: "",
+        paramX: description || `תשלום עבור ${customerName}`,
       }),
     });
 
@@ -66,13 +88,15 @@ serve(async (req) => {
       data = { raw: responseText };
     }
 
-    // Pelecard returns URL field with the payment page URL
-    if (data.URL) {
+    // Check Pelecard response - StatusCode "000" means success
+    if (data.StatusCode === "000") {
       return new Response(
         JSON.stringify({ 
           success: true, 
-          url: data.URL,
-          transactionId: data.ConfirmationKey || null
+          message: data.ErrorMessage || 'operation success',
+          transactionId: data.PelecardTransactionId,
+          voucherId: data.VoucherId,
+          approvalNumber: data.DebitApproveNumber,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -80,7 +104,8 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: data.Error || data.ErrorMessage || 'Unknown error from Pelecard',
+          error: data.ErrorMessage || 'Payment failed',
+          errorCode: data.StatusCode,
           details: data 
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
