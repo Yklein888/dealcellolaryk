@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { useRole } from '@/hooks/useRole';
 import { Button } from '@/components/ui/button';
 import { 
   LayoutDashboard, 
@@ -10,7 +11,8 @@ import {
   Wrench,
   ChevronRight,
   Smartphone,
-  LogOut
+  LogOut,
+  Shield
 } from 'lucide-react';
 
 const navItems = [
@@ -21,6 +23,10 @@ const navItems = [
   { path: '/repairs', label: 'תיקונים', icon: Wrench },
 ];
 
+const adminNavItems = [
+  { path: '/users', label: 'ניהול משתמשים', icon: Shield },
+];
+
 interface AppSidebarProps {
   onNavigate?: () => void;
 }
@@ -28,6 +34,7 @@ interface AppSidebarProps {
 export function AppSidebar({ onNavigate }: AppSidebarProps) {
   const location = useLocation();
   const { user, signOut } = useAuth();
+  const { isAdmin } = useRole();
 
   return (
     <aside className="fixed right-0 top-0 z-40 h-screen w-64 glass-strong border-l border-white/20 shadow-[var(--shadow-glass)]">
@@ -75,6 +82,47 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
             </Link>
           );
         })}
+
+        {/* Admin Section */}
+        {isAdmin && (
+          <>
+            <div className="my-2 px-4">
+              <div className="h-px bg-white/20" />
+              <p className="text-xs text-muted-foreground mt-2 mb-1">ניהול</p>
+            </div>
+            {adminNavItems.map((item) => {
+              const isActive = location.pathname === item.path;
+              const Icon = item.icon;
+              
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  onClick={onNavigate}
+                  className={cn(
+                    'flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300',
+                    'hover:bg-white/40 hover:shadow-sm group',
+                    isActive && 'bg-gradient-to-l from-primary/20 to-primary/5 text-primary shadow-sm border border-primary/20'
+                  )}
+                >
+                  <Icon className={cn(
+                    'h-5 w-5 transition-all duration-300',
+                    isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground group-hover:scale-110'
+                  )} />
+                  <span className={cn(
+                    'font-medium transition-colors duration-300',
+                    isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
+                  )}>
+                    {item.label}
+                  </span>
+                  {isActive && (
+                    <ChevronRight className="h-4 w-4 mr-auto text-primary animate-pulse" />
+                  )}
+                </Link>
+              );
+            })}
+          </>
+        )}
       </nav>
 
       {/* User & Logout */}
