@@ -28,7 +28,8 @@ import {
   Calendar,
   User,
   Package,
-  PackagePlus
+  PackagePlus,
+  Phone
 } from 'lucide-react';
 import { 
   Rental, 
@@ -81,6 +82,64 @@ export default function Rentals() {
   // Item selection state
   const [itemSearchTerm, setItemSearchTerm] = useState('');
   const [itemCategoryFilter, setItemCategoryFilter] = useState<string>('all');
+  const [callingRentalId, setCallingRentalId] = useState<string | null>(null);
+
+  // Notify customer about rental return reminder
+  const notifyRentalCustomer = async (rental: Rental) => {
+    const customer = customers.find(c => c.id === rental.customerId);
+    const customerPhone = customer?.phone;
+
+    if (!customerPhone) {
+      toast({
+        title: 'שגיאה',
+        description: 'אין מספר טלפון ללקוח זה',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setCallingRentalId(rental.id);
+
+    try {
+      const message = `שלום ${rental.customerName}, תזכורת להחזרת הציוד המושכר. תאריך ההחזרה הוא ${format(parseISO(rental.endDate), 'dd/MM/yyyy', { locale: he })}. תודה רבה.`;
+      
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/yemot-call`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            phone: customerPhone,
+            message,
+            campaignType: 'rental_reminder',
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast({
+          title: 'ההודעה נשלחה',
+          description: `שיחה יוצאת ל-${customerPhone}`,
+        });
+      } else {
+        throw new Error(data.error || 'שגיאה בשליחת ההודעה');
+      }
+    } catch (error) {
+      console.error('Error calling customer:', error);
+      toast({
+        title: 'שגיאה',
+        description: 'לא ניתן לשלוח הודעה ללקוח',
+        variant: 'destructive',
+      });
+    } finally {
+      setCallingRentalId(null);
+    }
+  };
 
   // Quick add inventory state
   const [quickAddData, setQuickAddData] = useState({
@@ -702,13 +761,24 @@ export default function Rentals() {
                   </div>
 
                   {rental.status === 'active' && (
-                    <Button 
-                      variant="outline"
-                      onClick={() => handleReturn(rental.id)}
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                      החזר
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline"
+                        size="sm"
+                        onClick={() => notifyRentalCustomer(rental)}
+                        disabled={callingRentalId === rental.id}
+                      >
+                        <Phone className="h-4 w-4" />
+                        {callingRentalId === rental.id ? 'מתקשר...' : 'תזכורת'}
+                      </Button>
+                      <Button 
+                        variant="outline"
+                        onClick={() => handleReturn(rental.id)}
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        החזר
+                      </Button>
+                    </div>
                   )}
                 </div>
               </div>
