@@ -13,22 +13,23 @@ export function AppLayout({ children }: AppLayoutProps) {
   return (
     <div className="min-h-screen bg-background">
       {/* Mobile Header */}
-      <header className="lg:hidden fixed top-0 right-0 left-0 z-50 bg-sidebar border-b border-sidebar-border px-4 py-3 flex items-center justify-between">
+      <header className="lg:hidden fixed top-0 right-0 left-0 z-50 glass-strong border-b border-white/20 px-4 py-3 flex items-center justify-between">
         <Button 
           variant="ghost" 
           size="icon"
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="hover:bg-white/40"
         >
           {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
         </Button>
-        <h1 className="text-lg font-bold text-foreground">ניהול השכרות</h1>
+        <h1 className="text-lg font-bold gradient-text">ניהול השכרות</h1>
         <div className="w-10" /> {/* Spacer for centering */}
       </header>
 
       {/* Mobile Overlay */}
       {isMobileMenuOpen && (
         <div 
-          className="lg:hidden fixed inset-0 bg-black/50 z-40"
+          className="lg:hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-40"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}

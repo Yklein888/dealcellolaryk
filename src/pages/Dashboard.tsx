@@ -118,10 +118,11 @@ export default function Dashboard() {
       </PageHeader>
 
       {/* Welcome Banner */}
-      <div className="mb-6 p-6 rounded-2xl bg-gradient-to-l from-primary/20 via-primary/10 to-transparent border border-primary/20">
-        <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/20">
-            <Sparkles className="h-7 w-7 text-primary" />
+      <div className="mb-6 p-6 rounded-2xl glass border border-primary/20 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-l from-primary/10 via-accent/5 to-transparent pointer-events-none" />
+        <div className="relative flex items-center gap-4">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-accent shadow-lg animate-float">
+            <Sparkles className="h-7 w-7 text-white" />
           </div>
           <div>
             <h2 className="text-xl font-bold text-foreground">שלום! 👋</h2>
@@ -178,23 +179,23 @@ export default function Dashboard() {
 
       {/* Quick Stats Row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-        <div className="p-4 rounded-xl bg-gradient-to-l from-green-500/10 to-green-500/5 border border-green-500/20 flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-500/20">
-            <TrendingUp className="h-6 w-6 text-green-600" />
+        <div className="p-4 rounded-2xl glass border border-success/20 flex items-center gap-4 card-glow">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-success/30 to-green-400/20 shadow-sm">
+            <TrendingUp className="h-6 w-6 text-success" />
           </div>
           <div>
             <p className="text-sm text-muted-foreground">תיקונים מוכנים</p>
-            <p className="text-2xl font-bold text-green-600">{readyRepairs.length}</p>
+            <p className="text-2xl font-bold text-success">{readyRepairs.length}</p>
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-gradient-to-l from-blue-500/10 to-blue-500/5 border border-blue-500/20 flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/20">
-            <Calendar className="h-6 w-6 text-blue-600" />
+        <div className="p-4 rounded-2xl glass border border-accent/20 flex items-center gap-4 card-glow">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-accent/30 to-blue-400/20 shadow-sm">
+            <Calendar className="h-6 w-6 text-accent" />
           </div>
           <div>
             <p className="text-sm text-muted-foreground">החזרות היום</p>
-            <p className="text-2xl font-bold text-blue-600">
+            <p className="text-2xl font-bold text-accent">
               {upcomingReturns.filter(r => 
                 format(parseISO(r.endDate), 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')
               ).length}
@@ -202,8 +203,8 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-gradient-to-l from-purple-500/10 to-purple-500/5 border border-purple-500/20 flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-500/20">
+        <div className="p-4 rounded-2xl glass border border-purple-500/20 flex items-center gap-4 card-glow">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500/30 to-purple-400/20 shadow-sm">
             <Activity className="h-6 w-6 text-purple-600" />
           </div>
           <div>
@@ -214,8 +215,8 @@ export default function Dashboard() {
 
         {/* Notification Settings */}
         {isSupported && (
-          <div className="p-4 rounded-xl bg-gradient-to-l from-primary/10 to-primary/5 border border-primary/20 flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/20">
+          <div className="p-4 rounded-2xl glass border border-primary/20 flex items-center gap-4 card-glow">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary/30 to-accent/20 shadow-sm">
               <Bell className="h-6 w-6 text-primary" />
             </div>
             <div className="flex-1">
