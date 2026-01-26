@@ -845,109 +845,103 @@ export default function Rentals() {
           <p className="text-muted-foreground">צור השכרה חדשה כדי להתחיל</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {filteredRentals.map((rental) => (
             <div 
               key={rental.id}
-              className="stat-card hover:border-primary/30 transition-all duration-200 p-4"
+              className="stat-card hover:border-primary/30 transition-all duration-200 p-4 flex flex-col aspect-square"
             >
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                {/* Left side - customer info */}
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/20 shrink-0">
-                    <User className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-semibold text-foreground truncate">{rental.customerName}</p>
-                      <StatusBadge 
-                        status={rentalStatusLabels[rental.status]} 
-                        variant={getStatusVariant(rental.status)} 
-                      />
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        {format(parseISO(rental.startDate), 'dd/MM', { locale: he })} - {format(parseISO(rental.endDate), 'dd/MM', { locale: he })}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Package className="h-3 w-3" />
-                        {rental.items.length}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Center - items (hidden on mobile) */}
-                <div className="hidden md:flex flex-wrap gap-1 max-w-xs">
-                  {rental.items.slice(0, 2).map((item, idx) => (
-                    <span 
-                      key={idx}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-muted text-xs"
-                    >
-                      {categoryIcons[item.itemCategory]}
-                    </span>
-                  ))}
-                  {rental.items.length > 2 && (
-                    <span className="text-xs text-muted-foreground">+{rental.items.length - 2}</span>
-                  )}
-                </div>
-
-                {/* Right side - price and actions */}
-                <div className="flex items-center gap-3">
-                  <div className="text-left">
-                    <p className="text-lg font-bold text-primary">
-                      {formatPrice(rental.totalPrice, rental.currency)}
-                    </p>
-                  </div>
-
-                  {rental.status === 'active' && (
-                    <div className="flex gap-1">
-                      <Button 
-                        variant="default"
-                        size="sm"
-                        onClick={() => openPaymentDialog(rental)}
-                        disabled={payingRentalId === rental.id}
-                        className="h-8 px-2"
-                      >
-                        {payingRentalId === rental.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <CreditCard className="h-4 w-4" />
-                        )}
-                      </Button>
-                      <Button 
-                        variant="outline"
-                        size="sm"
-                        onClick={() => notifyRentalCustomer(rental)}
-                        disabled={callingRentalId === rental.id}
-                        className="h-8 px-2"
-                      >
-                        <Phone className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleReturn(rental.id)}
-                        className="h-8 px-2"
-                      >
-                        <RotateCcw className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
-
-                  {rental.status === 'returned' && (
-                    <Button 
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteRental(rental.id, rental.customerName)}
-                      className="h-8 px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
+              {/* Header - Status and Delete */}
+              <div className="flex items-center justify-between mb-3">
+                <StatusBadge 
+                  status={rentalStatusLabels[rental.status]} 
+                  variant={getStatusVariant(rental.status)} 
+                />
+                {rental.status === 'returned' && (
+                  <Button 
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleDeleteRental(rental.id, rental.customerName)}
+                    className="h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                )}
               </div>
+
+              {/* Customer */}
+              <div className="flex items-center gap-2 mb-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 shrink-0">
+                  <User className="h-4 w-4 text-primary" />
+                </div>
+                <p className="font-semibold text-sm text-foreground truncate flex-1">{rental.customerName}</p>
+              </div>
+
+              {/* Dates */}
+              <div className="flex items-center gap-1 text-xs text-muted-foreground mb-2">
+                <Calendar className="h-3 w-3" />
+                <span>{format(parseISO(rental.startDate), 'dd/MM', { locale: he })} - {format(parseISO(rental.endDate), 'dd/MM', { locale: he })}</span>
+              </div>
+
+              {/* Items */}
+              <div className="flex flex-wrap gap-1 mb-3 flex-1">
+                {rental.items.slice(0, 3).map((item, idx) => (
+                  <span 
+                    key={idx}
+                    className="inline-flex items-center justify-center w-6 h-6 rounded bg-muted text-sm"
+                  >
+                    {categoryIcons[item.itemCategory]}
+                  </span>
+                ))}
+                {rental.items.length > 3 && (
+                  <span className="inline-flex items-center justify-center w-6 h-6 rounded bg-muted text-xs text-muted-foreground">
+                    +{rental.items.length - 3}
+                  </span>
+                )}
+              </div>
+
+              {/* Price */}
+              <div className="text-center mb-3">
+                <p className="text-lg font-bold text-primary">
+                  {formatPrice(rental.totalPrice, rental.currency)}
+                </p>
+              </div>
+
+              {/* Actions */}
+              {rental.status === 'active' && (
+                <div className="flex justify-center gap-1 mt-auto">
+                  <Button 
+                    variant="default"
+                    size="icon"
+                    onClick={() => openPaymentDialog(rental)}
+                    disabled={payingRentalId === rental.id}
+                    className="h-8 w-8"
+                  >
+                    {payingRentalId === rental.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <CreditCard className="h-4 w-4" />
+                    )}
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    size="icon"
+                    onClick={() => notifyRentalCustomer(rental)}
+                    disabled={callingRentalId === rental.id}
+                    className="h-8 w-8"
+                  >
+                    <Phone className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handleReturn(rental.id)}
+                    className="h-8 w-8"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
             </div>
           ))}
         </div>
