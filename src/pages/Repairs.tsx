@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
   DialogContent,
@@ -28,7 +29,8 @@ import {
   Package,
   Printer,
   Download,
-  Trash2
+  Trash2,
+  Shield
 } from 'lucide-react';
 import { Repair, repairStatusLabels } from '@/types/rental';
 import { useToast } from '@/hooks/use-toast';
@@ -53,10 +55,14 @@ export default function Repairs() {
   const [formData, setFormData] = useState({
     repairNumber: '',
     deviceType: '',
+    deviceModel: '',
+    deviceCost: '',
     customerName: '',
     customerPhone: '',
     problemDescription: '',
     notes: '',
+    status: 'in_lab' as Repair['status'],
+    isWarranty: false,
   });
 
   const filteredRepairs = repairs.filter(repair => {
@@ -112,10 +118,14 @@ export default function Repairs() {
     setFormData({
       repairNumber: '',
       deviceType: '',
+      deviceModel: '',
+      deviceCost: '',
       customerName: '',
       customerPhone: '',
       problemDescription: '',
       notes: '',
+      status: 'in_lab',
+      isWarranty: false,
     });
   };
 
@@ -130,8 +140,16 @@ export default function Repairs() {
     }
 
     const newRepairData = {
-      ...formData,
-      status: 'in_lab' as const,
+      repairNumber: formData.repairNumber,
+      deviceType: formData.deviceType,
+      deviceModel: formData.deviceModel || undefined,
+      deviceCost: formData.deviceCost ? parseFloat(formData.deviceCost) : undefined,
+      customerName: formData.customerName,
+      customerPhone: formData.customerPhone,
+      problemDescription: formData.problemDescription,
+      notes: formData.notes || undefined,
+      status: formData.status,
+      isWarranty: formData.isWarranty,
       receivedDate: new Date().toISOString().split('T')[0],
     };
 
@@ -149,7 +167,7 @@ export default function Repairs() {
     setIsAddDialogOpen(false);
   };
 
-  const printRepairForm = (repair: typeof formData & { status: string; receivedDate: string }) => {
+  const printRepairForm = (repair: { repairNumber: string; deviceType: string; deviceModel?: string; deviceCost?: number; customerName: string; customerPhone: string; problemDescription: string; notes?: string; status: string; isWarranty?: boolean; receivedDate: string }) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
@@ -172,6 +190,15 @@ export default function Repairs() {
             border-radius: 16px;
             background: #f0fdfa;
           }
+          .warranty-badge {
+            display: inline-block;
+            background: #22c55e;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            margin-right: 10px;
+          }
           .title { font-size: 20px; color: #333; text-align: center; margin-bottom: 25px; }
           .field { margin-bottom: 12px; padding: 10px; background: #f5f5f5; border-radius: 8px; }
           .label { font-weight: bold; color: #555; margin-bottom: 5px; }
@@ -181,12 +208,19 @@ export default function Repairs() {
       </head>
       <body>
         <div class="repair-number-huge">${repair.repairNumber}</div>
-        <div class="title">טופס קבלת מכשיר לתיקון</div>
+        <div class="title">טופס קבלת מכשיר לתיקון ${repair.isWarranty ? '<span class="warranty-badge">באחריות</span>' : ''}</div>
         
         <div class="field">
           <div class="label">סוג המכשיר:</div>
-          <div class="value">${repair.deviceType}</div>
+          <div class="value">${repair.deviceType}${repair.deviceModel ? ` - ${repair.deviceModel}` : ''}</div>
         </div>
+
+        ${repair.deviceCost ? `
+        <div class="field">
+          <div class="label">עלות המכשיר:</div>
+          <div class="value">₪${repair.deviceCost}</div>
+        </div>
+        ` : ''}
         
         <div class="field">
           <div class="label">שם הלקוח:</div>
@@ -303,31 +337,33 @@ export default function Repairs() {
               <DialogTitle>הוספת תיקון חדש</DialogTitle>
             </DialogHeader>
             
-            <div className="space-y-4 mt-4">
-              <div className="space-y-2">
-                <Label>מספר תיקון *</Label>
-                <Input
-                  value={formData.repairNumber}
-                  onChange={(e) => setFormData({ ...formData, repairNumber: e.target.value })}
-                  placeholder="לדוגמה: 1001"
-                />
-              </div>
+            <div className="space-y-4 mt-4 max-h-[70vh] overflow-y-auto">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>מספר תיקון *</Label>
+                  <Input
+                    value={formData.repairNumber}
+                    onChange={(e) => setFormData({ ...formData, repairNumber: e.target.value })}
+                    placeholder="לדוגמה: 1"
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label>סוג המכשיר *</Label>
-                <Select 
-                  value={formData.deviceType} 
-                  onValueChange={(value) => setFormData({ ...formData, deviceType: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="בחר סוג מכשיר" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {deviceTypes.map((type) => (
-                      <SelectItem key={type} value={type}>{type}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="space-y-2">
+                  <Label>סטטוס</Label>
+                  <Select 
+                    value={formData.status} 
+                    onValueChange={(value) => setFormData({ ...formData, status: value as Repair['status'] })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="in_lab">במעבדה</SelectItem>
+                      <SelectItem value="ready">מוכן</SelectItem>
+                      <SelectItem value="collected">נאסף</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -346,6 +382,60 @@ export default function Repairs() {
                   onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
                   placeholder="050-1234567"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>סוג המכשיר *</Label>
+                  <Select 
+                    value={formData.deviceType} 
+                    onValueChange={(value) => setFormData({ ...formData, deviceType: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="בחר סוג מכשיר" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {deviceTypes.map((type) => (
+                        <SelectItem key={type} value={type}>{type}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>דגם המכשיר</Label>
+                  <Input
+                    value={formData.deviceModel}
+                    onChange={(e) => setFormData({ ...formData, deviceModel: e.target.value })}
+                    placeholder="לדוגמה: iPhone 14"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>עלות המכשיר (₪)</Label>
+                  <Input
+                    type="number"
+                    value={formData.deviceCost}
+                    onChange={(e) => setFormData({ ...formData, deviceCost: e.target.value })}
+                    placeholder="0"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>באחריות</Label>
+                  <div className="flex items-center gap-2 h-10">
+                    <Switch
+                      checked={formData.isWarranty}
+                      onCheckedChange={(checked) => setFormData({ ...formData, isWarranty: checked })}
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      {formData.isWarranty ? 'כן, באחריות' : 'לא באחריות'}
+                    </span>
+                    {formData.isWarranty && <Shield className="h-4 w-4 text-success" />}
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -442,11 +532,21 @@ export default function Repairs() {
                       />
                     </div>
                     <p className="text-muted-foreground">{repair.customerName} • {repair.customerPhone}</p>
+                    {repair.deviceModel && (
+                      <p className="text-sm text-muted-foreground">דגם: {repair.deviceModel}</p>
+                    )}
                     <p className="text-sm text-muted-foreground mt-1">{repair.problemDescription}</p>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      התקבל: {format(parseISO(repair.receivedDate), 'dd/MM/yyyy', { locale: he })}
-                      {repair.completedDate && ` • הושלם: ${format(parseISO(repair.completedDate), 'dd/MM/yyyy', { locale: he })}`}
-                    </p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
+                      <span>התקבל: {format(parseISO(repair.receivedDate), 'dd/MM/yyyy', { locale: he })}</span>
+                      {repair.completedDate && <span>• הושלם: {format(parseISO(repair.completedDate), 'dd/MM/yyyy', { locale: he })}</span>}
+                      {repair.deviceCost && <span>• עלות: ₪{repair.deviceCost}</span>}
+                      {repair.isWarranty && (
+                        <span className="inline-flex items-center gap-1 text-success">
+                          <Shield className="h-3 w-3" />
+                          באחריות
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 

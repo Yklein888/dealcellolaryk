@@ -62,10 +62,13 @@ export interface Repair {
   id: string;
   repairNumber: string;
   deviceType: string;
+  deviceModel?: string;
+  deviceCost?: number;
   customerName: string;
   customerPhone: string;
   problemDescription: string;
   status: 'in_lab' | 'ready' | 'collected';
+  isWarranty?: boolean;
   receivedDate: string;
   completedDate?: string;
   collectedDate?: string;
