@@ -566,10 +566,11 @@ export default function Repairs() {
         </div>
       ) : (
         <div className="space-y-4">
-          {filteredRepairs.map((repair) => (
+          {filteredRepairs.map((repair, index) => (
             <div 
               key={repair.id}
-              className="stat-card hover:border-primary/30 transition-all duration-200"
+              className="stat-card hover:border-primary/30 transition-all duration-200 animate-slide-up"
+              style={{ animationDelay: `${index * 50}ms` }}
             >
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-start gap-4">

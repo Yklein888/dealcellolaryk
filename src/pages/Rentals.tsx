@@ -1004,14 +1004,15 @@ export default function Rentals() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredRentals.map((rental) => (
+          {filteredRentals.map((rental, index) => (
             <div 
               key={rental.id}
-              className={`stat-card hover:border-primary/30 transition-all duration-200 p-5 flex flex-col min-h-[280px] border-r-4 ${
-                rental.status === 'active' ? 'border-r-blue-500' :
-                rental.status === 'overdue' ? 'border-r-red-500' :
-                'border-r-green-500'
+              className={`stat-card hover:border-primary/30 transition-all duration-200 p-5 flex flex-col min-h-[280px] border-r-4 animate-slide-up ${
+                rental.status === 'active' ? 'border-r-primary' :
+                rental.status === 'overdue' ? 'border-r-destructive' :
+                'border-r-success'
               }`}
+              style={{ animationDelay: `${index * 50}ms` }}
             >
               {/* Header - Status, Edit and Delete */}
               <div className="flex items-center justify-between mb-4">
