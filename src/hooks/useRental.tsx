@@ -27,6 +27,7 @@ interface RentalContextType {
   addRental: (rental: Omit<Rental, 'id' | 'createdAt'>) => Promise<void>;
   updateRental: (id: string, rental: Partial<Rental>) => Promise<void>;
   returnRental: (id: string) => Promise<void>;
+  deleteRental: (id: string) => Promise<void>;
   addRepair: (repair: Omit<Repair, 'id'>) => Promise<void>;
   updateRepair: (id: string, repair: Partial<Repair>) => Promise<void>;
   deleteRepair: (id: string) => Promise<void>;
@@ -435,6 +436,32 @@ export function RentalProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const deleteRental = async (id: string) => {
+    // First delete rental items
+    const { error: itemsError } = await supabase
+      .from('rental_items')
+      .delete()
+      .eq('rental_id', id);
+
+    if (itemsError) {
+      console.error('Error deleting rental items:', itemsError);
+      throw itemsError;
+    }
+
+    // Then delete the rental
+    const { error } = await supabase
+      .from('rentals')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting rental:', error);
+      throw error;
+    }
+
+    setRentals(prev => prev.filter(r => r.id !== id));
+  };
+
   const addRepair = async (repair: Omit<Repair, 'id'>) => {
     const { data, error } = await supabase
       .from('repairs')
@@ -558,6 +585,7 @@ export function RentalProvider({ children }: { children: ReactNode }) {
       addRental,
       updateRental,
       returnRental,
+      deleteRental,
       addRepair,
       updateRepair,
       deleteRepair,
