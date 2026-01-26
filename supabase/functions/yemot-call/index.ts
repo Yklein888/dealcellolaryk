@@ -45,11 +45,9 @@ serve(async (req) => {
     yemotUrl.searchParams.set('phones', cleanPhone);
     yemotUrl.searchParams.set('tts', message);
     
-    // Set campaign name based on type
+    // Set template ID based on campaign type
     if (campaignType === 'rental_reminder') {
-      yemotUrl.searchParams.set('campaign_name', 'תזכורת ללקוחות החזרת ציוד מושכר');
-    } else {
-      yemotUrl.searchParams.set('campaign_name', 'הודעה ללקוח על איסוף מכשיר');
+      yemotUrl.searchParams.set('templateId', '1267261');
     }
     
     if (callerId) {
