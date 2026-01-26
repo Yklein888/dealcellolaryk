@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -31,7 +32,9 @@ import {
   PackagePlus,
   Phone,
   CreditCard,
-  Loader2
+  Loader2,
+  Trash2,
+  UserPlus
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -55,8 +58,10 @@ export default function Rentals() {
     rentals, 
     customers, 
     inventory, 
-    addRental, 
+    addRental,
+    addCustomer,
     returnRental,
+    deleteRental,
     addInventoryItem,
     getAvailableItems 
   } = useRental();
@@ -65,6 +70,7 @@ export default function Rentals() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
+  const [isQuickAddCustomerOpen, setIsQuickAddCustomerOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     customerId: '',
@@ -72,6 +78,13 @@ export default function Rentals() {
     endDate: '',
     deposit: '',
     notes: '',
+  });
+
+  // Quick add customer form
+  const [quickCustomerData, setQuickCustomerData] = useState({
+    name: '',
+    phone: '',
+    address: '',
   });
 
   const [selectedItems, setSelectedItems] = useState<Array<{
@@ -426,6 +439,50 @@ export default function Rentals() {
     });
   };
 
+  const handleDeleteRental = (rentalId: string, customerName: string) => {
+    if (confirm(`האם אתה בטוח שברצונך למחוק את ההשכרה של ${customerName}?`)) {
+      deleteRental(rentalId);
+      toast({
+        title: 'השכרה נמחקה',
+        description: 'ההשכרה נמחקה מהמערכת',
+      });
+    }
+  };
+
+  const handleQuickAddCustomer = async () => {
+    if (!quickCustomerData.name || !quickCustomerData.phone) {
+      toast({
+        title: 'שגיאה',
+        description: 'יש להזין שם וטלפון',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      await addCustomer({
+        name: quickCustomerData.name,
+        phone: quickCustomerData.phone,
+        address: quickCustomerData.address || undefined,
+      });
+      
+      // Get the newly added customer (it should be first in the list after refresh)
+      toast({
+        title: 'לקוח נוסף',
+        description: `${quickCustomerData.name} נוסף בהצלחה`,
+      });
+      
+      setQuickCustomerData({ name: '', phone: '', address: '' });
+      setIsQuickAddCustomerOpen(false);
+    } catch (error) {
+      toast({
+        title: 'שגיאה',
+        description: 'לא ניתן להוסיף לקוח',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const getStatusVariant = (status: Rental['status']) => {
     switch (status) {
       case 'active': return 'info';
@@ -454,12 +511,25 @@ export default function Rentals() {
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>יצירת השכרה חדשה</DialogTitle>
+              <DialogDescription>מלא את הפרטים ליצירת השכרה חדשה</DialogDescription>
             </DialogHeader>
             
             <div className="space-y-6 mt-4">
               {/* Customer Selection */}
               <div className="space-y-2">
-                <Label>בחר לקוח *</Label>
+                <div className="flex items-center justify-between">
+                  <Label>בחר לקוח *</Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsQuickAddCustomerOpen(true)}
+                    className="h-7 text-xs"
+                  >
+                    <UserPlus className="h-3 w-3" />
+                    הוסף לקוח חדש
+                  </Button>
+                </div>
                 <Select 
                   value={formData.customerId} 
                   onValueChange={(value) => setFormData({ ...formData, customerId: value })}
@@ -775,92 +845,106 @@ export default function Rentals() {
           <p className="text-muted-foreground">צור השכרה חדשה כדי להתחיל</p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {filteredRentals.map((rental) => (
             <div 
               key={rental.id}
-              className="stat-card hover:border-primary/30 transition-all duration-200"
+              className="stat-card hover:border-primary/30 transition-all duration-200 p-4"
             >
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20">
-                      <User className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-foreground text-lg">{rental.customerName}</p>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                {/* Left side - customer info */}
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/20 shrink-0">
+                    <User className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-semibold text-foreground truncate">{rental.customerName}</p>
                       <StatusBadge 
                         status={rentalStatusLabels[rental.status]} 
                         variant={getStatusVariant(rental.status)} 
                       />
                     </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {rental.items.map((item, idx) => (
-                      <span 
-                        key={idx}
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-muted text-sm"
-                      >
-                        {categoryIcons[item.itemCategory]} {item.itemName}
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        {format(parseISO(rental.startDate), 'dd/MM', { locale: he })} - {format(parseISO(rental.endDate), 'dd/MM', { locale: he })}
                       </span>
-                    ))}
-                  </div>
-
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Calendar className="h-4 w-4" />
-                      {format(parseISO(rental.startDate), 'dd/MM/yyyy', { locale: he })} - {format(parseISO(rental.endDate), 'dd/MM/yyyy', { locale: he })}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Package className="h-4 w-4" />
-                      {rental.items.length} פריטים
-                    </span>
+                      <span className="flex items-center gap-1">
+                        <Package className="h-3 w-3" />
+                        {rental.items.length}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-4">
+                {/* Center - items (hidden on mobile) */}
+                <div className="hidden md:flex flex-wrap gap-1 max-w-xs">
+                  {rental.items.slice(0, 2).map((item, idx) => (
+                    <span 
+                      key={idx}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-muted text-xs"
+                    >
+                      {categoryIcons[item.itemCategory]}
+                    </span>
+                  ))}
+                  {rental.items.length > 2 && (
+                    <span className="text-xs text-muted-foreground">+{rental.items.length - 2}</span>
+                  )}
+                </div>
+
+                {/* Right side - price and actions */}
+                <div className="flex items-center gap-3">
                   <div className="text-left">
-                    <p className="text-2xl font-bold text-primary">
+                    <p className="text-lg font-bold text-primary">
                       {formatPrice(rental.totalPrice, rental.currency)}
                     </p>
-                    {rental.deposit && (
-                      <p className="text-sm text-muted-foreground">פיקדון: ₪{rental.deposit}</p>
-                    )}
                   </div>
 
                   {rental.status === 'active' && (
-                    <div className="flex gap-2">
+                    <div className="flex gap-1">
                       <Button 
                         variant="default"
                         size="sm"
                         onClick={() => openPaymentDialog(rental)}
                         disabled={payingRentalId === rental.id}
+                        className="h-8 px-2"
                       >
                         {payingRentalId === rental.id ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
                           <CreditCard className="h-4 w-4" />
                         )}
-                        {payingRentalId === rental.id ? 'מעבד...' : 'תשלום'}
                       </Button>
                       <Button 
                         variant="outline"
                         size="sm"
                         onClick={() => notifyRentalCustomer(rental)}
                         disabled={callingRentalId === rental.id}
+                        className="h-8 px-2"
                       >
                         <Phone className="h-4 w-4" />
-                        {callingRentalId === rental.id ? 'מתקשר...' : 'תזכורת'}
                       </Button>
                       <Button 
                         variant="outline"
+                        size="sm"
                         onClick={() => handleReturn(rental.id)}
+                        className="h-8 px-2"
                       >
                         <RotateCcw className="h-4 w-4" />
-                        החזר
                       </Button>
                     </div>
+                  )}
+
+                  {rental.status === 'returned' && (
+                    <Button 
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteRental(rental.id, rental.customerName)}
+                      className="h-8 px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   )}
                 </div>
               </div>
@@ -874,6 +958,7 @@ export default function Rentals() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>תשלום עבור השכרה</DialogTitle>
+            <DialogDescription>הזן פרטי כרטיס אשראי לביצוע התשלום</DialogDescription>
           </DialogHeader>
           {paymentRental && (
             <div className="space-y-4 mt-4">
@@ -947,6 +1032,64 @@ export default function Rentals() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Add Customer Dialog */}
+      <Dialog open={isQuickAddCustomerOpen} onOpenChange={setIsQuickAddCustomerOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5" />
+              הוספת לקוח חדש
+            </DialogTitle>
+            <DialogDescription>הוסף לקוח חדש במהירות לבחירה בהשכרה</DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label>שם הלקוח *</Label>
+              <Input
+                value={quickCustomerData.name}
+                onChange={(e) => setQuickCustomerData({ ...quickCustomerData, name: e.target.value })}
+                placeholder="שם מלא"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>טלפון *</Label>
+              <Input
+                value={quickCustomerData.phone}
+                onChange={(e) => setQuickCustomerData({ ...quickCustomerData, phone: e.target.value })}
+                placeholder="050-1234567"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>כתובת</Label>
+              <Input
+                value={quickCustomerData.address}
+                onChange={(e) => setQuickCustomerData({ ...quickCustomerData, address: e.target.value })}
+                placeholder="כתובת (אופציונלי)"
+              />
+            </div>
+            
+            <div className="flex gap-3 pt-2">
+              <Button onClick={handleQuickAddCustomer} className="flex-1">
+                <UserPlus className="h-4 w-4" />
+                הוסף לקוח
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setQuickCustomerData({ name: '', phone: '', address: '' });
+                  setIsQuickAddCustomerOpen(false);
+                }}
+              >
+                ביטול
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

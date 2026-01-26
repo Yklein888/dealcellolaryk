@@ -232,28 +232,30 @@ export default function Repairs() {
         <meta charset="UTF-8">
         <title>טופס תיקון ${repair.repairNumber}</title>
         <style>
-          body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 30px; direction: rtl; }
+          body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 20px; direction: rtl; }
           .repair-number-huge { 
-            font-size: 72px; 
-            font-weight: bold; 
+            font-size: 120px; 
+            font-weight: 900; 
             color: #0d9488; 
             text-align: center; 
-            padding: 30px;
+            padding: 40px 20px;
             margin-bottom: 20px;
-            border: 4px solid #0d9488;
-            border-radius: 16px;
-            background: #f0fdfa;
+            border: 6px solid #0d9488;
+            border-radius: 20px;
+            background: linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%);
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+            line-height: 1;
           }
           .warranty-badge {
             display: inline-block;
             background: #22c55e;
             color: white;
-            padding: 4px 12px;
+            padding: 6px 16px;
             border-radius: 20px;
-            font-size: 14px;
+            font-size: 16px;
             margin-right: 10px;
           }
-          .title { font-size: 20px; color: #333; text-align: center; margin-bottom: 25px; }
+          .title { font-size: 22px; color: #333; text-align: center; margin-bottom: 25px; }
           .field { margin-bottom: 12px; padding: 10px; background: #f5f5f5; border-radius: 8px; }
           .label { font-weight: bold; color: #555; margin-bottom: 5px; }
           .value { font-size: 16px; color: #333; }
