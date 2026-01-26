@@ -1,7 +1,12 @@
+import { useState } from 'react';
 import { useRental } from '@/hooks/useRental';
 import { PageHeader } from '@/components/PageHeader';
 import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
+import { Button } from '@/components/ui/button';
+import { GlobalSearch } from '@/components/GlobalSearch';
+import { QuickActions } from '@/components/QuickActions';
+import { PriceCalculator } from '@/components/PriceCalculator';
 import { 
   ShoppingCart, 
   Users, 
@@ -10,31 +15,100 @@ import {
   Wrench,
   Clock,
   Calendar,
-  ArrowLeft
+  ArrowLeft,
+  Search,
+  Plus,
+  Calculator,
+  Sparkles,
+  TrendingUp,
+  Activity,
 } from 'lucide-react';
-import { format, parseISO, isAfter, isBefore, addDays } from 'date-fns';
+import { format, parseISO, isBefore } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { Link } from 'react-router-dom';
-import { rentalStatusLabels, repairStatusLabels } from '@/types/rental';
+import { repairStatusLabels } from '@/types/rental';
 
 export default function Dashboard() {
-  const { stats, rentals, repairs, getUpcomingReturns } = useRental();
+  const { stats, rentals, repairs, getUpcomingReturns, loading } = useRental();
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isQuickActionsOpen, setIsQuickActionsOpen] = useState(false);
+  const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
+
   const upcomingReturns = getUpcomingReturns();
   const today = new Date();
 
   const activeRentals = rentals.filter(r => r.status === 'active');
   const overdueRentals = activeRentals.filter(r => isBefore(parseISO(r.endDate), today));
   const pendingRepairs = repairs.filter(r => r.status !== 'collected');
+  const readyRepairs = repairs.filter(r => r.status === 'ready');
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Activity className="h-12 w-12 mx-auto animate-pulse text-primary" />
+          <p className="mt-4 text-muted-foreground">טוען נתונים...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-fade-in">
       <PageHeader 
         title="דאשבורד" 
         description="סקירה כללית של המערכת"
-      />
+      >
+        <div className="flex flex-wrap gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => setIsSearchOpen(true)}
+            className="gap-2"
+          >
+            <Search className="h-4 w-4" />
+            <span className="hidden sm:inline">חיפוש</span>
+            <kbd className="hidden sm:inline px-2 py-0.5 text-xs rounded bg-muted">⌘K</kbd>
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={() => setIsCalculatorOpen(true)}
+            className="gap-2"
+          >
+            <Calculator className="h-4 w-4" />
+            <span className="hidden sm:inline">מחשבון</span>
+          </Button>
+          <Button 
+            variant="glow" 
+            onClick={() => setIsQuickActionsOpen(true)}
+            className="gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">פעולה מהירה</span>
+          </Button>
+        </div>
+      </PageHeader>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
+      {/* Welcome Banner */}
+      <div className="mb-6 p-6 rounded-2xl bg-gradient-to-l from-primary/20 via-primary/10 to-transparent border border-primary/20">
+        <div className="flex items-center gap-4">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/20">
+            <Sparkles className="h-7 w-7 text-primary" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-foreground">שלום! 👋</h2>
+            <p className="text-muted-foreground">
+              {overdueRentals.length > 0 
+                ? `יש לך ${overdueRentals.length} השכרות באיחור שדורשות טיפול`
+                : readyRepairs.length > 0
+                ? `${readyRepairs.length} תיקונים מוכנים לאיסוף`
+                : 'הכל תקין! אין פעולות דחופות'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Grid - Modern Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
         <StatCard
           title="השכרות פעילות"
           value={stats.activeRentals}
@@ -71,6 +145,43 @@ export default function Dashboard() {
           icon={Clock}
           variant="primary"
         />
+      </div>
+
+      {/* Quick Stats Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <div className="p-4 rounded-xl bg-gradient-to-l from-green-500/10 to-green-500/5 border border-green-500/20 flex items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-500/20">
+            <TrendingUp className="h-6 w-6 text-green-600" />
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground">תיקונים מוכנים</p>
+            <p className="text-2xl font-bold text-green-600">{readyRepairs.length}</p>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-xl bg-gradient-to-l from-blue-500/10 to-blue-500/5 border border-blue-500/20 flex items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/20">
+            <Calendar className="h-6 w-6 text-blue-600" />
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground">החזרות היום</p>
+            <p className="text-2xl font-bold text-blue-600">
+              {upcomingReturns.filter(r => 
+                format(parseISO(r.endDate), 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')
+              ).length}
+            </p>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-xl bg-gradient-to-l from-purple-500/10 to-purple-500/5 border border-purple-500/20 flex items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-500/20">
+            <Activity className="h-6 w-6 text-purple-600" />
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground">סה"כ השכרות</p>
+            <p className="text-2xl font-bold text-purple-600">{rentals.length}</p>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -148,9 +259,14 @@ export default function Dashboard() {
                   key={repair.id}
                   className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
                 >
-                  <div>
-                    <p className="font-medium text-foreground">{repair.customerName}</p>
-                    <p className="text-sm text-muted-foreground">{repair.deviceType} - {repair.problemDescription}</p>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold">
+                      {repair.repairNumber}
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground">{repair.customerName}</p>
+                      <p className="text-sm text-muted-foreground">{repair.deviceType}</p>
+                    </div>
                   </div>
                   <StatusBadge 
                     status={repairStatusLabels[repair.status]} 
@@ -194,6 +310,11 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* Modals */}
+      <GlobalSearch isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+      <QuickActions isOpen={isQuickActionsOpen} onClose={() => setIsQuickActionsOpen(false)} />
+      <PriceCalculator isOpen={isCalculatorOpen} onClose={() => setIsCalculatorOpen(false)} />
     </div>
   );
 }
