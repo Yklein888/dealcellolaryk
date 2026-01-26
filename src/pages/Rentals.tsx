@@ -27,14 +27,18 @@ import {
   RotateCcw,
   Calendar,
   User,
-  Package
+  Package,
+  PackagePlus
 } from 'lucide-react';
 import { 
   Rental, 
   RentalItem, 
   ItemCategory,
+  BundleType,
   categoryLabels, 
   categoryIcons,
+  bundleLabels,
+  bundleIcons,
   rentalStatusLabels 
 } from '@/types/rental';
 import { calculateRentalPrice, formatPrice } from '@/lib/pricing';
@@ -49,12 +53,14 @@ export default function Rentals() {
     inventory, 
     addRental, 
     returnRental,
+    addInventoryItem,
     getAvailableItems 
   } = useRental();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     customerId: '',
@@ -69,11 +75,18 @@ export default function Rentals() {
     category: ItemCategory;
     name: string;
     hasIsraeliNumber: boolean;
+    isGeneric?: boolean;
   }>>([]);
 
   // Item selection state
   const [itemSearchTerm, setItemSearchTerm] = useState('');
   const [itemCategoryFilter, setItemCategoryFilter] = useState<string>('all');
+
+  // Quick add inventory state
+  const [quickAddData, setQuickAddData] = useState({
+    category: 'sim_european' as ItemCategory,
+    name: '',
+  });
 
   const filteredRentals = rentals.filter(rental => {
     const matchesSearch = 
@@ -104,6 +117,61 @@ export default function Rentals() {
     setSelectedItems([]);
     setItemSearchTerm('');
     setItemCategoryFilter('all');
+  };
+
+  // Add bundle items
+  const handleAddBundle = (bundleType: BundleType) => {
+    const bundleId = `bundle-${Date.now()}`;
+    if (bundleType === 'european_sim_simple') {
+      setSelectedItems([...selectedItems, 
+        { inventoryItemId: `${bundleId}-sim`, category: 'sim_european', name: 'סים אירופאי (באנדל)', hasIsraeliNumber: false, isGeneric: true },
+        { inventoryItemId: `${bundleId}-device`, category: 'device_simple', name: 'מכשיר פשוט (באנדל)', hasIsraeliNumber: false, isGeneric: true },
+      ]);
+    } else if (bundleType === 'european_sim_smartphone') {
+      setSelectedItems([...selectedItems, 
+        { inventoryItemId: `${bundleId}-sim`, category: 'sim_european', name: 'סים אירופאי (באנדל)', hasIsraeliNumber: false, isGeneric: true },
+        { inventoryItemId: `${bundleId}-device`, category: 'device_smartphone', name: 'סמארטפון (באנדל)', hasIsraeliNumber: false, isGeneric: true },
+      ]);
+    }
+    toast({
+      title: 'באנדל נוסף',
+      description: bundleLabels[bundleType],
+    });
+  };
+
+  // Add generic item (not linked to inventory)
+  const handleAddGenericItem = (category: ItemCategory) => {
+    const genericId = `generic-${Date.now()}`;
+    setSelectedItems([...selectedItems, {
+      inventoryItemId: genericId,
+      category,
+      name: `${categoryLabels[category]} (כללי)`,
+      hasIsraeliNumber: false,
+      isGeneric: true,
+    }]);
+  };
+
+  // Quick add new inventory item
+  const handleQuickAddInventory = () => {
+    if (!quickAddData.name) {
+      toast({
+        title: 'שגיאה',
+        description: 'יש להזין שם לפריט',
+        variant: 'destructive',
+      });
+      return;
+    }
+    addInventoryItem({
+      category: quickAddData.category,
+      name: quickAddData.name,
+      status: 'available',
+    });
+    toast({
+      title: 'פריט נוסף למלאי',
+      description: `${quickAddData.name} נוסף למלאי`,
+    });
+    setQuickAddData({ category: 'sim_european', name: '' });
+    setIsQuickAddOpen(false);
   };
 
   const handleAddItem = (inventoryItemId: string) => {
@@ -197,6 +265,7 @@ export default function Rentals() {
       itemCategory: item.category,
       itemName: item.name,
       hasIsraeliNumber: item.hasIsraeliNumber,
+      isGeneric: item.isGeneric,
     }));
 
     addRental({
@@ -302,7 +371,88 @@ export default function Rentals() {
 
               {/* Item Selection */}
               <div className="space-y-3">
-                <Label>בחר פריטים להשכרה *</Label>
+                <div className="flex items-center justify-between">
+                  <Label>בחר פריטים להשכרה *</Label>
+                  <Dialog open={isQuickAddOpen} onOpenChange={setIsQuickAddOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-1">
+                        <PackagePlus className="h-4 w-4" />
+                        הוסף למלאי
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-sm">
+                      <DialogHeader>
+                        <DialogTitle>הוספה מהירה למלאי</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 mt-4">
+                        <div className="space-y-2">
+                          <Label>קטגוריה</Label>
+                          <Select 
+                            value={quickAddData.category} 
+                            onValueChange={(value: ItemCategory) => setQuickAddData({ ...quickAddData, category: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Object.entries(categoryLabels).map(([key, label]) => (
+                                <SelectItem key={key} value={key}>
+                                  {categoryIcons[key as ItemCategory]} {label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>שם הפריט</Label>
+                          <Input
+                            value={quickAddData.name}
+                            onChange={(e) => setQuickAddData({ ...quickAddData, name: e.target.value })}
+                            placeholder="לדוגמה: סים אירופאי #002"
+                          />
+                        </div>
+                        <Button onClick={handleQuickAddInventory} className="w-full">
+                          הוסף למלאי
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+
+                {/* Bundles */}
+                <div className="flex flex-wrap gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => handleAddBundle('european_sim_simple')}
+                    className="text-xs"
+                  >
+                    {bundleIcons.european_sim_simple} סים אירופאי + מכשיר פשוט
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => handleAddBundle('european_sim_smartphone')}
+                    className="text-xs"
+                  >
+                    {bundleIcons.european_sim_smartphone} סים אירופאי + סמארטפון
+                  </Button>
+                </div>
+
+                {/* Generic Items */}
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(categoryLabels).map(([key, label]) => (
+                    <Button 
+                      key={key}
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => handleAddGenericItem(key as ItemCategory)}
+                      className="text-xs border border-dashed border-border"
+                    >
+                      {categoryIcons[key as ItemCategory]} {label} (כללי)
+                    </Button>
+                  ))}
+                </div>
                 
                 {/* Category Filter */}
                 <div className="flex flex-col sm:flex-row gap-2">
@@ -327,17 +477,17 @@ export default function Rentals() {
                     <Input
                       value={itemSearchTerm}
                       onChange={(e) => setItemSearchTerm(e.target.value)}
-                      placeholder="חפש מוצר..."
+                      placeholder="חפש מוצר מהמלאי..."
                       className="pr-10"
                     />
                   </div>
                 </div>
 
-                {/* Items List */}
-                <div className="max-h-48 overflow-y-auto border rounded-lg p-2 space-y-1 bg-muted/30">
+                {/* Items List from Inventory */}
+                <div className="max-h-36 overflow-y-auto border rounded-lg p-2 space-y-1 bg-muted/30">
                   {filteredAvailableItems.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-4 text-sm">
-                      {availableItems.length === 0 ? 'אין פריטים זמינים' : 'לא נמצאו פריטים'}
+                    <p className="text-center text-muted-foreground py-3 text-sm">
+                      {availableItems.length === 0 ? 'אין פריטים זמינים במלאי' : 'לא נמצאו פריטים'}
                     </p>
                   ) : (
                     filteredAvailableItems.map((item) => (
