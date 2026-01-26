@@ -109,6 +109,9 @@ export default function Rentals() {
   // Item selection state
   const [itemSearchTerm, setItemSearchTerm] = useState('');
   const [itemCategoryFilter, setItemCategoryFilter] = useState<string>('all');
+  
+  // Customer search state
+  const [customerSearchTerm, setCustomerSearchTerm] = useState('');
   const [callingRentalId, setCallingRentalId] = useState<string | null>(null);
   const [payingRentalId, setPayingRentalId] = useState<string | null>(null);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
@@ -259,6 +262,13 @@ export default function Rentals() {
     return matchesSearch && matchesCategory;
   });
 
+  // Filter customers by search
+  const filteredCustomers = customers.filter(customer => {
+    const searchLower = customerSearchTerm.toLowerCase();
+    return customer.name.toLowerCase().includes(searchLower) ||
+           customer.phone.includes(customerSearchTerm);
+  });
+
   const resetForm = () => {
     setFormData({
       customerId: '',
@@ -270,6 +280,7 @@ export default function Rentals() {
     setSelectedItems([]);
     setItemSearchTerm('');
     setItemCategoryFilter('all');
+    setCustomerSearchTerm('');
   };
 
   // Add bundle items
@@ -577,10 +588,13 @@ export default function Rentals() {
             </DialogHeader>
             
             <div className="space-y-6 mt-4">
-              {/* Customer Selection */}
+              {/* Customer Selection with Search */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label>בחר לקוח *</Label>
+                  <Label className="flex items-center gap-2">
+                    <User className="h-4 w-4 text-primary" />
+                    בחר לקוח *
+                  </Label>
                   <Button
                     type="button"
                     variant="ghost"
@@ -592,21 +606,53 @@ export default function Rentals() {
                     הוסף לקוח חדש
                   </Button>
                 </div>
-                <Select 
-                  value={formData.customerId} 
-                  onValueChange={(value) => setFormData({ ...formData, customerId: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="בחר לקוח מהרשימה" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {customers.map((customer) => (
-                      <SelectItem key={customer.id} value={customer.id}>
-                        {customer.name} - {customer.phone}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                
+                {/* Customer Search Input */}
+                <div className="relative">
+                  <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    value={customerSearchTerm}
+                    onChange={(e) => setCustomerSearchTerm(e.target.value)}
+                    placeholder="חפש לקוח לפי שם או טלפון..."
+                    className="pr-10"
+                  />
+                </div>
+
+                {/* Customer List */}
+                <div className="max-h-40 overflow-y-auto border rounded-lg bg-muted/30">
+                  {filteredCustomers.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-4 text-sm">
+                      {customers.length === 0 ? 'אין לקוחות במערכת' : 'לא נמצאו לקוחות'}
+                    </p>
+                  ) : (
+                    filteredCustomers.map((customer) => (
+                      <button
+                        key={customer.id}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, customerId: customer.id })}
+                        className={`w-full flex items-center justify-between p-3 hover:bg-muted text-right transition-colors border-b last:border-b-0 ${
+                          formData.customerId === customer.id ? 'bg-primary/10 border-primary/30' : ''
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
+                            <User className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-foreground">{customer.name}</p>
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Phone className="h-3 w-3" />
+                              {customer.phone}
+                            </p>
+                          </div>
+                        </div>
+                        {formData.customerId === customer.id && (
+                          <span className="text-xs text-primary font-medium">נבחר ✓</span>
+                        )}
+                      </button>
+                    ))
+                  )}
+                </div>
               </div>
 
               {/* Dates */}
@@ -629,10 +675,14 @@ export default function Rentals() {
                 </div>
               </div>
 
-              {/* Item Selection */}
-              <div className="space-y-3">
+
+
+              <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <Label>בחר פריטים להשכרה *</Label>
+                  <Label className="flex items-center gap-2">
+                    <Package className="h-4 w-4 text-primary" />
+                    בחר פריטים להשכרה *
+                  </Label>
                   <Dialog open={isQuickAddOpen} onOpenChange={setIsQuickAddOpen}>
                     <DialogTrigger asChild>
                       <Button variant="outline" size="sm" className="gap-1">
@@ -679,100 +729,132 @@ export default function Rentals() {
                   </Dialog>
                 </div>
 
-                {/* Bundles */}
-                <div className="flex flex-wrap gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                {/* Quick Bundles - Prominent Cards */}
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
                     onClick={() => handleAddBundle('european_sim_simple')}
-                    className="text-xs"
+                    className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 hover:bg-primary/10 hover:border-primary/50 transition-all"
                   >
-                    {bundleIcons.european_sim_simple} סים אירופאי + מכשיר פשוט
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                    <div className="flex items-center gap-2 text-2xl">
+                      <span>🇪🇺</span>
+                      <span>+</span>
+                      <span>📱</span>
+                    </div>
+                    <span className="text-sm font-medium text-primary">סים אירופאי + מכשיר פשוט</span>
+                    <span className="text-xs text-muted-foreground">באנדל מוזל</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => handleAddBundle('european_sim_smartphone')}
-                    className="text-xs"
+                    className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-dashed border-secondary/50 bg-secondary/10 hover:bg-secondary/20 hover:border-secondary transition-all"
                   >
-                    {bundleIcons.european_sim_smartphone} סים אירופאי + סמארטפון
-                  </Button>
+                    <div className="flex items-center gap-2 text-2xl">
+                      <span>🇪🇺</span>
+                      <span>+</span>
+                      <span>📲</span>
+                    </div>
+                    <span className="text-sm font-medium text-foreground">סים אירופאי + סמארטפון</span>
+                    <span className="text-xs text-muted-foreground">באנדל מוזל</span>
+                  </button>
                 </div>
 
-                {/* Generic Items */}
-                <div className="flex flex-wrap gap-2">
-                  {Object.entries(categoryLabels).map(([key, label]) => (
-                    <Button 
-                      key={key}
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => handleAddGenericItem(key as ItemCategory)}
-                      className="text-xs border border-dashed border-border"
-                    >
-                      {categoryIcons[key as ItemCategory]} {label} (כללי)
-                    </Button>
-                  ))}
-                </div>
-                
-                {/* Category Filter */}
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <Select value={itemCategoryFilter} onValueChange={setItemCategoryFilter}>
-                    <SelectTrigger className="w-full sm:w-48">
-                      <SelectValue placeholder="כל הקטגוריות" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">כל הקטגוריות</SelectItem>
-                      <SelectItem value="sim_american">🇺🇸 סים אמריקאי</SelectItem>
-                      <SelectItem value="sim_european">🇪🇺 סים אירופאי</SelectItem>
-                      <SelectItem value="device_simple">📱 מכשיר פשוט</SelectItem>
-                      <SelectItem value="device_smartphone">📲 סמארטפון</SelectItem>
-                      <SelectItem value="modem">📡 מודם</SelectItem>
-                      <SelectItem value="netstick">📶 נטסטיק</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  
-                  {/* Search Input */}
-                  <div className="relative flex-1">
-                    <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      value={itemSearchTerm}
-                      onChange={(e) => setItemSearchTerm(e.target.value)}
-                      placeholder="חפש מוצר מהמלאי..."
-                      className="pr-10"
-                    />
+                {/* Generic Items - Category Cards */}
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">או הוסף פריט כללי:</p>
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                    {Object.entries(categoryLabels).map(([key, label]) => (
+                      <button 
+                        key={key}
+                        type="button"
+                        onClick={() => handleAddGenericItem(key as ItemCategory)}
+                        className="flex flex-col items-center gap-1 p-3 rounded-lg border border-border bg-card hover:bg-muted transition-colors"
+                      >
+                        <span className="text-2xl">{categoryIcons[key as ItemCategory]}</span>
+                        <span className="text-xs text-center leading-tight">{label}</span>
+                      </button>
+                    ))}
                   </div>
                 </div>
+                
+                {/* Inventory Items Section */}
+                <div className="border rounded-xl p-4 bg-card">
+                  <p className="text-sm font-medium mb-3 flex items-center gap-2">
+                    <ShoppingCart className="h-4 w-4" />
+                    בחר מהמלאי
+                  </p>
+                  
+                  {/* Search and Filter */}
+                  <div className="flex flex-col sm:flex-row gap-2 mb-3">
+                    <Select value={itemCategoryFilter} onValueChange={setItemCategoryFilter}>
+                      <SelectTrigger className="w-full sm:w-48">
+                        <SelectValue placeholder="כל הקטגוריות" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">כל הקטגוריות</SelectItem>
+                        <SelectItem value="sim_american">🇺🇸 סים אמריקאי</SelectItem>
+                        <SelectItem value="sim_european">🇪🇺 סים אירופאי</SelectItem>
+                        <SelectItem value="device_simple">📱 מכשיר פשוט</SelectItem>
+                        <SelectItem value="device_smartphone">📲 סמארטפון</SelectItem>
+                        <SelectItem value="modem">📡 מודם</SelectItem>
+                        <SelectItem value="netstick">📶 נטסטיק</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    
+                    <div className="relative flex-1">
+                      <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        value={itemSearchTerm}
+                        onChange={(e) => setItemSearchTerm(e.target.value)}
+                        placeholder="חפש מוצר..."
+                        className="pr-10"
+                      />
+                    </div>
+                  </div>
 
-                {/* Items List from Inventory */}
-                <div className="max-h-36 overflow-y-auto border rounded-lg p-2 space-y-1 bg-muted/30">
-                  {filteredAvailableItems.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-3 text-sm">
-                      {availableItems.length === 0 ? 'אין פריטים זמינים במלאי' : 'לא נמצאו פריטים'}
-                    </p>
-                  ) : (
-                    filteredAvailableItems.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => handleAddItem(item.id)}
-                        disabled={selectedItems.some(i => i.inventoryItemId === item.id)}
-                        className="w-full flex items-center justify-between p-2 rounded-md hover:bg-muted text-right transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg">{categoryIcons[item.category]}</span>
-                          <div>
-                            <p className="font-medium text-foreground text-sm">{item.name}</p>
-                            <p className="text-xs text-muted-foreground">{categoryLabels[item.category]}</p>
-                          </div>
-                        </div>
-                        {selectedItems.some(i => i.inventoryItemId === item.id) ? (
-                          <span className="text-xs text-success">נבחר ✓</span>
-                        ) : (
-                          <Plus className="h-4 w-4 text-muted-foreground" />
-                        )}
-                      </button>
-                    ))
-                  )}
+                  {/* Items Grid */}
+                  <div className="max-h-48 overflow-y-auto">
+                    {filteredAvailableItems.length === 0 ? (
+                      <div className="text-center py-8">
+                        <Package className="h-12 w-12 mx-auto text-muted-foreground/30 mb-2" />
+                        <p className="text-muted-foreground text-sm">
+                          {availableItems.length === 0 ? 'אין פריטים זמינים במלאי' : 'לא נמצאו פריטים'}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {filteredAvailableItems.map((item) => {
+                          const isSelected = selectedItems.some(i => i.inventoryItemId === item.id);
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => handleAddItem(item.id)}
+                              disabled={isSelected}
+                              className={`flex items-center gap-3 p-3 rounded-lg text-right transition-all ${
+                                isSelected 
+                                  ? 'bg-primary/10 border-2 border-primary/30 cursor-default' 
+                                  : 'bg-muted/50 hover:bg-muted border-2 border-transparent hover:border-primary/20'
+                              }`}
+                            >
+                              <div className="h-10 w-10 rounded-lg bg-background flex items-center justify-center text-xl shrink-0">
+                                {categoryIcons[item.category]}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-foreground text-sm truncate">{item.name}</p>
+                                <p className="text-xs text-muted-foreground">{categoryLabels[item.category]}</p>
+                              </div>
+                              {isSelected ? (
+                                <span className="text-xs text-primary font-medium shrink-0">✓</span>
+                              ) : (
+                                <Plus className="h-4 w-4 text-muted-foreground shrink-0" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
