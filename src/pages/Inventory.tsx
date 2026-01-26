@@ -24,7 +24,8 @@ import {
   Search, 
   Edit2, 
   Trash2,
-  Package
+  Package,
+  Upload
 } from 'lucide-react';
 import { 
   InventoryItem, 
@@ -33,6 +34,7 @@ import {
   categoryIcons 
 } from '@/types/rental';
 import { useToast } from '@/hooks/use-toast';
+import { ImportDialog } from '@/components/inventory/ImportDialog';
 
 export default function Inventory() {
   const { inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem } = useRental();
@@ -40,6 +42,7 @@ export default function Inventory() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
 
   const [formData, setFormData] = useState({
@@ -147,16 +150,21 @@ export default function Inventory() {
         title="ניהול מלאי" 
         description="הוספה, עריכה ומעקב אחר פריטים במלאי"
       >
-        <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
-          setIsAddDialogOpen(open);
-          if (!open) resetForm();
-        }}>
-          <DialogTrigger asChild>
-            <Button variant="glow" size="lg">
-              <Plus className="h-5 w-5" />
-              הוסף פריט
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Button variant="outline" size="lg" onClick={() => setIsImportDialogOpen(true)}>
+            <Upload className="h-5 w-5" />
+            ייבוא מקובץ
+          </Button>
+          <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
+            setIsAddDialogOpen(open);
+            if (!open) resetForm();
+          }}>
+            <DialogTrigger asChild>
+              <Button variant="glow" size="lg">
+                <Plus className="h-5 w-5" />
+                הוסף פריט
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>
@@ -267,7 +275,13 @@ export default function Inventory() {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </PageHeader>
+
+      <ImportDialog 
+        isOpen={isImportDialogOpen} 
+        onClose={() => setIsImportDialogOpen(false)} 
+      />
 
       {/* Filters */}
       <div className="flex flex-col md:flex-row gap-4 mb-6">
