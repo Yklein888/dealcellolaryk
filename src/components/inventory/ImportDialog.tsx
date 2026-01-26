@@ -89,11 +89,20 @@ export function ImportDialog({ isOpen, onClose }: ImportDialogProps) {
 
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+      // Read with cellText to preserve phone numbers as text
+      const workbook = XLSX.read(arrayBuffer, { 
+        type: 'array',
+        raw: true,
+        cellText: true,
+        cellDates: true
+      });
       const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      
+      // Use rawNumbers: false to prevent formula interpretation
       const jsonData = XLSX.utils.sheet_to_json<Record<string, string>>(firstSheet, { 
         header: 1,
         raw: false,
+        rawNumbers: false,
         defval: ''
       });
 
