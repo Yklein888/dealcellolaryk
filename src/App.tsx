@@ -12,6 +12,8 @@ import Rentals from "./pages/Rentals";
 import Customers from "./pages/Customers";
 import Inventory from "./pages/Inventory";
 import Repairs from "./pages/Repairs";
+import PaymentSuccess from "./pages/PaymentSuccess";
+import PaymentError from "./pages/PaymentError";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +34,8 @@ const App = () => (
                   <Route path="/customers" element={<Customers />} />
                   <Route path="/inventory" element={<Inventory />} />
                   <Route path="/repairs" element={<Repairs />} />
+                  <Route path="/payment-success" element={<PaymentSuccess />} />
+                  <Route path="/payment-error" element={<PaymentError />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </AppLayout>
