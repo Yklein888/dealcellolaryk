@@ -304,10 +304,11 @@ export default function Inventory() {
         </div>
       ) : (
         <div className="space-y-2">
-          {filteredInventory.map((item) => (
+          {filteredInventory.map((item, index) => (
             <div 
               key={item.id}
-              className="flex items-center justify-between p-3 rounded-lg border border-border bg-card hover:border-primary/30 transition-all duration-200"
+              className="flex items-center justify-between p-3 rounded-lg border border-border bg-card hover:border-primary/30 transition-all duration-200 animate-slide-up"
+              style={{ animationDelay: `${index * 50}ms` }}
             >
               <div className="flex items-center gap-3 flex-1">
                 <span className="text-xl">{categoryIcons[item.category]}</span>
