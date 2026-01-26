@@ -37,17 +37,19 @@ serve(async (req) => {
     // Clean phone number - remove non-digits
     const cleanPhone = phone.replace(/\D/g, '');
     
-    // Build Yemot API URL for outgoing call with TTS
-    const yemotUrl = new URL('https://www.call2all.co.il/ym/api/CallFile');
+    // Try the RunCampaign API endpoint for TTS calls
+    // Format: https://www.call2all.co.il/ym/api/RunCampaign
+    const yemotUrl = new URL('https://www.call2all.co.il/ym/api/RunCampaign');
     yemotUrl.searchParams.set('token', `${systemNumber}:${password}`);
     yemotUrl.searchParams.set('phones', cleanPhone);
-    yemotUrl.searchParams.set('tts_text', message);
+    yemotUrl.searchParams.set('tts', message);
     
     if (callerId) {
       yemotUrl.searchParams.set('caller_id', callerId);
     }
 
-    console.log('Calling Yemot API for phone:', cleanPhone);
+    console.log('Calling Yemot RunCampaign API for phone:', cleanPhone);
+    console.log('URL:', yemotUrl.toString().replace(password, '***'));
 
     const response = await fetch(yemotUrl.toString());
     const responseText = await response.text();
@@ -62,10 +64,15 @@ serve(async (req) => {
       result = { raw: responseText };
     }
 
+    // Check if response indicates success
+    const isSuccess = result.responseStatus === 'OK' || 
+                      (result.success !== undefined && result.success) ||
+                      (!result.responseStatus && !result.error);
+
     return new Response(
       JSON.stringify({ 
-        success: true, 
-        message: 'Call initiated successfully',
+        success: isSuccess, 
+        message: isSuccess ? 'Call initiated successfully' : 'Call may have failed',
         result 
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
