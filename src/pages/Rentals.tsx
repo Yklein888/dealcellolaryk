@@ -68,6 +68,7 @@ export default function Rentals() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterCategory, setFilterCategory] = useState<string>('all');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [isQuickAddCustomerOpen, setIsQuickAddCustomerOpen] = useState(false);
@@ -234,7 +235,8 @@ export default function Rentals() {
       rental.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       rental.items.some(i => i.itemName.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesStatus = filterStatus === 'all' || rental.status === filterStatus;
-    return matchesSearch && matchesStatus;
+    const matchesCategory = filterCategory === 'all' || rental.items.some(i => i.itemCategory === filterCategory);
+    return matchesSearch && matchesStatus && matchesCategory;
   });
 
   const availableItems = getAvailableItems();
@@ -825,7 +827,7 @@ export default function Rentals() {
           />
         </div>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-full md:w-48">
+          <SelectTrigger className="w-full md:w-40">
             <SelectValue placeholder="כל הסטטוסים" />
           </SelectTrigger>
           <SelectContent>
@@ -833,6 +835,20 @@ export default function Rentals() {
             <SelectItem value="active">פעיל</SelectItem>
             <SelectItem value="overdue">באיחור</SelectItem>
             <SelectItem value="returned">הוחזר</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={filterCategory} onValueChange={setFilterCategory}>
+          <SelectTrigger className="w-full md:w-44">
+            <SelectValue placeholder="כל הקטגוריות" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">כל הקטגוריות</SelectItem>
+            <SelectItem value="sim_american">🇺🇸 סים אמריקאי</SelectItem>
+            <SelectItem value="sim_european">🇪🇺 סים אירופאי</SelectItem>
+            <SelectItem value="device_simple">📱 מכשיר פשוט</SelectItem>
+            <SelectItem value="device_smartphone">📲 סמארטפון</SelectItem>
+            <SelectItem value="modem">📡 מודם</SelectItem>
+            <SelectItem value="netstick">📶 נטסטיק</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -908,7 +924,7 @@ export default function Rentals() {
               </div>
 
               {/* Actions */}
-              {rental.status === 'active' && (
+              {(rental.status === 'active' || rental.status === 'overdue') && (
                 <div className="flex justify-center gap-1 mt-auto">
                   <Button 
                     variant="default"
