@@ -9,6 +9,7 @@ interface YemotCallRequest {
   phone: string;
   message: string;
   callerId?: string;
+  campaignType?: 'repair_ready' | 'rental_reminder';
 }
 
 serve(async (req) => {
@@ -25,7 +26,7 @@ serve(async (req) => {
       throw new Error('Yemot credentials not configured');
     }
 
-    const { phone, message, callerId } = await req.json() as YemotCallRequest;
+    const { phone, message, callerId, campaignType } = await req.json() as YemotCallRequest;
 
     if (!phone || !message) {
       return new Response(
@@ -43,6 +44,13 @@ serve(async (req) => {
     yemotUrl.searchParams.set('token', `${systemNumber}:${password}`);
     yemotUrl.searchParams.set('phones', cleanPhone);
     yemotUrl.searchParams.set('tts', message);
+    
+    // Set campaign name based on type
+    if (campaignType === 'rental_reminder') {
+      yemotUrl.searchParams.set('campaign_name', 'תזכורת ללקוחות החזרת ציוד מושכר');
+    } else {
+      yemotUrl.searchParams.set('campaign_name', 'הודעה ללקוח על איסוף מכשיר');
+    }
     
     if (callerId) {
       yemotUrl.searchParams.set('caller_id', callerId);
