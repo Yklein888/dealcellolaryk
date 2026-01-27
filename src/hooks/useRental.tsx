@@ -49,11 +49,23 @@ export function RentalProvider({ children }: { children: ReactNode }) {
   // Fetch all data from database with retry logic.
   // IMPORTANT: one failed table fetch should NOT block the others (e.g. inventory failure shouldn't hide customers).
   const fetchData = async (retryCount = 0) => {
-    const maxRetries = 2;
+    const maxRetries = 3;
 
     const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
     type QueryResult<T> = { data: T[] | null; error: unknown | null };
+
+    const fetchWithTimeout = async <T,>(
+      queryBuilder: { then: (resolve: (value: T) => void) => PromiseLike<T> },
+      timeoutMs = 15000
+    ): Promise<T> => {
+      return Promise.race([
+        Promise.resolve().then(() => queryBuilder as unknown as Promise<T>),
+        new Promise<T>((_, reject) =>
+          setTimeout(() => reject(new Error('Request timeout')), timeoutMs)
+        ),
+      ]);
+    };
 
     const runFetchesOnce = async () => {
       const results = await Promise.allSettled([
@@ -78,12 +90,15 @@ export function RentalProvider({ children }: { children: ReactNode }) {
 
       const res = await runFetchesOnce();
 
-      // Retry only when we hit network-level failures (e.g. "Failed to fetch")
+      // Retry when we hit network-level failures (e.g. "Failed to fetch", "timeout")
       const hasNetworkFailure = Object.values(res).some(
-        (r) => r.status === 'rejected' && String((r as PromiseRejectedResult).reason).toLowerCase().includes('failed to fetch')
+        (r) => r.status === 'rejected' && 
+          (String((r as PromiseRejectedResult).reason).toLowerCase().includes('failed to fetch') ||
+           String((r as PromiseRejectedResult).reason).toLowerCase().includes('timeout'))
       );
       if (hasNetworkFailure && retryCount < maxRetries) {
-        await sleep(1000 * (retryCount + 1));
+        // Exponential backoff: 1.5s, 3s, 4.5s
+        await sleep(1500 * (retryCount + 1));
         return fetchData(retryCount + 1);
       }
 
