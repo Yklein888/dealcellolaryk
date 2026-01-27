@@ -18,21 +18,39 @@ const formatPhoneNumber = (num: string | undefined): string => {
     }
   }
   
-  return num;
+  // Remove any existing dashes or spaces
+  return num.replace(/[-\s]/g, '');
 };
 
-// Format Israeli number with dashes (e.g., 0722-587-081)
+// Format Israeli number with dashes (e.g., 0722-587-081 or 0553-232-3232)
 const formatIsraeliDisplay = (num: string): string => {
-  if (num.length === 10) {
-    return `${num.slice(0, 4)}-${num.slice(4, 7)}-${num.slice(7)}`;
+  // Remove non-digits
+  const digits = num.replace(/\D/g, '');
+  
+  if (digits.length === 10) {
+    // 10 digits: 0722-587-081 format
+    return `${digits.slice(0, 4)}-${digits.slice(4, 7)}-${digits.slice(7)}`;
+  } else if (digits.length === 11) {
+    // 11 digits: 0553-232-3232 format
+    return `${digits.slice(0, 4)}-${digits.slice(4, 7)}-${digits.slice(7)}`;
+  } else if (digits.length === 9) {
+    // 9 digits (without leading 0): add 0 and format
+    return `0${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
   }
   return num;
 };
 
 // Format international number (e.g., 44-7429629581)
 const formatInternationalDisplay = (num: string): string => {
-  if (num.startsWith('44') && num.length > 10) {
-    return `44-${num.slice(2)}`;
+  // Remove non-digits
+  const digits = num.replace(/\D/g, '');
+  
+  if (digits.startsWith('44')) {
+    return `44-${digits.slice(2)}`;
+  }
+  // If it doesn't start with 44, assume it's a UK number and add 44
+  if (digits.length >= 10) {
+    return `44-${digits}`;
   }
   return num;
 };
@@ -52,6 +70,8 @@ serve(async (req) => {
     const israeliDisplay = formattedIsraeli ? formatIsraeliDisplay(formattedIsraeli) : '---';
     const localDisplay = formattedLocal ? formatInternationalDisplay(formattedLocal) : '---';
 
+    console.log("Input Israeli:", israeliNumber, "-> Formatted:", israeliDisplay);
+    console.log("Input Local:", localNumber, "-> Formatted:", localDisplay);
     console.log("Fetching template from:", templateUrl);
 
     // Fetch the template
@@ -77,13 +97,17 @@ serve(async (req) => {
     // The template has "0722-587-081" as the Israeli number and "44-7429629581" as the local number
     let modifiedXml = documentXml;
     
-    // Replace Israeli number
+    // Replace Israeli number placeholder
     modifiedXml = modifiedXml.replace(/0722-587-081/g, israeliDisplay);
     
-    // Replace local number
+    // Replace local number placeholder
     modifiedXml = modifiedXml.replace(/44-7429629581/g, localDisplay);
     
-    console.log("Modified document, Israeli:", israeliDisplay, "Local:", localDisplay);
+    // Log if replacements were made
+    const israeliReplaced = documentXml.includes('0722-587-081');
+    const localReplaced = documentXml.includes('44-7429629581');
+    console.log("Israeli placeholder found:", israeliReplaced, "Local placeholder found:", localReplaced);
+    console.log("Final Israeli:", israeliDisplay, "Final Local:", localDisplay);
 
     // Update the document.xml in the zip
     zip.file("word/document.xml", modifiedXml);
