@@ -153,7 +153,8 @@ serve(async (req) => {
                 transaction_id: transactionId,
               });
 
-              console.log(`Rental ${rental.id}: Charged ${chargeAmount} ${rental.currency} successfully`);
+              // Invoice is automatically created by pelecard-pay function
+              console.log(`Rental ${rental.id}: Charged ${chargeAmount} ${rental.currency} successfully, Invoice: ${paymentResult.invoiceNumber || 'created'}`);
               results.push({ rentalId: rental.id, status: 'charged', amount: chargeAmount });
             } else {
               // Record failed charge

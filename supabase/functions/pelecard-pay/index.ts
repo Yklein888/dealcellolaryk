@@ -236,6 +236,37 @@ serve(async (req) => {
         }
       }
 
+      // Generate invoice for successful payment
+      let invoiceNumber = null;
+      try {
+        const { data: invoice, error: invoiceError } = await supabase
+          .from('invoices')
+          .insert({
+            customer_id: customerId || null,
+            customer_name: customerName,
+            rental_id: rentalId || null,
+            transaction_id: transactionId,
+            amount,
+            currency: 'ILS',
+            description: description || `תשלום עבור ${customerName}`,
+            business_name: 'דיל סלולר',
+            business_id: '201512258',
+            status: 'issued',
+            issued_at: new Date().toISOString(),
+          })
+          .select('invoice_number')
+          .single();
+
+        if (invoiceError) {
+          console.error('Failed to create invoice:', invoiceError);
+        } else {
+          invoiceNumber = invoice.invoice_number;
+          console.log('Invoice created:', invoiceNumber);
+        }
+      } catch (invoiceErr) {
+        console.error('Error creating invoice:', invoiceErr);
+      }
+
       return new Response(
         JSON.stringify({ 
           success: true, 
@@ -244,6 +275,7 @@ serve(async (req) => {
           voucherId: data.VoucherId,
           approvalNumber: data.DebitApproveNumber,
           tokenSaved: !!returnedToken,
+          invoiceNumber,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
