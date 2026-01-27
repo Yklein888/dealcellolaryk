@@ -117,6 +117,7 @@ export default function Rentals() {
   
   // Customer search state
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+  const [downloadingInstructions, setDownloadingInstructions] = useState<string | null>(null);
   const [callingRentalId, setCallingRentalId] = useState<string | null>(null);
   const [payingRentalId, setPayingRentalId] = useState<string | null>(null);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
@@ -389,6 +390,36 @@ export default function Rentals() {
     });
     setQuickAddData({ category: 'sim_european', name: '', localNumber: '', israeliNumber: '', expiryDate: '' });
     setIsQuickAddOpen(false);
+  };
+
+  // Handle downloading calling instructions with error handling
+  const handleDownloadInstructions = async (itemId: string, israeliNumber?: string, localNumber?: string) => {
+    if (!israeliNumber && !localNumber) {
+      toast({
+        title: 'אין מספרים',
+        description: 'לסים זה אין מספר ישראלי או מקומי מוגדר',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setDownloadingInstructions(itemId);
+    try {
+      await generateCallingInstructions(israeliNumber, localNumber);
+      toast({
+        title: 'ההורדה הושלמה',
+        description: 'קובץ הוראות החיוג הורד בהצלחה',
+      });
+    } catch (error) {
+      console.error('Error downloading instructions:', error);
+      toast({
+        title: 'שגיאה בהורדה',
+        description: error instanceof Error ? error.message : 'לא ניתן להוריד את קובץ ההוראות',
+        variant: 'destructive',
+      });
+    } finally {
+      setDownloadingInstructions(null);
+    }
   };
 
   const isSim = (category: ItemCategory) => 
@@ -996,13 +1027,19 @@ export default function Rentals() {
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                onClick={() => generateCallingInstructions(
+                                onClick={() => handleDownloadInstructions(
+                                  item.inventoryItemId,
                                   inventoryItem.israeliNumber || undefined,
                                   inventoryItem.localNumber || undefined
                                 )}
+                                disabled={downloadingInstructions === item.inventoryItemId}
                                 className="gap-1 text-xs"
                               >
-                                <FileDown className="h-3 w-3" />
+                                {downloadingInstructions === item.inventoryItemId ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <FileDown className="h-3 w-3" />
+                                )}
                                 הורד הוראות
                               </Button>
                             )}
@@ -1200,30 +1237,37 @@ export default function Rentals() {
               </div>
 
               {/* Download Instructions for European SIM */}
-              {rental.items.some(item => item.itemCategory === 'sim_european' && !item.isGeneric && item.inventoryItemId) && (
-                <div className="flex justify-center mb-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const europeanSimItem = rental.items.find(item => item.itemCategory === 'sim_european' && !item.isGeneric && item.inventoryItemId);
-                      if (europeanSimItem) {
-                        const inventoryItem = inventory.find(i => i.id === europeanSimItem.inventoryItemId);
+              {rental.items.some(item => item.itemCategory === 'sim_european' && !item.isGeneric && item.inventoryItemId) && (() => {
+                const europeanSimItem = rental.items.find(item => item.itemCategory === 'sim_european' && !item.isGeneric && item.inventoryItemId);
+                const inventoryItem = europeanSimItem ? inventory.find(i => i.id === europeanSimItem.inventoryItemId) : null;
+                const itemId = `rental-${rental.id}`;
+                return (
+                  <div className="flex justify-center mb-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
                         if (inventoryItem) {
-                          generateCallingInstructions(
+                          handleDownloadInstructions(
+                            itemId,
                             inventoryItem.israeliNumber || undefined,
                             inventoryItem.localNumber || undefined
                           );
                         }
-                      }
-                    }}
-                    className="gap-1 text-xs w-full"
-                  >
-                    <FileDown className="h-3 w-3" />
-                    הורד הוראות חיוג
-                  </Button>
-                </div>
-              )}
+                      }}
+                      disabled={downloadingInstructions === itemId || !inventoryItem}
+                      className="gap-1 text-xs w-full"
+                    >
+                      {downloadingInstructions === itemId ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <FileDown className="h-3 w-3" />
+                      )}
+                      הורד הוראות חיוג
+                    </Button>
+                  </div>
+                );
+              })()}
 
               {/* Actions - Always visible for active/overdue */}
               {(rental.status === 'active' || rental.status === 'overdue') && (
