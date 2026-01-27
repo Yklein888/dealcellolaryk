@@ -46,137 +46,201 @@ export function RentalProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  // Fetch all data from database with retry logic
+  // Fetch all data from database with retry logic.
+  // IMPORTANT: one failed table fetch should NOT block the others (e.g. inventory failure shouldn't hide customers).
   const fetchData = async (retryCount = 0) => {
     const maxRetries = 2;
-    
+
+    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    type QueryResult<T> = { data: T[] | null; error: unknown | null };
+
+    const runFetchesOnce = async () => {
+      const results = await Promise.allSettled([
+        supabase.from('customers').select('*').order('created_at', { ascending: false }),
+        supabase.from('inventory').select('*').order('created_at', { ascending: false }),
+        supabase.from('rentals').select('*').order('created_at', { ascending: false }),
+        supabase.from('rental_items').select('*'),
+        supabase.from('repairs').select('*').order('created_at', { ascending: false }),
+      ]);
+
+      return {
+        customers: results[0],
+        inventory: results[1],
+        rentals: results[2],
+        rentalItems: results[3],
+        repairs: results[4],
+      };
+    };
+
     try {
       setLoading(true);
-      
-      // Fetch customers
-      const { data: customersData, error: customersError } = await supabase
-        .from('customers')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (customersError) throw customersError;
-      
-      // Fetch inventory
-      const { data: inventoryData, error: inventoryError } = await supabase
-        .from('inventory')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (inventoryError) throw inventoryError;
-      
-      // Fetch rentals with their items
-      const { data: rentalsData, error: rentalsError } = await supabase
-        .from('rentals')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (rentalsError) throw rentalsError;
 
-      // Fetch rental items
-      const { data: rentalItemsData, error: rentalItemsError } = await supabase
-        .from('rental_items')
-        .select('*');
-      
-      if (rentalItemsError) throw rentalItemsError;
-      
-      // Fetch repairs
-      const { data: repairsData, error: repairsError } = await supabase
-        .from('repairs')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (repairsError) throw repairsError;
-      
-      // Map database format to app format
-      setCustomers(customersData?.map(c => ({
-        id: c.id,
-        name: c.name,
-        address: c.address || undefined,
-        phone: c.phone,
-        email: c.email || undefined,
-        creditCard: c.credit_card || undefined,
-        notes: c.notes || undefined,
-        createdAt: c.created_at.split('T')[0],
-        paymentToken: c.payment_token || undefined,
-        paymentTokenLast4: c.payment_token_last4 || undefined,
-        paymentTokenExpiry: c.payment_token_expiry || undefined,
-        paymentTokenUpdatedAt: c.payment_token_updated_at || undefined,
-      })) || []);
+      const res = await runFetchesOnce();
 
-      setInventory(inventoryData?.map(i => ({
-        id: i.id,
-        category: i.category as ItemCategory,
-        name: i.name,
-        localNumber: i.local_number || undefined,
-        israeliNumber: i.israeli_number || undefined,
-        expiryDate: i.expiry_date || undefined,
-        status: i.status as 'available' | 'rented' | 'maintenance',
-        notes: i.notes || undefined,
-      })) || []);
-
-      // Group rental items by rental_id
-      const itemsByRental: Record<string, typeof rentalItemsData> = {};
-      rentalItemsData?.forEach(item => {
-        if (!itemsByRental[item.rental_id]) {
-          itemsByRental[item.rental_id] = [];
-        }
-        itemsByRental[item.rental_id].push(item);
-      });
-
-      setRentals(rentalsData?.map(r => ({
-        id: r.id,
-        customerId: r.customer_id || '',
-        customerName: r.customer_name,
-        items: (itemsByRental[r.id] || []).map(item => ({
-          inventoryItemId: item.inventory_item_id || '',
-          itemCategory: item.item_category as ItemCategory,
-          itemName: item.item_name,
-          pricePerDay: item.price_per_day ? Number(item.price_per_day) : undefined,
-          hasIsraeliNumber: item.has_israeli_number || false,
-          isGeneric: item.is_generic || false,
-        })),
-        startDate: r.start_date,
-        endDate: r.end_date,
-        totalPrice: Number(r.total_price),
-        currency: r.currency as 'ILS' | 'USD',
-        status: r.status as 'active' | 'overdue' | 'returned',
-        deposit: r.deposit ? Number(r.deposit) : undefined,
-        notes: r.notes || undefined,
-        createdAt: r.created_at.split('T')[0],
-      })) || []);
-
-      setRepairs(repairsData?.map(r => ({
-        id: r.id,
-        repairNumber: r.repair_number,
-        deviceType: r.device_type,
-        deviceModel: r.device_model || undefined,
-        deviceCost: r.device_cost ? Number(r.device_cost) : undefined,
-        customerName: r.customer_name,
-        customerPhone: r.customer_phone || '',
-        problemDescription: r.problem_description,
-        status: r.status as 'in_lab' | 'ready' | 'collected',
-        isWarranty: r.is_warranty || false,
-        receivedDate: r.received_date,
-        completedDate: r.completed_date || undefined,
-        collectedDate: r.collected_date || undefined,
-        notes: r.notes || undefined,
-      })) || []);
-
-    } catch (error) {
-      console.error('Error fetching data:', error);
-      
-      // Retry on network errors
-      if (retryCount < maxRetries) {
-        console.log(`Retrying fetch (${retryCount + 1}/${maxRetries})...`);
-        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+      // Retry only when we hit network-level failures (e.g. "Failed to fetch")
+      const hasNetworkFailure = Object.values(res).some(
+        (r) => r.status === 'rejected' && String((r as PromiseRejectedResult).reason).toLowerCase().includes('failed to fetch')
+      );
+      if (hasNetworkFailure && retryCount < maxRetries) {
+        await sleep(1000 * (retryCount + 1));
         return fetchData(retryCount + 1);
       }
-      
+
+      const failedParts: string[] = [];
+
+      // Customers
+      if (res.customers.status === 'fulfilled') {
+        const { data, error } = res.customers.value as QueryResult<any>;
+        if (error) {
+          failedParts.push('לקוחות');
+        } else {
+          setCustomers(
+            (data || []).map((c) => ({
+              id: c.id,
+              name: c.name,
+              address: c.address || undefined,
+              phone: c.phone,
+              email: c.email || undefined,
+              creditCard: c.credit_card || undefined,
+              notes: c.notes || undefined,
+              createdAt: String(c.created_at).split('T')[0],
+              paymentToken: c.payment_token || undefined,
+              paymentTokenLast4: c.payment_token_last4 || undefined,
+              paymentTokenExpiry: c.payment_token_expiry || undefined,
+              paymentTokenUpdatedAt: c.payment_token_updated_at || undefined,
+            }))
+          );
+        }
+      } else {
+        failedParts.push('לקוחות');
+      }
+
+      // Inventory
+      if (res.inventory.status === 'fulfilled') {
+        const { data, error } = res.inventory.value as QueryResult<any>;
+        if (error) {
+          failedParts.push('מלאי');
+        } else {
+          setInventory(
+            (data || []).map((i) => ({
+              id: i.id,
+              category: i.category as ItemCategory,
+              name: i.name,
+              localNumber: i.local_number || undefined,
+              israeliNumber: i.israeli_number || undefined,
+              expiryDate: i.expiry_date || undefined,
+              status: i.status as 'available' | 'rented' | 'maintenance',
+              notes: i.notes || undefined,
+            }))
+          );
+        }
+      } else {
+        failedParts.push('מלאי');
+      }
+
+      // Rentals + Rental Items
+      let rentalsData: any[] | null = null;
+      let rentalsOk = false;
+      if (res.rentals.status === 'fulfilled') {
+        const { data, error } = res.rentals.value as QueryResult<any>;
+        if (error) {
+          failedParts.push('השכרות');
+        } else {
+          rentalsData = data;
+          rentalsOk = true;
+        }
+      } else {
+        failedParts.push('השכרות');
+      }
+
+      let rentalItemsData: any[] = [];
+      if (res.rentalItems.status === 'fulfilled') {
+        const { data, error } = res.rentalItems.value as QueryResult<any>;
+        if (error) {
+          failedParts.push('פריטי השכרה');
+        } else {
+          rentalItemsData = data || [];
+        }
+      } else {
+        failedParts.push('פריטי השכרה');
+      }
+
+      if (rentalsOk) {
+        const itemsByRental: Record<string, any[]> = {};
+        rentalItemsData.forEach((item) => {
+          if (!itemsByRental[item.rental_id]) itemsByRental[item.rental_id] = [];
+          itemsByRental[item.rental_id].push(item);
+        });
+
+        setRentals(
+          (rentalsData || []).map((r) => ({
+            id: r.id,
+            customerId: r.customer_id || '',
+            customerName: r.customer_name,
+            items: (itemsByRental[r.id] || []).map((item) => ({
+              inventoryItemId: item.inventory_item_id || '',
+              itemCategory: item.item_category as ItemCategory,
+              itemName: item.item_name,
+              pricePerDay: item.price_per_day ? Number(item.price_per_day) : undefined,
+              hasIsraeliNumber: item.has_israeli_number || false,
+              isGeneric: item.is_generic || false,
+            })),
+            startDate: r.start_date,
+            endDate: r.end_date,
+            totalPrice: Number(r.total_price),
+            currency: r.currency as 'ILS' | 'USD',
+            status: r.status as 'active' | 'overdue' | 'returned',
+            deposit: r.deposit ? Number(r.deposit) : undefined,
+            notes: r.notes || undefined,
+            createdAt: String(r.created_at).split('T')[0],
+          }))
+        );
+      }
+
+      // Repairs
+      if (res.repairs.status === 'fulfilled') {
+        const { data, error } = res.repairs.value as QueryResult<any>;
+        if (error) {
+          failedParts.push('תיקונים');
+        } else {
+          setRepairs(
+            (data || []).map((r) => ({
+              id: r.id,
+              repairNumber: r.repair_number,
+              deviceType: r.device_type,
+              deviceModel: r.device_model || undefined,
+              deviceCost: r.device_cost ? Number(r.device_cost) : undefined,
+              customerName: r.customer_name,
+              customerPhone: r.customer_phone || '',
+              problemDescription: r.problem_description,
+              status: r.status as 'in_lab' | 'ready' | 'collected',
+              isWarranty: r.is_warranty || false,
+              receivedDate: r.received_date,
+              completedDate: r.completed_date || undefined,
+              collectedDate: r.collected_date || undefined,
+              notes: r.notes || undefined,
+            }))
+          );
+        }
+      } else {
+        failedParts.push('תיקונים');
+      }
+
+      // Show one toast (avoid spamming) only if something failed
+      if (failedParts.length > 0) {
+        const uniqueFailed = Array.from(new Set(failedParts));
+        const allFailed = uniqueFailed.length >= 4; // customers+inventory+rentals+repairs (rentalItems is auxiliary)
+        toast({
+          title: allFailed ? 'שגיאה בטעינת נתונים' : 'חלק מהנתונים לא נטענו',
+          description: allFailed
+            ? 'לא ניתן לטעון את הנתונים מהשרת. נסה לרענן את הדף.'
+            : `נכשל בטעינת: ${uniqueFailed.join(', ')}. שאר הנתונים נטענו.`,
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
       toast({
         title: 'שגיאה בטעינת נתונים',
         description: 'לא ניתן לטעון את הנתונים מהשרת. נסה לרענן את הדף.',
