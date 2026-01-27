@@ -17,6 +17,7 @@ import UserManagement from "./pages/UserManagement";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentError from "./pages/PaymentError";
 import PaymentHistory from "./pages/PaymentHistory";
+import Invoices from "./pages/Invoices";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -40,6 +41,7 @@ const App = () => (
                     <Route path="/repairs" element={<Repairs />} />
                     <Route path="/users" element={<UserManagement />} />
                     <Route path="/payments" element={<PaymentHistory />} />
+                    <Route path="/invoices" element={<Invoices />} />
                     <Route path="/payment-success" element={<PaymentSuccess />} />
                     <Route path="/payment-error" element={<PaymentError />} />
                     <Route path="*" element={<NotFound />} />
