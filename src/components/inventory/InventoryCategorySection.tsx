@@ -105,7 +105,7 @@ export function InventoryCategorySection({
                       )}
                     </div>
                     {isSim(item.category) && (
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground mt-0.5">
                         {item.localNumber && <span>מקומי: {item.localNumber}</span>}
                         {item.israeliNumber && <span>ישראלי: {item.israeliNumber}</span>}
                         {item.expiryDate && (
@@ -113,6 +113,7 @@ export function InventoryCategorySection({
                             תוקף: {item.expiryDate}
                           </span>
                         )}
+                        {item.simNumber && <span>סים: {item.simNumber}</span>}
                       </div>
                     )}
                   </div>

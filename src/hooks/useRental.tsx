@@ -137,7 +137,7 @@ export function RentalProvider({ children }: { children: ReactNode }) {
         if (error) {
           failedParts.push('מלאי');
         } else {
-          setInventory(
+        setInventory(
             (data || []).map((i) => ({
               id: i.id,
               category: i.category as ItemCategory,
@@ -145,6 +145,7 @@ export function RentalProvider({ children }: { children: ReactNode }) {
               localNumber: i.local_number || undefined,
               israeliNumber: i.israeli_number || undefined,
               expiryDate: i.expiry_date || undefined,
+              simNumber: i.sim_number || undefined,
               status: i.status as 'available' | 'rented' | 'maintenance',
               notes: i.notes || undefined,
             }))
@@ -397,6 +398,7 @@ export function RentalProvider({ children }: { children: ReactNode }) {
         local_number: item.localNumber || null,
         israeli_number: item.israeliNumber || null,
         expiry_date: item.expiryDate || null,
+        sim_number: item.simNumber || null,
         status: item.status,
         notes: item.notes || null,
       })
@@ -415,6 +417,7 @@ export function RentalProvider({ children }: { children: ReactNode }) {
       localNumber: data.local_number || undefined,
       israeliNumber: data.israeli_number || undefined,
       expiryDate: data.expiry_date || undefined,
+      simNumber: data.sim_number || undefined,
       status: data.status as 'available' | 'rented' | 'maintenance',
       notes: data.notes || undefined,
     }, ...prev]);
@@ -427,6 +430,7 @@ export function RentalProvider({ children }: { children: ReactNode }) {
     if (item.localNumber !== undefined) updateData.local_number = item.localNumber;
     if (item.israeliNumber !== undefined) updateData.israeli_number = item.israeliNumber;
     if (item.expiryDate !== undefined) updateData.expiry_date = item.expiryDate;
+    if (item.simNumber !== undefined) updateData.sim_number = item.simNumber;
     if (item.status !== undefined) updateData.status = item.status;
     if (item.notes !== undefined) updateData.notes = item.notes;
 
