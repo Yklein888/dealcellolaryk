@@ -18,7 +18,6 @@ export type Database = {
         Row: {
           address: string | null
           created_at: string
-          credit_card: string | null
           email: string | null
           id: string
           name: string
@@ -33,7 +32,6 @@ export type Database = {
         Insert: {
           address?: string | null
           created_at?: string
-          credit_card?: string | null
           email?: string | null
           id?: string
           name: string
@@ -48,7 +46,6 @@ export type Database = {
         Update: {
           address?: string | null
           created_at?: string
-          credit_card?: string | null
           email?: string | null
           id?: string
           name?: string
@@ -165,6 +162,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "invoices_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_secure"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "invoices_rental_id_fkey"
             columns: ["rental_id"]
             isOneToOne: false
@@ -222,6 +226,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "overdue_charges_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_secure"
             referencedColumns: ["id"]
           },
           {
@@ -401,6 +412,13 @@ export type Database = {
             referencedRelation: "customers"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "rentals_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_secure"
+            referencedColumns: ["id"]
+          },
         ]
       }
       repairs: {
@@ -483,9 +501,62 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      customers_secure: {
+        Row: {
+          address: string | null
+          created_at: string | null
+          email: string | null
+          id: string | null
+          name: string | null
+          notes: string | null
+          payment_token_expiry: string | null
+          payment_token_last4: string | null
+          payment_token_updated_at: string | null
+          phone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: string | null
+          name?: string | null
+          notes?: string | null
+          payment_token_expiry?: string | null
+          payment_token_last4?: string | null
+          payment_token_updated_at?: string | null
+          phone?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: string | null
+          name?: string | null
+          notes?: string | null
+          payment_token_expiry?: string | null
+          payment_token_last4?: string | null
+          payment_token_updated_at?: string | null
+          phone?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      customer_has_payment_token: {
+        Args: { customer_id: string }
+        Returns: boolean
+      }
+      get_customer_payment_token: {
+        Args: { customer_id: string }
+        Returns: {
+          expiry: string
+          last4: string
+          token: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

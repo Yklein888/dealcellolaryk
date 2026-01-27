@@ -12,7 +12,8 @@ interface PelecardRequest {
   creditCard?: string;
   creditCardExpiry?: string; // Format: MMYY
   cvv?: string;
-  token?: string; // For token-based payments
+  token?: string; // For token-based payments (direct token - deprecated)
+  useStoredToken?: boolean; // SECURE: fetch token from DB instead of client
   customerId?: string;
   description?: string;
   rentalId?: string;
@@ -60,6 +61,7 @@ serve(async (req) => {
       creditCardExpiry,
       cvv,
       token,
+      useStoredToken,
       customerId,
       description,
       rentalId,
@@ -84,8 +86,28 @@ serve(async (req) => {
       );
     }
 
+    // SECURE TOKEN RETRIEVAL: If useStoredToken is true, fetch token from DB
+    let actualToken = token;
+    if (useStoredToken && customerId) {
+      console.log('Fetching stored token securely from database for customer:', customerId);
+      const { data: customerData, error: customerError } = await supabase
+        .from('customers')
+        .select('payment_token, payment_token_last4, payment_token_expiry')
+        .eq('id', customerId)
+        .single();
+      
+      if (customerError || !customerData?.payment_token) {
+        return new Response(
+          JSON.stringify({ error: 'No payment token found for customer' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      actualToken = customerData.payment_token;
+      console.log('Token retrieved securely, last4:', customerData.payment_token_last4);
+    }
+
     // Check for token or credit card details
-    const hasToken = !!token;
+    const hasToken = !!actualToken;
     const hasCardDetails = creditCard && creditCardExpiry && cvv;
 
     if (!hasToken && !hasCardDetails) {
@@ -169,7 +191,7 @@ serve(async (req) => {
 
     // Use token or card details
     if (hasToken) {
-      gatewayPayload.token = token;
+      gatewayPayload.token = actualToken!;
       gatewayPayload.creditCard = "";
       gatewayPayload.creditCardDateMmYy = "";
       gatewayPayload.cvv2 = "";

@@ -30,13 +30,13 @@ export interface Customer {
   address?: string;
   phone: string;
   email?: string;
-  creditCard?: string;
   notes?: string;
   createdAt: string;
-  paymentToken?: string;
+  // Payment token details - only last4 and expiry are exposed for display
+  // The actual token (paymentToken) is NEVER sent to the frontend for security
+  hasPaymentToken?: boolean; // Indicates if customer has a saved payment method
   paymentTokenLast4?: string;
   paymentTokenExpiry?: string;
-  paymentTokenUpdatedAt?: string;
 }
 
 export interface RentalItem {

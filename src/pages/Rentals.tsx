@@ -191,9 +191,9 @@ export default function Rentals() {
   const openPaymentDialog = (rental: Rental) => {
     setPaymentRental(rental);
     setPaymentFormData({ creditCard: '', creditCardExpiry: '', cvv: '' });
-    // Check if customer has stored token
+    // Check if customer has stored token (using the secure hasPaymentToken flag)
     const customer = customers.find(c => c.id === rental.customerId);
-    setUseStoredCard(!!customer?.paymentToken);
+    setUseStoredCard(!!customer?.hasPaymentToken);
     setIsPaymentDialogOpen(true);
   };
 
@@ -215,7 +215,7 @@ export default function Rentals() {
     if (!paymentRental) return;
     
     const customer = getPaymentCustomer();
-    const hasStoredToken = customer?.paymentToken;
+    const hasStoredToken = customer?.hasPaymentToken;
     
     // If using stored card, we don't need card details
     if (!useStoredCard) {
@@ -252,7 +252,8 @@ export default function Rentals() {
       };
 
       if (useStoredCard && hasStoredToken) {
-        paymentBody.token = customer.paymentToken;
+        // Token payment - backend will fetch the actual token securely
+        paymentBody.useStoredToken = true;
       } else {
         paymentBody.creditCard = paymentFormData.creditCard;
         paymentBody.creditCardExpiry = paymentFormData.creditCardExpiry;
@@ -1509,7 +1510,7 @@ export default function Rentals() {
           </DialogHeader>
           {paymentRental && (() => {
             const customer = getPaymentCustomer();
-            const hasStoredToken = customer?.paymentToken;
+            const hasStoredToken = customer?.hasPaymentToken;
             
             return (
             <div className="space-y-4 mt-4">
