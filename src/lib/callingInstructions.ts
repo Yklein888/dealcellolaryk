@@ -1,4 +1,4 @@
-import { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel, BorderStyle } from 'docx';
+import { Document, Packer, Paragraph, TextRun, AlignmentType, ImageRun, convertInchesToTwip, PageOrientation } from 'docx';
 import { saveAs } from 'file-saver';
 
 // Convert scientific notation (e.g., 9.72E+11) to regular number string
@@ -16,6 +16,23 @@ const formatPhoneNumber = (num: string | undefined): string => {
   return num;
 };
 
+// Format phone number with dashes for display (Israeli format: 0722-587-081)
+const formatIsraeliDisplay = (num: string): string => {
+  if (num.length === 10) {
+    return `${num.slice(0, 4)}-${num.slice(4, 7)}-${num.slice(7)}`;
+  }
+  return num;
+};
+
+// Format international number with country code (UK format: 44-7429629581)
+const formatInternationalDisplay = (num: string): string => {
+  // If starts with country code like 44, format as 44-rest
+  if (num.startsWith('44') && num.length > 10) {
+    return `44-${num.slice(2)}`;
+  }
+  return num;
+};
+
 export const generateCallingInstructions = async (
   israeliNumber: string | undefined,
   localNumber: string | undefined
@@ -23,184 +40,136 @@ export const generateCallingInstructions = async (
   const formattedIsraeli = formatPhoneNumber(israeliNumber);
   const formattedLocal = formatPhoneNumber(localNumber);
 
+  const israeliDisplay = formattedIsraeli ? formatIsraeliDisplay(formattedIsraeli) : '---';
+  const localDisplay = formattedLocal ? formatInternationalDisplay(formattedLocal) : '---';
+
   const doc = new Document({
     sections: [
       {
-        properties: {},
+        properties: {
+          page: {
+            size: {
+              orientation: PageOrientation.PORTRAIT,
+            },
+            margin: {
+              top: convertInchesToTwip(0.5),
+              right: convertInchesToTwip(0.5),
+              bottom: convertInchesToTwip(0.5),
+              left: convertInchesToTwip(0.5),
+            },
+          },
+        },
         children: [
-          // Title
+          // Israeli Number - Top Left (RTL so appears on right)
           new Paragraph({
             children: [
               new TextRun({
-                text: 'הוראות חיוג מחו"ל לישראל',
+                text: `מספר ישראלי: ${israeliDisplay}`,
                 bold: true,
-                size: 48, // 24pt
-                font: 'David',
+                size: 28,
+                font: 'Arial',
+              }),
+            ],
+            alignment: AlignmentType.RIGHT,
+            spacing: { after: 100 },
+          }),
+
+          // Local Number
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: `מספר מקומי: ${localDisplay}`,
+                bold: true,
+                size: 28,
+                font: 'Arial',
+              }),
+            ],
+            alignment: AlignmentType.RIGHT,
+            spacing: { after: 600 },
+          }),
+
+          // Customer Service Header
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: 'מוקד שירות לקוחות:',
+                bold: true,
+                size: 36,
+                font: 'Arial',
+                color: 'FF6600',
               }),
             ],
             alignment: AlignmentType.CENTER,
-            spacing: { after: 400 },
-            heading: HeadingLevel.HEADING_1,
-          }),
-
-          // Separator line
-          new Paragraph({
-            border: {
-              bottom: {
-                color: '000000',
-                space: 1,
-                style: BorderStyle.SINGLE,
-                size: 6,
-              },
-            },
-            spacing: { after: 400 },
-          }),
-
-          // Phone numbers section
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: 'מספר ישראלי: ',
-                bold: true,
-                size: 32, // 16pt
-                font: 'David',
-              }),
-              new TextRun({
-                text: formattedIsraeli || '---',
-                size: 32,
-                font: 'David',
-              }),
-            ],
-            alignment: AlignmentType.RIGHT,
             spacing: { after: 200 },
           }),
 
+          // Israeli Service Number
           new Paragraph({
             children: [
               new TextRun({
-                text: 'מספר מקומי: ',
+                text: '0722-163-444',
                 bold: true,
                 size: 32,
-                font: 'David',
-              }),
-              new TextRun({
-                text: formattedLocal || '---',
-                size: 32,
-                font: 'David',
+                font: 'Arial',
               }),
             ],
-            alignment: AlignmentType.RIGHT,
-            spacing: { after: 400 },
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 100 },
           }),
 
-          // Instructions header
+          // International Service Number
           new Paragraph({
             children: [
               new TextRun({
-                text: 'הוראות חיוג:',
+                text: '44-203-129-090200',
+                bold: true,
+                size: 32,
+                font: 'Arial',
+              }),
+            ],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 100 },
+          }),
+
+          // Service Languages
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: '(שפת השירות: עברית | אנגלית | אידיש)',
+                size: 24,
+                font: 'Arial',
+              }),
+            ],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 600 },
+          }),
+
+          // Good Flight Wish
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: 'טיסה נעימה ובטוחה!',
                 bold: true,
                 size: 28,
-                font: 'David',
-              }),
-            ],
-            alignment: AlignmentType.RIGHT,
-            spacing: { after: 200 },
-          }),
-
-          // Instructions
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: '1. חייגו את המספר הישראלי כפי שמופיע למעלה',
-                size: 24,
-                font: 'David',
-              }),
-            ],
-            alignment: AlignmentType.RIGHT,
-            spacing: { after: 100 },
-          }),
-
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: '2. המתינו לצליל חיוג',
-                size: 24,
-                font: 'David',
-              }),
-            ],
-            alignment: AlignmentType.RIGHT,
-            spacing: { after: 100 },
-          }),
-
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: '3. הקישו את מספר הטלפון בישראל אליו תרצו להתקשר',
-                size: 24,
-                font: 'David',
-              }),
-            ],
-            alignment: AlignmentType.RIGHT,
-            spacing: { after: 100 },
-          }),
-
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: '4. לחצו על # לסיום',
-                size: 24,
-                font: 'David',
+                font: 'Arial',
               }),
             ],
             alignment: AlignmentType.RIGHT,
             spacing: { after: 300 },
           }),
 
-          // Note
+          // Company Name
           new Paragraph({
             children: [
               new TextRun({
-                text: 'שימו לב: ',
+                text: 'דיל סלולר',
                 bold: true,
-                size: 22,
-                font: 'David',
-                italics: true,
-              }),
-              new TextRun({
-                text: 'יש להקיש את מספר הטלפון עם קידומת 0 (לדוגמה: 050-1234567)',
-                size: 22,
-                font: 'David',
-                italics: true,
+                size: 36,
+                font: 'Arial',
+                color: 'FF6600',
               }),
             ],
             alignment: AlignmentType.RIGHT,
-            spacing: { after: 400 },
-          }),
-
-          // Footer separator
-          new Paragraph({
-            border: {
-              bottom: {
-                color: '000000',
-                space: 1,
-                style: BorderStyle.SINGLE,
-                size: 6,
-              },
-            },
-            spacing: { after: 200 },
-          }),
-
-          // Footer
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: 'נסיעה טובה!',
-                bold: true,
-                size: 28,
-                font: 'David',
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
           }),
         ],
       },
