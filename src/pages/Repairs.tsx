@@ -232,34 +232,56 @@ export default function Repairs() {
         <meta charset="UTF-8">
         <title>טופס תיקון ${repair.repairNumber}</title>
         <style>
-          body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 20px; direction: rtl; }
+          @page { 
+            size: A6; 
+            margin: 3mm; 
+          }
+          * { box-sizing: border-box; }
+          body { 
+            font-family: 'Segoe UI', Tahoma, sans-serif; 
+            padding: 3mm; 
+            direction: rtl; 
+            margin: 0;
+            width: 105mm;
+            height: 148mm;
+            font-size: 9pt;
+          }
           .repair-number-huge { 
-            font-size: 120px; 
+            font-size: 72pt; 
             font-weight: 900; 
             color: #0d9488; 
             text-align: center; 
-            padding: 40px 20px;
-            margin-bottom: 20px;
-            border: 6px solid #0d9488;
-            border-radius: 20px;
+            padding: 8mm 5mm;
+            margin: 0 auto 5mm auto;
+            border: 3px solid #0d9488;
+            border-radius: 10px;
             background: linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%);
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
             line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
           }
           .warranty-badge {
             display: inline-block;
             background: #22c55e;
             color: white;
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-size: 16px;
-            margin-right: 10px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 8pt;
+            margin-right: 5px;
           }
-          .title { font-size: 22px; color: #333; text-align: center; margin-bottom: 25px; }
-          .field { margin-bottom: 12px; padding: 10px; background: #f5f5f5; border-radius: 8px; }
-          .label { font-weight: bold; color: #555; margin-bottom: 5px; }
-          .value { font-size: 16px; color: #333; }
-          .footer { margin-top: 30px; text-align: center; color: #888; font-size: 12px; }
+          .title { font-size: 11pt; color: #333; text-align: center; margin-bottom: 4mm; }
+          .field { margin-bottom: 2mm; padding: 2mm; background: #f5f5f5; border-radius: 4px; }
+          .label { font-weight: bold; color: #555; font-size: 8pt; }
+          .value { font-size: 9pt; color: #333; }
+          .footer { margin-top: 3mm; text-align: center; color: #888; font-size: 7pt; }
+          @media print {
+            body { 
+              -webkit-print-color-adjust: exact; 
+              print-color-adjust: exact;
+            }
+          }
         </style>
       </head>
       <body>
@@ -305,7 +327,7 @@ export default function Repairs() {
           <div class="value">${new Date(repair.receivedDate).toLocaleDateString('he-IL')}</div>
         </div>
         
-        <div class="footer">מסמך זה הופק אוטומטית ממערכת ניהול ההשכרות</div>
+        <div class="footer">דיל סלולר | מסמך זה הופק אוטומטית</div>
       </body>
       </html>
     `;
