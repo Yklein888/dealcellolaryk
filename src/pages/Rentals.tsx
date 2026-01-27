@@ -38,6 +38,7 @@ import {
   Pencil,
   Printer
 } from 'lucide-react';
+import { generateCallingInstructions } from '@/lib/callingInstructions';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Rental, 
@@ -410,8 +411,8 @@ export default function Rentals() {
     return num;
   };
 
-  // Handle printing calling instructions
-  const handlePrintInstructions = (itemId: string, israeliNumber?: string, localNumber?: string) => {
+  // Handle printing calling instructions - downloads Word doc for exact template fidelity
+  const handlePrintInstructions = async (itemId: string, israeliNumber?: string, localNumber?: string) => {
     if (!israeliNumber && !localNumber) {
       toast({
         title: 'אין מספרים',
@@ -421,100 +422,23 @@ export default function Rentals() {
       return;
     }
 
-    const israeliDisplay = formatPhoneForPrint(israeliNumber);
-    const localDisplay = formatPhoneForPrint(localNumber);
-
-    // Create print window with calling instructions
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
+    setPrintingInstructions(itemId);
+    try {
+      await generateCallingInstructions(israeliNumber, localNumber);
+      toast({
+        title: 'הקובץ הורד',
+        description: 'פתח את הקובץ והדפס אותו',
+      });
+    } catch (error) {
+      console.error('Error generating instructions:', error);
       toast({
         title: 'שגיאה',
-        description: 'לא ניתן לפתוח חלון הדפסה. בדוק שחלונות קופצים מותרים.',
+        description: 'לא ניתן ליצור קובץ הוראות חיוג',
         variant: 'destructive',
       });
-      return;
+    } finally {
+      setPrintingInstructions(null);
     }
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html dir="rtl" lang="he">
-      <head>
-        <meta charset="UTF-8">
-        <title>הוראות חיוג</title>
-        <style>
-          @page { size: A4; margin: 0.5in; }
-          body {
-            font-family: David, Arial, sans-serif;
-            text-align: center;
-            padding: 20px;
-            margin: 0;
-          }
-          .phone-section {
-            margin-bottom: 40px;
-          }
-          .phone-number {
-            font-size: 28pt;
-            font-weight: bold;
-            margin: 10px 0;
-            direction: ltr;
-          }
-          .label {
-            font-size: 18pt;
-            color: #333;
-          }
-          .service-header {
-            color: #FF6600;
-            font-size: 36pt;
-            font-weight: bold;
-            margin: 40px 0 20px;
-          }
-          .service-numbers {
-            font-size: 20pt;
-            margin: 10px 0;
-            direction: ltr;
-          }
-          .footer {
-            margin-top: 60px;
-          }
-          .footer-text {
-            color: #FF6600;
-            font-size: 36pt;
-            font-weight: bold;
-          }
-          @media print {
-            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="phone-section">
-          <div class="label">מספר ישראלי:</div>
-          <div class="phone-number">${israeliDisplay}</div>
-        </div>
-        <div class="phone-section">
-          <div class="label">מספר מקומי:</div>
-          <div class="phone-number">${localDisplay}</div>
-        </div>
-        
-        <div class="service-header">מוקד שירות לקוחות</div>
-        <div class="service-numbers">0722-163-444</div>
-        <div class="service-numbers">44-203-129-090200</div>
-        
-        <div class="footer">
-          <div class="footer-text">טיסה נעימה ובטוחה!</div>
-          <div class="footer-text">דיל סלולר</div>
-        </div>
-      </body>
-      </html>
-    `);
-    
-    printWindow.document.close();
-    printWindow.focus();
-    
-    // Print after content loads
-    setTimeout(() => {
-      printWindow.print();
-    }, 250);
   };
 
   const isSim = (category: ItemCategory) => 
@@ -1127,9 +1051,14 @@ export default function Rentals() {
                                   inventoryItem.israeliNumber || undefined,
                                   inventoryItem.localNumber || undefined
                                 )}
+                                disabled={printingInstructions === item.inventoryItemId}
                                 className="gap-1 text-xs"
                               >
-                                <Printer className="h-3 w-3" />
+                                {printingInstructions === item.inventoryItemId ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Printer className="h-3 w-3" />
+                                )}
                                 הדפס הוראות
                               </Button>
                             )}
@@ -1376,6 +1305,7 @@ export default function Rentals() {
                       <Button
                         variant="outline"
                         size="sm"
+                        disabled={printingInstructions === itemId}
                         onClick={async () => {
                           let israeliNumber = inventoryItem?.israeliNumber;
                           let localNumber = inventoryItem?.localNumber;
@@ -1396,7 +1326,11 @@ export default function Rentals() {
                         }}
                         className="gap-1 text-xs w-full"
                       >
-                        <Printer className="h-3 w-3" />
+                        {printingInstructions === itemId ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Printer className="h-3 w-3" />
+                        )}
                         הדפס הוראות חיוג
                       </Button>
                     </div>
