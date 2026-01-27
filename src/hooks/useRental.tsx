@@ -46,8 +46,10 @@ export function RentalProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  // Fetch all data from database
-  const fetchData = async () => {
+  // Fetch all data from database with retry logic
+  const fetchData = async (retryCount = 0) => {
+    const maxRetries = 2;
+    
     try {
       setLoading(true);
       
@@ -167,9 +169,17 @@ export function RentalProvider({ children }: { children: ReactNode }) {
 
     } catch (error) {
       console.error('Error fetching data:', error);
+      
+      // Retry on network errors
+      if (retryCount < maxRetries) {
+        console.log(`Retrying fetch (${retryCount + 1}/${maxRetries})...`);
+        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+        return fetchData(retryCount + 1);
+      }
+      
       toast({
         title: 'שגיאה בטעינת נתונים',
-        description: 'לא ניתן לטעון את הנתונים מהשרת',
+        description: 'לא ניתן לטעון את הנתונים מהשרת. נסה לרענן את הדף.',
         variant: 'destructive',
       });
     } finally {
