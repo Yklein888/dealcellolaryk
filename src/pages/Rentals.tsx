@@ -35,8 +35,10 @@ import {
   Loader2,
   Trash2,
   UserPlus,
-  Pencil
+  Pencil,
+  FileDown
 } from 'lucide-react';
+import { generateCallingInstructions } from '@/lib/callingInstructions';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Rental, 
@@ -914,39 +916,63 @@ export default function Rentals() {
                 <div className="space-y-2">
                   <Label>פריטים נבחרים</Label>
                   <div className="space-y-2">
-                    {selectedItems.map((item) => (
-                      <div 
-                        key={item.inventoryItemId}
-                        className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className="text-xl">{categoryIcons[item.category]}</span>
-                          <div>
-                            <p className="font-medium text-foreground">{item.name}</p>
-                            <p className="text-sm text-muted-foreground">{categoryLabels[item.category]}</p>
+                    {selectedItems.map((item) => {
+                      // Check if this is a European SIM from inventory (not generic)
+                      const isEuropeanSimFromInventory = item.category === 'sim_european' && !item.isGeneric;
+                      const inventoryItem = isEuropeanSimFromInventory 
+                        ? inventory.find(i => i.id === item.inventoryItemId)
+                        : null;
+
+                      return (
+                        <div 
+                          key={item.inventoryItemId}
+                          className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="text-xl">{categoryIcons[item.category]}</span>
+                            <div>
+                              <p className="font-medium text-foreground">{item.name}</p>
+                              <p className="text-sm text-muted-foreground">{categoryLabels[item.category]}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {item.category === 'sim_american' && (
+                              <div className="flex items-center gap-2">
+                                <Checkbox
+                                  checked={item.hasIsraeliNumber}
+                                  onCheckedChange={() => handleToggleIsraeliNumber(item.inventoryItemId)}
+                                />
+                                <Label className="text-sm">מספר ישראלי (+$10)</Label>
+                              </div>
+                            )}
+                            {/* Download calling instructions for European SIM from inventory */}
+                            {isEuropeanSimFromInventory && inventoryItem && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => generateCallingInstructions(
+                                  inventoryItem.israeliNumber || undefined,
+                                  inventoryItem.localNumber || undefined
+                                )}
+                                className="gap-1 text-xs"
+                              >
+                                <FileDown className="h-3 w-3" />
+                                הורד הוראות
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => handleRemoveItem(item.inventoryItemId)}
+                            >
+                              הסר
+                            </Button>
                           </div>
                         </div>
-                        <div className="flex items-center gap-4">
-                          {item.category === 'sim_american' && (
-                            <div className="flex items-center gap-2">
-                              <Checkbox
-                                checked={item.hasIsraeliNumber}
-                                onCheckedChange={() => handleToggleIsraeliNumber(item.inventoryItemId)}
-                              />
-                              <Label className="text-sm">מספר ישראלי (+$10)</Label>
-                            </div>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => handleRemoveItem(item.inventoryItemId)}
-                          >
-                            הסר
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
