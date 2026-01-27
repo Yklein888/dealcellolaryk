@@ -121,6 +121,7 @@ export default function Rentals() {
     creditCardExpiry: '',
     cvv: '',
   });
+  const [useStoredCard, setUseStoredCard] = useState(false);
 
   // Notify customer about rental return reminder
   const notifyRentalCustomer = async (rental: Rental) => {
@@ -183,7 +184,16 @@ export default function Rentals() {
   const openPaymentDialog = (rental: Rental) => {
     setPaymentRental(rental);
     setPaymentFormData({ creditCard: '', creditCardExpiry: '', cvv: '' });
+    // Check if customer has stored token
+    const customer = customers.find(c => c.id === rental.customerId);
+    setUseStoredCard(!!customer?.paymentToken);
     setIsPaymentDialogOpen(true);
+  };
+
+  // Get customer for current payment rental
+  const getPaymentCustomer = () => {
+    if (!paymentRental) return null;
+    return customers.find(c => c.id === paymentRental.customerId);
   };
 
   // Handle payment via Pelecard (direct charge)
@@ -197,10 +207,23 @@ export default function Rentals() {
   const handlePayment = async () => {
     if (!paymentRental) return;
     
-    if (!paymentFormData.creditCard || !paymentFormData.creditCardExpiry || !paymentFormData.cvv) {
+    const customer = getPaymentCustomer();
+    const hasStoredToken = customer?.paymentToken;
+    
+    // If using stored card, we don't need card details
+    if (!useStoredCard) {
+      if (!paymentFormData.creditCard || !paymentFormData.creditCardExpiry || !paymentFormData.cvv) {
+        toast({
+          title: 'שגיאה',
+          description: 'יש להזין את כל פרטי הכרטיס',
+          variant: 'destructive',
+        });
+        return;
+      }
+    } else if (!hasStoredToken) {
       toast({
         title: 'שגיאה',
-        description: 'יש להזין את כל פרטי הכרטיס',
+        description: 'אין כרטיס שמור ללקוח זה',
         variant: 'destructive',
       });
       return;
@@ -212,18 +235,25 @@ export default function Rentals() {
     const transactionId = generateTransactionId(paymentRental.id);
 
     try {
+      const paymentBody: Record<string, unknown> = { 
+        amount: paymentRental.totalPrice,
+        customerName: paymentRental.customerName,
+        customerId: paymentRental.customerId,
+        description: `השכרה - ${paymentRental.items.map(i => i.itemName).join(', ')}`,
+        rentalId: paymentRental.id,
+        transactionId: transactionId
+      };
+
+      if (useStoredCard && hasStoredToken) {
+        paymentBody.token = customer.paymentToken;
+      } else {
+        paymentBody.creditCard = paymentFormData.creditCard;
+        paymentBody.creditCardExpiry = paymentFormData.creditCardExpiry;
+        paymentBody.cvv = paymentFormData.cvv;
+      }
+
       const { data, error } = await supabase.functions.invoke('pelecard-pay', {
-        body: { 
-          amount: paymentRental.totalPrice,
-          customerName: paymentRental.customerName,
-          creditCard: paymentFormData.creditCard,
-          creditCardExpiry: paymentFormData.creditCardExpiry,
-          cvv: paymentFormData.cvv,
-          customerId: paymentRental.customerId,
-          description: `השכרה - ${paymentRental.items.map(i => i.itemName).join(', ')}`,
-          rentalId: paymentRental.id,
-          transactionId: transactionId
-        },
+        body: paymentBody,
       });
 
       if (error) throw error;
@@ -231,7 +261,7 @@ export default function Rentals() {
       if (data?.success) {
         toast({
           title: 'התשלום בוצע בהצלחה',
-          description: `מספר עסקה: ${data.transactionId || transactionId}`,
+          description: `מספר עסקה: ${data.transactionId || transactionId}${data.tokenSaved ? ' (כרטיס נשמר)' : ''}`,
         });
         setIsPaymentDialogOpen(false);
       } else if (data?.error) {
@@ -1213,7 +1243,11 @@ export default function Rentals() {
             <DialogTitle>תשלום עבור השכרה</DialogTitle>
             <DialogDescription>הזן פרטי כרטיס אשראי לביצוע התשלום</DialogDescription>
           </DialogHeader>
-          {paymentRental && (
+          {paymentRental && (() => {
+            const customer = getPaymentCustomer();
+            const hasStoredToken = customer?.paymentToken;
+            
+            return (
             <div className="space-y-4 mt-4">
               <div className="p-4 rounded-lg bg-muted/50">
                 <p className="font-medium">{paymentRental.customerName}</p>
@@ -1222,40 +1256,65 @@ export default function Rentals() {
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <Label>מספר כרטיס אשראי</Label>
-                <Input
-                  value={paymentFormData.creditCard}
-                  onChange={(e) => setPaymentFormData({ ...paymentFormData, creditCard: e.target.value })}
-                  placeholder="1234 5678 9012 3456"
-                  maxLength={19}
-                  dir="ltr"
-                />
-              </div>
+              {/* Stored card option */}
+              {hasStoredToken && (
+                <div className="p-3 rounded-lg border border-primary/20 bg-primary/5">
+                  <div className="flex items-center gap-3">
+                    <Checkbox
+                      id="useStoredCard"
+                      checked={useStoredCard}
+                      onCheckedChange={(checked) => setUseStoredCard(!!checked)}
+                    />
+                    <Label htmlFor="useStoredCard" className="flex-1 cursor-pointer">
+                      <span className="font-medium">השתמש בכרטיס שמור</span>
+                      <span className="block text-sm text-muted-foreground" dir="ltr">
+                        •••• {customer.paymentTokenLast4} | {customer.paymentTokenExpiry}
+                      </span>
+                    </Label>
+                    <CreditCard className="h-5 w-5 text-primary" />
+                  </div>
+                </div>
+              )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>תוקף (MM/YY)</Label>
-                  <Input
-                    value={paymentFormData.creditCardExpiry}
-                    onChange={(e) => setPaymentFormData({ ...paymentFormData, creditCardExpiry: e.target.value })}
-                    placeholder="0126"
-                    maxLength={4}
-                    dir="ltr"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>CVV</Label>
-                  <Input
-                    value={paymentFormData.cvv}
-                    onChange={(e) => setPaymentFormData({ ...paymentFormData, cvv: e.target.value })}
-                    placeholder="123"
-                    maxLength={4}
-                    type="password"
-                    dir="ltr"
-                  />
-                </div>
-              </div>
+              {/* Manual card entry - hidden when using stored card */}
+              {!useStoredCard && (
+                <>
+                  <div className="space-y-2">
+                    <Label>מספר כרטיס אשראי</Label>
+                    <Input
+                      value={paymentFormData.creditCard}
+                      onChange={(e) => setPaymentFormData({ ...paymentFormData, creditCard: e.target.value })}
+                      placeholder="1234 5678 9012 3456"
+                      maxLength={19}
+                      dir="ltr"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>תוקף (MMYY)</Label>
+                      <Input
+                        value={paymentFormData.creditCardExpiry}
+                        onChange={(e) => setPaymentFormData({ ...paymentFormData, creditCardExpiry: e.target.value })}
+                        placeholder="0126"
+                        maxLength={4}
+                        dir="ltr"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>CVV</Label>
+                      <Input
+                        value={paymentFormData.cvv}
+                        onChange={(e) => setPaymentFormData({ ...paymentFormData, cvv: e.target.value })}
+                        placeholder="123"
+                        maxLength={4}
+                        type="password"
+                        dir="ltr"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
 
               <div className="flex gap-3 pt-4">
                 <Button 
@@ -1271,7 +1330,7 @@ export default function Rentals() {
                   ) : (
                     <>
                       <CreditCard className="h-4 w-4 mr-2" />
-                      בצע תשלום
+                      {useStoredCard ? 'חייב כרטיס שמור' : 'בצע תשלום'}
                     </>
                   )}
                 </Button>
@@ -1284,7 +1343,8 @@ export default function Rentals() {
                 </Button>
               </div>
             </div>
-          )}
+            );
+          })()}
         </DialogContent>
       </Dialog>
 

@@ -100,6 +100,10 @@ export function RentalProvider({ children }: { children: ReactNode }) {
         creditCard: c.credit_card || undefined,
         notes: c.notes || undefined,
         createdAt: c.created_at.split('T')[0],
+        paymentToken: c.payment_token || undefined,
+        paymentTokenLast4: c.payment_token_last4 || undefined,
+        paymentTokenExpiry: c.payment_token_expiry || undefined,
+        paymentTokenUpdatedAt: c.payment_token_updated_at || undefined,
       })) || []);
 
       setInventory(inventoryData?.map(i => ({

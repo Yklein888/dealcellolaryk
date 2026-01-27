@@ -32,6 +32,10 @@ export interface Customer {
   creditCard?: string;
   notes?: string;
   createdAt: string;
+  paymentToken?: string;
+  paymentTokenLast4?: string;
+  paymentTokenExpiry?: string;
+  paymentTokenUpdatedAt?: string;
 }
 
 export interface RentalItem {

@@ -23,6 +23,10 @@ export type Database = {
           id: string
           name: string
           notes: string | null
+          payment_token: string | null
+          payment_token_expiry: string | null
+          payment_token_last4: string | null
+          payment_token_updated_at: string | null
           phone: string
           updated_at: string
         }
@@ -34,6 +38,10 @@ export type Database = {
           id?: string
           name: string
           notes?: string | null
+          payment_token?: string | null
+          payment_token_expiry?: string | null
+          payment_token_last4?: string | null
+          payment_token_updated_at?: string | null
           phone: string
           updated_at?: string
         }
@@ -45,6 +53,10 @@ export type Database = {
           id?: string
           name?: string
           notes?: string | null
+          payment_token?: string | null
+          payment_token_expiry?: string | null
+          payment_token_last4?: string | null
+          payment_token_updated_at?: string | null
           phone?: string
           updated_at?: string
         }

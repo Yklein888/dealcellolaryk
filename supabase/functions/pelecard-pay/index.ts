@@ -210,6 +210,32 @@ serve(async (req) => {
 
       console.log('Payment successful for transaction:', transactionId);
 
+      // Save token to customer for future charges (if available and customer exists)
+      const resultData = data.ResultData || data;
+      const returnedToken = resultData.Token || data.Token;
+      const cardLast4 = resultData.CreditCardNumber 
+        ? resultData.CreditCardNumber.slice(-4) 
+        : (creditCard ? creditCard.slice(-4) : null);
+      const cardExpiry = resultData.CreditCardExpDate || creditCardExpiry;
+
+      if (returnedToken && customerId) {
+        const { error: tokenError } = await supabase
+          .from('customers')
+          .update({
+            payment_token: returnedToken,
+            payment_token_last4: cardLast4,
+            payment_token_expiry: cardExpiry,
+            payment_token_updated_at: new Date().toISOString()
+          })
+          .eq('id', customerId);
+
+        if (tokenError) {
+          console.error('Failed to save token to customer:', tokenError);
+        } else {
+          console.log('Token saved for customer:', customerId);
+        }
+      }
+
       return new Response(
         JSON.stringify({ 
           success: true, 
@@ -217,6 +243,7 @@ serve(async (req) => {
           transactionId: data.PelecardTransactionId,
           voucherId: data.VoucherId,
           approvalNumber: data.DebitApproveNumber,
+          tokenSaved: !!returnedToken,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
