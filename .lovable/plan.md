@@ -1,110 +1,39 @@
 
-# תוכנית: שיפור מערכת סליקה Pelecard
+# יצירת קובץ הוראות חיוג מחו"ל לישראל
 
-## מה הבנתי
+## מה יקרה
+בכל השכרה של סים אירופאי, תוכל להוריד קובץ וורד עם הוראות **חיוג מחו"ל לישראל בלבד** - דף אחד עם המספרים של הסים הנבחר.
 
-### המצב הקיים
-- יש Edge Function פעילה ב-`supabase/functions/pelecard-pay/index.ts`
-- משתמשת ב-endpoint: `https://gateway21.pelecard.biz/services/DebitRegularType`
-- מקבלת שגיאת אימות (קוד 501): "Login for user deal failed"
-
-### הקוד שסיפקת
-- מבוסס על Node.js/Express (לא תואם ישירות ל-Edge Functions שמשתמשות ב-Deno)
-- כולל תכונות נוספות טובות:
-  - בדיקת idempotency (למניעת כפילויות)
-  - לוגים מובנים
-  - טיפול בשגיאות מפורט
-
-## מה נעשה
-
-### שלב 1: עדכון Edge Function
-שדרוג הפונקציה `pelecard-pay` עם השיפורים הבאים:
+## מה יופיע בקובץ
 
 ```text
-┌────────────────────────────────────────────────────────────────┐
-│  pelecard-pay Edge Function (Deno)                            │
-├────────────────────────────────────────────────────────────────┤
-│  1. בדיקת idempotency לפי transaction_id                      │
-│  2. תמיכה בשתי שיטות תשלום:                                   │
-│     - Direct Debit (כרטיס + CVV)                              │
-│     - Token-based (אם יש token שמור)                          │
-│  3. לוגים מפורטים ללא מידע רגיש                               │
-│  4. טיפול בשגיאות משופר                                       │
-└────────────────────────────────────────────────────────────────┘
+חיוג מחו"ל לישראל
+
+מספר ישראלי: [המספר הישראלי מהסים שנבחר]
+מספר מקומי: [המספר המקומי מהסים שנבחר]
+
+[הוראות החיוג כמו בקובץ המקורי]
 ```
 
-### שלב 2: הוספת טבלת payment_transactions
-לשמירת היסטוריית עסקאות ובדיקת כפילויות:
+## איך זה יעבוד
 
-| שדה | סוג | תיאור |
-|-----|-----|-------|
-| id | uuid | מזהה ייחודי |
-| rental_id | uuid | קישור להשכרה |
-| transaction_id | text | מזהה עסקה (idempotency) |
-| amount | numeric | סכום |
-| status | enum | success / failed / pending |
-| gateway_response | jsonb | תגובת הסליקה |
-| created_at | timestamp | תאריך יצירה |
-
-### שלב 3: עדכון הקוד הקיים ב-Edge Function
-
-```typescript
-// שינויים עיקריים:
-
-// 1. הוספת בדיקת idempotency
-const existingTransaction = await checkIdempotency(transactionId);
-if (existingTransaction) {
-  return existingResponse(existingTransaction);
-}
-
-// 2. תמיכה ב-token או כרטיס
-const payload = token 
-  ? { token, total, currency: "1", ... }
-  : { creditCard, creditCardDateMmYy, cvv2, total, ... };
-
-// 3. שמירת תוצאת העסקה ב-DB
-await saveTransaction({
-  rentalId,
-  transactionId,
-  amount,
-  status: result.success ? 'success' : 'failed',
-  gatewayResponse: result
-});
-```
-
-### שלב 4: עדכון ה-Frontend
-הוספת `transaction_id` ייחודי לכל בקשת תשלום למניעת כפילויות
-
-## הערה חשובה לגבי שגיאת האימות
-
-שגיאת 501 "Login for user deal failed" מצביעה על:
-- פרטי התחברות שגויים (user/password/terminal)
-- או שה-Terminal לא מורשה לסוג העסקה הזה
-
-**יש לוודא** שה-secrets מוגדרים נכון:
-- `PELECARD_TERMINAL` - מספר מסוף נכון
-- `PELECARD_USER` - שם משתמש נכון
-- `PELECARD_PASSWORD` - סיסמה נכונה
-
-בקוד שסיפקת רשום:
-- TERMINAL: `5757227016`
-- USER: `deal`
-
-אם אלו הפרטים הנכונים, יש לעדכן את ה-secrets. אם לא, יש לספק את הפרטים הנכונים.
+1. בטופס השכרה חדשה - כשבוחרים סים אירופאי מהמלאי
+2. יופיע כפתור **"הורד הוראות חיוג"**
+3. לחיצה תוריד קובץ וורד עם דף אחד בלבד - הוראות מחו"ל לישראל עם המספרים הנכונים
 
 ## פרטים טכניים
 
-### קבצים שיווצרו/יעודכנו
-1. `supabase/functions/pelecard-pay/index.ts` - עדכון הלוגיקה
-2. Migration חדש - טבלת payment_transactions
-3. `src/pages/Rentals.tsx` - הוספת transaction_id לבקשות
+### קבצים שישתנו
 
-### RLS לטבלת payment_transactions
-```sql
--- כל משתמש מאומת יכול לראות ולהוסיף עסקאות
-CREATE POLICY "Authenticated users can manage transactions"
-ON payment_transactions
-FOR ALL
-USING (true)
-WITH CHECK (true);
-```
+**`src/pages/Rentals.tsx`:**
+- הוספת פונקציה `generateCallingInstructions(israeliNumber, localNumber)`
+- יצירת קובץ וורד עם דף אחד בלבד
+- כפתור "הורד הוראות" שמופיע כשנבחר סים אירופאי מהמלאי
+
+### ספריות
+- שימוש בספריית `docx` שכבר מותקנת (בשימוש ב-xlsx שמותקן)
+
+### שלבי ביצוע
+1. יצירת פונקציה שמייצרת קובץ וורד עם הוראות חיוג מחו"ל לישראל
+2. עיצוב הדף כמו בקובץ המקורי (כותרת, מספרים, הוראות)
+3. הוספת כפתור הורדה בדיאלוג ההשכרה
