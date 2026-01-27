@@ -93,7 +93,8 @@ export function RentalProvider({ children }: { children: ReactNode }) {
     const runFetchesOnce = async () => {
       const results = await Promise.allSettled([
         supabase.from('customers').select('*').order('created_at', { ascending: false }),
-        supabase.from('inventory').select('*').order('created_at', { ascending: false }),
+        // Use RPC to avoid "/inventory" path being blocked by browser extensions/antivirus
+        supabase.rpc('get_stock_items'),
         supabase.from('rentals').select('*').order('created_at', { ascending: false }),
         supabase.from('rental_items').select('*'),
         supabase.from('repairs').select('*').order('created_at', { ascending: false }),

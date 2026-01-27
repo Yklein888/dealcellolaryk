@@ -557,6 +557,28 @@ export type Database = {
           token: string
         }[]
       }
+      get_stock_items: {
+        Args: never
+        Returns: {
+          category: Database["public"]["Enums"]["item_category"]
+          created_at: string
+          expiry_date: string | null
+          id: string
+          israeli_number: string | null
+          local_number: string | null
+          name: string
+          notes: string | null
+          sim_number: string | null
+          status: Database["public"]["Enums"]["item_status"]
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "inventory"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
