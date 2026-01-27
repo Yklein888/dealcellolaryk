@@ -1246,16 +1246,27 @@ export default function Rentals() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {
-                        if (inventoryItem) {
-                          handleDownloadInstructions(
-                            itemId,
-                            inventoryItem.israeliNumber || undefined,
-                            inventoryItem.localNumber || undefined
-                          );
+                      onClick={async () => {
+                        // If inventory is loaded, use it. Otherwise fetch from DB
+                        let israeliNumber = inventoryItem?.israeliNumber;
+                        let localNumber = inventoryItem?.localNumber;
+                        
+                        if (!inventoryItem && europeanSimItem?.inventoryItemId) {
+                          // Fetch directly from database
+                          const { data } = await supabase
+                            .from('inventory')
+                            .select('israeli_number, local_number')
+                            .eq('id', europeanSimItem.inventoryItemId)
+                            .maybeSingle();
+                          if (data) {
+                            israeliNumber = data.israeli_number || undefined;
+                            localNumber = data.local_number || undefined;
+                          }
                         }
+                        
+                        handleDownloadInstructions(itemId, israeliNumber || undefined, localNumber || undefined);
                       }}
-                      disabled={downloadingInstructions === itemId || !inventoryItem}
+                      disabled={downloadingInstructions === itemId}
                       className="gap-1 text-xs w-full"
                     >
                       {downloadingInstructions === itemId ? (
