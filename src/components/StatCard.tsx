@@ -34,13 +34,13 @@ export function StatCard({ title, value, icon: Icon, trend, variant = 'default' 
       'stat-card animate-fade-in card-glow group',
       variantStyles[variant]
     )}>
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm font-medium text-muted-foreground">{title}</p>
-          <p className="mt-2 text-3xl font-bold text-foreground">{value}</p>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <p className="text-xs sm:text-sm font-medium text-muted-foreground truncate">{title}</p>
+          <p className="mt-1 sm:mt-2 text-2xl sm:text-3xl font-bold text-foreground">{value}</p>
           {trend && (
             <p className={cn(
-              'mt-1 text-sm font-medium',
+              'mt-1 text-xs sm:text-sm font-medium',
               trend.isPositive ? 'text-success' : 'text-destructive'
             )}>
               {trend.isPositive ? '+' : ''}{trend.value}%
@@ -48,10 +48,10 @@ export function StatCard({ title, value, icon: Icon, trend, variant = 'default' 
           )}
         </div>
         <div className={cn(
-          'flex h-12 w-12 items-center justify-center rounded-2xl transition-transform duration-300 group-hover:scale-110',
+          'flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl sm:rounded-2xl transition-transform duration-300 group-hover:scale-110 shrink-0',
           iconVariantStyles[variant]
         )}>
-          <Icon className="h-6 w-6" />
+          <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
         </div>
       </div>
     </div>

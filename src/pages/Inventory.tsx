@@ -287,8 +287,8 @@ export default function Inventory() {
       />
 
       {/* Filters */}
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="relative flex-1">
+      <div className="flex flex-col gap-3 sm:gap-4 mb-4 sm:mb-6">
+        <div className="relative">
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             value={searchTerm}
@@ -298,7 +298,7 @@ export default function Inventory() {
           />
         </div>
         <Select value={filterCategory} onValueChange={setFilterCategory}>
-          <SelectTrigger className="w-full md:w-48">
+          <SelectTrigger className="w-full">
             <SelectValue placeholder="כל הקטגוריות" />
           </SelectTrigger>
           <SelectContent>
@@ -314,13 +314,13 @@ export default function Inventory() {
 
       {/* Inventory by Category */}
       {filteredInventory.length === 0 ? (
-        <div className="stat-card text-center py-8">
-          <Package className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-          <p className="text-base font-medium text-foreground">אין פריטים במלאי</p>
-          <p className="text-sm text-muted-foreground">הוסף פריטים חדשים כדי להתחיל</p>
+        <div className="stat-card text-center py-6 sm:py-8">
+          <Package className="h-8 w-8 sm:h-10 sm:w-10 mx-auto text-muted-foreground mb-2 sm:mb-3" />
+          <p className="text-sm sm:text-base font-medium text-foreground">אין פריטים במלאי</p>
+          <p className="text-xs sm:text-sm text-muted-foreground">הוסף פריטים חדשים כדי להתחיל</p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           {categoryOrder
             .filter(cat => inventoryByCategory[cat]?.length > 0)
             .map((category, index) => (
