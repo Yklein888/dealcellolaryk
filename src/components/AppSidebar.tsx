@@ -12,7 +12,8 @@ import {
   ChevronRight,
   Smartphone,
   LogOut,
-  Shield
+  Shield,
+  CreditCard
 } from 'lucide-react';
 
 const navItems = [
@@ -21,6 +22,7 @@ const navItems = [
   { path: '/customers', label: 'לקוחות', icon: Users },
   { path: '/inventory', label: 'מלאי', icon: Package },
   { path: '/repairs', label: 'תיקונים', icon: Wrench },
+  { path: '/payments', label: 'תשלומים', icon: CreditCard },
 ];
 
 const adminNavItems = [
