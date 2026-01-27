@@ -22,8 +22,8 @@ export const generateCallingInstructions = async (
   const formattedIsraeli = formatPhoneNumber(israeliNumber);
 
   try {
-    // Get the template URL - it's in the public folder
-    const templateUrl = `${window.location.origin}/templates/calling-instructions-template.docx`;
+    // Get the template URL from Supabase Storage
+    const templateUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/templates/calling-instructions-template.docx`;
 
     // Call the edge function to generate the document
     const response = await fetch(
