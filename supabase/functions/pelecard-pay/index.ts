@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,11 +9,24 @@ const corsHeaders = {
 interface PelecardRequest {
   amount: number;
   customerName: string;
-  creditCard: string;
-  creditCardExpiry: string; // Format: MMYY
-  cvv: string;
+  creditCard?: string;
+  creditCardExpiry?: string; // Format: MMYY
+  cvv?: string;
+  token?: string; // For token-based payments
   customerId?: string;
   description?: string;
+  rentalId?: string;
+  transactionId: string; // Required for idempotency
+}
+
+// Mask sensitive data for logging
+function maskSensitive(data: Record<string, unknown>): Record<string, unknown> {
+  const masked = { ...data };
+  if (masked.creditCard) masked.creditCard = '****';
+  if (masked.cvv) masked.cvv = '***';
+  if (masked.password) masked.password = '****';
+  if (masked.token) masked.token = '****';
+  return masked;
 }
 
 serve(async (req) => {
@@ -25,20 +39,43 @@ serve(async (req) => {
     const terminal = Deno.env.get('PELECARD_TERMINAL');
     const user = Deno.env.get('PELECARD_USER');
     const password = Deno.env.get('PELECARD_PASSWORD');
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
     if (!terminal || !user || !password) {
       throw new Error('Pelecard credentials not configured');
     }
 
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Supabase configuration missing');
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const requestBody = await req.json() as PelecardRequest;
     const { 
       amount, 
       customerName, 
       creditCard,
       creditCardExpiry,
       cvv,
+      token,
       customerId,
-      description 
-    } = await req.json() as PelecardRequest;
+      description,
+      rentalId,
+      transactionId
+    } = requestBody;
+
+    // Log incoming request (masked)
+    console.log('Charge request received:', JSON.stringify(maskSensitive(requestBody as unknown as Record<string, unknown>)));
+
+    // Validate required fields
+    if (!transactionId) {
+      return new Response(
+        JSON.stringify({ error: 'transaction_id is required for idempotency' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     if (!amount || amount <= 0) {
       return new Response(
@@ -47,35 +84,100 @@ serve(async (req) => {
       );
     }
 
-    if (!creditCard || !creditCardExpiry || !cvv) {
+    // Check for token or credit card details
+    const hasToken = !!token;
+    const hasCardDetails = creditCard && creditCardExpiry && cvv;
+
+    if (!hasToken && !hasCardDetails) {
       return new Response(
-        JSON.stringify({ error: 'Credit card details are required' }),
+        JSON.stringify({ error: 'Either token or credit card details (creditCard, creditCardExpiry, cvv) are required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('Initiating Pelecard debit for:', customerName, 'Amount:', amount);
+    // Idempotency check - return existing result if already processed
+    const { data: existingTransaction } = await supabase
+      .from('payment_transactions')
+      .select('*')
+      .eq('transaction_id', transactionId)
+      .maybeSingle();
+
+    if (existingTransaction) {
+      console.log('Idempotent request - returning existing result:', transactionId);
+      
+      if (existingTransaction.status === 'success') {
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            message: 'Transaction already processed',
+            transactionId: existingTransaction.transaction_id,
+            gatewayResponse: existingTransaction.gateway_response
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } else {
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: existingTransaction.error_message || 'Transaction previously failed',
+            transactionId: existingTransaction.transaction_id,
+            gatewayResponse: existingTransaction.gateway_response
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Create pending transaction record
+    const { error: insertError } = await supabase
+      .from('payment_transactions')
+      .insert({
+        transaction_id: transactionId,
+        rental_id: rentalId || null,
+        amount,
+        currency: 'ILS',
+        status: 'pending',
+        customer_name: customerName
+      });
+
+    if (insertError) {
+      console.error('Failed to create transaction record:', insertError);
+      // Continue anyway - idempotency is nice-to-have, not critical
+    }
+
+    console.log('Initiating Pelecard debit for:', customerName, 'Amount:', amount, 'TransactionId:', transactionId);
+
+    // Build gateway payload based on payment method
+    const gatewayPayload: Record<string, string> = {
+      terminalNumber: terminal,
+      user: user,
+      password: password,
+      shopNumber: "001",
+      total: Math.round(amount * 100).toString(), // Amount in agorot as string
+      currency: "1", // 1 = ILS
+      id: customerId || "",
+      authorizationNumber: "",
+      paramX: description || `תשלום עבור ${customerName}`,
+    };
+
+    // Use token or card details
+    if (hasToken) {
+      gatewayPayload.token = token;
+      gatewayPayload.creditCard = "";
+      gatewayPayload.creditCardDateMmYy = "";
+      gatewayPayload.cvv2 = "";
+    } else {
+      gatewayPayload.token = "";
+      gatewayPayload.creditCard = creditCard!.replace(/\s/g, ''); // Remove spaces
+      gatewayPayload.creditCardDateMmYy = creditCardExpiry!;
+      gatewayPayload.cvv2 = cvv!;
+    }
 
     // Send request to Pelecard Services API - DebitRegularType for direct charge
-    // Using gateway21 as specified in Pelecard documentation
     const response = await fetch('https://gateway21.pelecard.biz/services/DebitRegularType', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        terminalNumber: terminal,
-        user: user,
-        password: password,
-        shopNumber: "001",
-        creditCard: creditCard.replace(/\s/g, ''), // Remove spaces
-        creditCardDateMmYy: creditCardExpiry,
-        token: "",
-        total: Math.round(amount * 100).toString(), // Amount in agorot as string
-        currency: "1", // 1 = ILS
-        cvv2: cvv,
-        id: customerId || "",
-        authorizationNumber: "",
-        paramX: description || `תשלום עבור ${customerName}`,
-      }),
+      body: JSON.stringify(gatewayPayload),
     });
 
     const responseText = await response.text();
@@ -90,6 +192,17 @@ serve(async (req) => {
 
     // Check Pelecard response - StatusCode "000" means success
     if (data.StatusCode === "000") {
+      // Update transaction as successful
+      await supabase
+        .from('payment_transactions')
+        .update({
+          status: 'success',
+          gateway_response: data
+        })
+        .eq('transaction_id', transactionId);
+
+      console.log('Payment successful for transaction:', transactionId);
+
       return new Response(
         JSON.stringify({ 
           success: true, 
@@ -101,10 +214,23 @@ serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     } else {
+      // Update transaction as failed
+      const errorMessage = data.ErrorMessage || 'Payment failed';
+      await supabase
+        .from('payment_transactions')
+        .update({
+          status: 'failed',
+          gateway_response: data,
+          error_message: errorMessage
+        })
+        .eq('transaction_id', transactionId);
+
+      console.log('Payment failed for transaction:', transactionId, 'Error:', errorMessage);
+
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: data.ErrorMessage || 'Payment failed',
+          error: errorMessage,
           errorCode: data.StatusCode,
           details: data 
         }),
