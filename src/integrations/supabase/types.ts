@@ -72,6 +72,7 @@ export type Database = {
           local_number: string | null
           name: string
           notes: string | null
+          sim_number: string | null
           status: Database["public"]["Enums"]["item_status"]
           updated_at: string
         }
@@ -84,6 +85,7 @@ export type Database = {
           local_number?: string | null
           name: string
           notes?: string | null
+          sim_number?: string | null
           status?: Database["public"]["Enums"]["item_status"]
           updated_at?: string
         }
@@ -96,6 +98,7 @@ export type Database = {
           local_number?: string | null
           name?: string
           notes?: string | null
+          sim_number?: string | null
           status?: Database["public"]["Enums"]["item_status"]
           updated_at?: string
         }

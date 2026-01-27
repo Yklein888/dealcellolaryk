@@ -49,6 +49,7 @@ export default function Inventory() {
     localNumber: '',
     israeliNumber: '',
     expiryDate: '',
+    simNumber: '',
     status: 'available' as InventoryItem['status'],
     notes: '',
   });
@@ -88,6 +89,7 @@ export default function Inventory() {
       localNumber: '',
       israeliNumber: '',
       expiryDate: '',
+      simNumber: '',
       status: 'available',
       notes: '',
     });
@@ -130,6 +132,7 @@ export default function Inventory() {
       localNumber: item.localNumber || '',
       israeliNumber: item.israeliNumber || '',
       expiryDate: item.expiryDate || '',
+      simNumber: item.simNumber || '',
       status: item.status,
       notes: item.notes || '',
     });
@@ -230,6 +233,15 @@ export default function Inventory() {
                       type="date"
                       value={formData.expiryDate}
                       onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>מספר סים (ICCID)</Label>
+                    <Input
+                      value={formData.simNumber}
+                      onChange={(e) => setFormData({ ...formData, simNumber: e.target.value })}
+                      placeholder="89972..."
                     />
                   </div>
                 </>
