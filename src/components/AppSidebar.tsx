@@ -13,7 +13,8 @@ import {
   Smartphone,
   LogOut,
   Shield,
-  CreditCard
+  CreditCard,
+  FileText
 } from 'lucide-react';
 
 const navItems = [
@@ -23,6 +24,7 @@ const navItems = [
   { path: '/inventory', label: 'מלאי', icon: Package },
   { path: '/repairs', label: 'תיקונים', icon: Wrench },
   { path: '/payments', label: 'תשלומים', icon: CreditCard },
+  { path: '/invoices', label: 'חשבוניות', icon: FileText },
 ];
 
 const adminNavItems = [
