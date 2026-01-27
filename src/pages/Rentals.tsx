@@ -956,6 +956,7 @@ export default function Rentals() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {filteredAvailableItems.map((item) => {
                           const isSelected = selectedItems.some(i => i.inventoryItemId === item.id);
+                          const hasPhoneNumber = item.localNumber || item.israeliNumber;
                           return (
                             <button
                               key={item.id}
@@ -974,6 +975,21 @@ export default function Rentals() {
                               <div className="flex-1 min-w-0">
                                 <p className="font-medium text-foreground text-sm truncate">{item.name}</p>
                                 <p className="text-xs text-muted-foreground">{categoryLabels[item.category]}</p>
+                                {hasPhoneNumber && (
+                                  <div className="flex items-center gap-2 mt-1">
+                                    {item.israeliNumber && (
+                                      <span className="text-xs text-primary flex items-center gap-1">
+                                        <Phone className="h-3 w-3" />
+                                        🇮🇱 {item.israeliNumber}
+                                      </span>
+                                    )}
+                                    {item.localNumber && (
+                                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                        📞 {item.localNumber}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                               {isSelected ? (
                                 <span className="text-xs text-primary font-medium shrink-0">✓</span>
