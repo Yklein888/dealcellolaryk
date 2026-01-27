@@ -147,6 +147,13 @@ serve(async (req) => {
 
     console.log('Initiating Pelecard debit for:', customerName, 'Amount:', amount, 'TransactionId:', transactionId);
 
+    // Pelecard expects the `id` field to be numeric (typically Israeli ID number).
+    // Our app sometimes passes internal UUIDs (e.g. customerId), which causes gateway errors.
+    // Send it only when it looks numeric.
+    const customerIdNumeric = typeof customerId === 'string' && /^\d{5,10}$/.test(customerId)
+      ? customerId
+      : "";
+
     // Build gateway payload based on payment method
     const gatewayPayload: Record<string, string> = {
       terminalNumber: terminal,
@@ -155,7 +162,7 @@ serve(async (req) => {
       shopNumber: "001",
       total: Math.round(amount * 100).toString(), // Amount in agorot as string
       currency: "1", // 1 = ILS
-      id: customerId || "",
+      id: customerIdNumeric,
       authorizationNumber: "",
       paramX: description || `תשלום עבור ${customerName}`,
     };
