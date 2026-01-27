@@ -81,6 +81,9 @@ export default function Rentals() {
     deposit: '',
     notes: '',
     status: 'active' as Rental['status'],
+    overdueDailyRate: '',
+    overdueGraceDays: '0',
+    autoChargeEnabled: false,
   });
 
   const [formData, setFormData] = useState({
@@ -523,6 +526,9 @@ export default function Rentals() {
       deposit: rental.deposit?.toString() || '',
       notes: rental.notes || '',
       status: rental.status,
+      overdueDailyRate: rental.overdueDailyRate?.toString() || '',
+      overdueGraceDays: (rental.overdueGraceDays ?? 0).toString(),
+      autoChargeEnabled: rental.autoChargeEnabled ?? false,
     });
     setIsEditDialogOpen(true);
   };
@@ -540,6 +546,9 @@ export default function Rentals() {
           deposit: editFormData.deposit ? parseFloat(editFormData.deposit) : null,
           notes: editFormData.notes || null,
           status: editFormData.status,
+          overdue_daily_rate: editFormData.overdueDailyRate ? parseFloat(editFormData.overdueDailyRate) : null,
+          overdue_grace_days: parseInt(editFormData.overdueGraceDays) || 0,
+          auto_charge_enabled: editFormData.autoChargeEnabled,
           updated_at: new Date().toISOString(),
         })
         .eq('id', editingRental.id);
@@ -1221,6 +1230,44 @@ export default function Rentals() {
                   onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
                   placeholder="הערות נוספות"
                 />
+              </div>
+
+              {/* Overdue Charging Section */}
+              <div className="border-t pt-4 mt-4">
+                <h4 className="font-medium text-sm mb-3">חיוב אוטומטי על איחור</h4>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>סכום ליום איחור (₪)</Label>
+                    <Input
+                      type="number"
+                      value={editFormData.overdueDailyRate}
+                      onChange={(e) => setEditFormData({ ...editFormData, overdueDailyRate: e.target.value })}
+                      placeholder="למשל: 50"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>ימי חסד</Label>
+                    <Input
+                      type="number"
+                      value={editFormData.overdueGraceDays}
+                      onChange={(e) => setEditFormData({ ...editFormData, overdueGraceDays: e.target.value })}
+                      placeholder="0"
+                      min="0"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 mt-3">
+                  <Checkbox
+                    id="autoChargeEnabled"
+                    checked={editFormData.autoChargeEnabled}
+                    onCheckedChange={(checked) => setEditFormData({ ...editFormData, autoChargeEnabled: checked === true })}
+                  />
+                  <Label htmlFor="autoChargeEnabled" className="text-sm cursor-pointer">
+                    חייב אוטומטית (רק ללקוחות עם כרטיס שמור)
+                  </Label>
+                </div>
               </div>
 
               <div className="flex gap-2 pt-4">

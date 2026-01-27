@@ -60,6 +60,24 @@ export interface Rental {
   deposit?: number;
   notes?: string;
   createdAt: string;
+  // Overdue charging configuration
+  overdueDailyRate?: number;
+  overdueGraceDays?: number;
+  autoChargeEnabled?: boolean;
+}
+
+export interface OverdueCharge {
+  id: string;
+  rentalId: string;
+  customerId?: string;
+  chargeDate: string;
+  daysOverdue: number;
+  amount: number;
+  currency: string;
+  status: 'pending' | 'charged' | 'failed' | 'waived';
+  transactionId?: string;
+  errorMessage?: string;
+  createdAt: string;
 }
 
 export interface Repair {

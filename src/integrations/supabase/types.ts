@@ -101,6 +101,73 @@ export type Database = {
         }
         Relationships: []
       }
+      overdue_charges: {
+        Row: {
+          amount: number
+          charge_date: string
+          created_at: string
+          currency: string
+          customer_id: string | null
+          days_overdue: number
+          error_message: string | null
+          id: string
+          rental_id: string
+          status: string
+          transaction_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          charge_date: string
+          created_at?: string
+          currency?: string
+          customer_id?: string | null
+          days_overdue: number
+          error_message?: string | null
+          id?: string
+          rental_id: string
+          status?: string
+          transaction_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          charge_date?: string
+          created_at?: string
+          currency?: string
+          customer_id?: string | null
+          days_overdue?: number
+          error_message?: string | null
+          id?: string
+          rental_id?: string
+          status?: string
+          transaction_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "overdue_charges_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "overdue_charges_rental_id_fkey"
+            columns: ["rental_id"]
+            isOneToOne: false
+            referencedRelation: "rentals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "overdue_charges_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "payment_transactions"
+            referencedColumns: ["transaction_id"]
+          },
+        ]
+      }
       payment_transactions: {
         Row: {
           amount: number
@@ -204,6 +271,7 @@ export type Database = {
       }
       rentals: {
         Row: {
+          auto_charge_enabled: boolean | null
           created_at: string
           currency: string
           customer_id: string | null
@@ -212,12 +280,15 @@ export type Database = {
           end_date: string
           id: string
           notes: string | null
+          overdue_daily_rate: number | null
+          overdue_grace_days: number | null
           start_date: string
           status: Database["public"]["Enums"]["rental_status"]
           total_price: number
           updated_at: string
         }
         Insert: {
+          auto_charge_enabled?: boolean | null
           created_at?: string
           currency?: string
           customer_id?: string | null
@@ -226,12 +297,15 @@ export type Database = {
           end_date: string
           id?: string
           notes?: string | null
+          overdue_daily_rate?: number | null
+          overdue_grace_days?: number | null
           start_date: string
           status?: Database["public"]["Enums"]["rental_status"]
           total_price?: number
           updated_at?: string
         }
         Update: {
+          auto_charge_enabled?: boolean | null
           created_at?: string
           currency?: string
           customer_id?: string | null
@@ -240,6 +314,8 @@ export type Database = {
           end_date?: string
           id?: string
           notes?: string | null
+          overdue_daily_rate?: number | null
+          overdue_grace_days?: number | null
           start_date?: string
           status?: Database["public"]["Enums"]["rental_status"]
           total_price?: number

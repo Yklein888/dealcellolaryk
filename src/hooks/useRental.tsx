@@ -194,6 +194,9 @@ export function RentalProvider({ children }: { children: ReactNode }) {
             deposit: r.deposit ? Number(r.deposit) : undefined,
             notes: r.notes || undefined,
             createdAt: String(r.created_at).split('T')[0],
+            overdueDailyRate: r.overdue_daily_rate ? Number(r.overdue_daily_rate) : undefined,
+            overdueGraceDays: r.overdue_grace_days ?? 0,
+            autoChargeEnabled: r.auto_charge_enabled ?? false,
           }))
         );
       }
@@ -453,6 +456,9 @@ export function RentalProvider({ children }: { children: ReactNode }) {
         status: rental.status,
         deposit: rental.deposit || null,
         notes: rental.notes || null,
+        overdue_daily_rate: rental.overdueDailyRate || null,
+        overdue_grace_days: rental.overdueGraceDays ?? 0,
+        auto_charge_enabled: rental.autoChargeEnabled ?? false,
       })
       .select()
       .single();
@@ -505,6 +511,9 @@ export function RentalProvider({ children }: { children: ReactNode }) {
     if (rental.status !== undefined) updateData.status = rental.status;
     if (rental.deposit !== undefined) updateData.deposit = rental.deposit;
     if (rental.notes !== undefined) updateData.notes = rental.notes;
+    if (rental.overdueDailyRate !== undefined) updateData.overdue_daily_rate = rental.overdueDailyRate;
+    if (rental.overdueGraceDays !== undefined) updateData.overdue_grace_days = rental.overdueGraceDays;
+    if (rental.autoChargeEnabled !== undefined) updateData.auto_charge_enabled = rental.autoChargeEnabled;
 
     const { error } = await supabase
       .from('rentals')
