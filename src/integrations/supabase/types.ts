@@ -101,6 +101,75 @@ export type Database = {
         }
         Relationships: []
       }
+      invoices: {
+        Row: {
+          amount: number
+          business_id: string
+          business_name: string
+          created_at: string
+          currency: string
+          customer_id: string | null
+          customer_name: string
+          description: string | null
+          id: string
+          invoice_number: number
+          issued_at: string
+          rental_id: string | null
+          status: string
+          transaction_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          business_id?: string
+          business_name?: string
+          created_at?: string
+          currency?: string
+          customer_id?: string | null
+          customer_name: string
+          description?: string | null
+          id?: string
+          invoice_number?: number
+          issued_at?: string
+          rental_id?: string | null
+          status?: string
+          transaction_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          business_id?: string
+          business_name?: string
+          created_at?: string
+          currency?: string
+          customer_id?: string | null
+          customer_name?: string
+          description?: string | null
+          id?: string
+          invoice_number?: number
+          issued_at?: string
+          rental_id?: string | null
+          status?: string
+          transaction_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_rental_id_fkey"
+            columns: ["rental_id"]
+            isOneToOne: false
+            referencedRelation: "rentals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       overdue_charges: {
         Row: {
           amount: number
