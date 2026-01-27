@@ -506,8 +506,12 @@ export default function Rentals() {
       description: `השכרה חדשה נוצרה עבור ${customer.name}`,
     });
 
-    resetForm();
+    // Close dialog first, then reset form
     setIsAddDialogOpen(false);
+    // Reset form after a short delay to ensure state is cleared properly
+    setTimeout(() => {
+      resetForm();
+    }, 100);
   };
 
   const handleReturn = (rentalId: string) => {
