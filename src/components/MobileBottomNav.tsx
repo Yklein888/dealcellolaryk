@@ -1,0 +1,183 @@
+import { Link, useLocation } from 'react-router-dom';
+import { cn } from '@/lib/utils';
+import { 
+  LayoutDashboard, 
+  ShoppingCart, 
+  Package, 
+  Users,
+  MoreHorizontal
+} from 'lucide-react';
+import { useState } from 'react';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
+import { Wrench, CreditCard, FileText, Shield, LogOut } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { useRole } from '@/hooks/useRole';
+import { Button } from './ui/button';
+
+const mainNavItems = [
+  { path: '/', label: 'ראשי', icon: LayoutDashboard },
+  { path: '/rentals', label: 'השכרות', icon: ShoppingCart },
+  { path: '/inventory', label: 'מלאי', icon: Package },
+  { path: '/customers', label: 'לקוחות', icon: Users },
+];
+
+const moreNavItems = [
+  { path: '/repairs', label: 'תיקונים', icon: Wrench },
+  { path: '/payments', label: 'תשלומים', icon: CreditCard },
+  { path: '/invoices', label: 'חשבוניות', icon: FileText },
+];
+
+const adminNavItems = [
+  { path: '/users', label: 'ניהול משתמשים', icon: Shield },
+];
+
+export function MobileBottomNav() {
+  const location = useLocation();
+  const { user, signOut } = useAuth();
+  const { isAdmin } = useRole();
+  const [isMoreOpen, setIsMoreOpen] = useState(false);
+
+  const isActive = (path: string) => location.pathname === path;
+  const isMoreActive = [...moreNavItems, ...adminNavItems].some(item => isActive(item.path));
+
+  return (
+    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 glass-strong border-t border-white/20 safe-area-bottom">
+      <div className="flex items-center justify-around h-16 px-2">
+        {mainNavItems.map((item) => {
+          const Icon = item.icon;
+          const active = isActive(item.path);
+          
+          return (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={cn(
+                'flex flex-col items-center justify-center flex-1 h-full py-2 transition-all duration-200 rounded-xl mx-0.5',
+                active 
+                  ? 'text-primary bg-primary/10' 
+                  : 'text-muted-foreground hover:text-foreground active:bg-muted/50'
+              )}
+            >
+              <Icon className={cn(
+                'h-5 w-5 mb-1 transition-transform duration-200',
+                active && 'scale-110'
+              )} />
+              <span className="text-[10px] font-medium leading-tight">{item.label}</span>
+            </Link>
+          );
+        })}
+
+        {/* More Menu */}
+        <Sheet open={isMoreOpen} onOpenChange={setIsMoreOpen}>
+          <SheetTrigger asChild>
+            <button
+              className={cn(
+                'flex flex-col items-center justify-center flex-1 h-full py-2 transition-all duration-200 rounded-xl mx-0.5',
+                isMoreActive 
+                  ? 'text-primary bg-primary/10' 
+                  : 'text-muted-foreground hover:text-foreground active:bg-muted/50'
+              )}
+            >
+              <MoreHorizontal className={cn(
+                'h-5 w-5 mb-1 transition-transform duration-200',
+                isMoreActive && 'scale-110'
+              )} />
+              <span className="text-[10px] font-medium leading-tight">עוד</span>
+            </button>
+          </SheetTrigger>
+          <SheetContent side="bottom" className="h-auto max-h-[70vh] rounded-t-3xl">
+            <SheetHeader className="pb-4">
+              <SheetTitle className="text-right">תפריט נוסף</SheetTitle>
+            </SheetHeader>
+            
+            <div className="space-y-2 pb-4">
+              {moreNavItems.map((item) => {
+                const Icon = item.icon;
+                const active = isActive(item.path);
+                
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    onClick={() => setIsMoreOpen(false)}
+                    className={cn(
+                      'flex items-center gap-4 p-4 rounded-2xl transition-all duration-200',
+                      active 
+                        ? 'bg-primary/10 text-primary' 
+                        : 'hover:bg-muted active:bg-muted/70'
+                    )}
+                  >
+                    <div className={cn(
+                      'flex items-center justify-center w-12 h-12 rounded-xl',
+                      active ? 'bg-primary text-white' : 'bg-muted'
+                    )}>
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <span className="font-medium text-base">{item.label}</span>
+                  </Link>
+                );
+              })}
+
+              {isAdmin && (
+                <>
+                  <div className="h-px bg-border my-4" />
+                  <p className="text-xs text-muted-foreground px-4 mb-2">ניהול מערכת</p>
+                  {adminNavItems.map((item) => {
+                    const Icon = item.icon;
+                    const active = isActive(item.path);
+                    
+                    return (
+                      <Link
+                        key={item.path}
+                        to={item.path}
+                        onClick={() => setIsMoreOpen(false)}
+                        className={cn(
+                          'flex items-center gap-4 p-4 rounded-2xl transition-all duration-200',
+                          active 
+                            ? 'bg-primary/10 text-primary' 
+                            : 'hover:bg-muted active:bg-muted/70'
+                        )}
+                      >
+                        <div className={cn(
+                          'flex items-center justify-center w-12 h-12 rounded-xl',
+                          active ? 'bg-primary text-white' : 'bg-muted'
+                        )}>
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <span className="font-medium text-base">{item.label}</span>
+                      </Link>
+                    );
+                  })}
+                </>
+              )}
+            </div>
+
+            {/* User Section */}
+            <div className="border-t border-border pt-4 pb-2">
+              <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/50">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-muted-foreground">מחובר כ:</p>
+                  <p className="text-sm font-medium truncate">{user?.email}</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={signOut}
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                >
+                  <LogOut className="h-5 w-5" />
+                </Button>
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
+    </nav>
+  );
+}

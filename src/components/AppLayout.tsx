@@ -1,51 +1,37 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode } from 'react';
 import { AppSidebar } from './AppSidebar';
-import { Menu, X } from 'lucide-react';
-import { Button } from './ui/button';
+import { MobileBottomNav } from './MobileBottomNav';
+import { Smartphone } from 'lucide-react';
 
 interface AppLayoutProps {
   children: ReactNode;
 }
 
 export function AppLayout({ children }: AppLayoutProps) {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
   return (
     <div className="min-h-screen bg-background">
-      {/* Mobile Header */}
-      <header className="lg:hidden fixed top-0 right-0 left-0 z-50 glass-strong border-b border-white/20 px-4 py-3 flex items-center justify-between">
-        <Button 
-          variant="ghost" 
-          size="icon"
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="hover:bg-white/40"
-        >
-          {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-        </Button>
-        <h1 className="text-lg font-bold gradient-text">ניהול השכרות</h1>
-        <div className="w-10" /> {/* Spacer for centering */}
+      {/* Mobile Header - Simplified */}
+      <header className="lg:hidden fixed top-0 right-0 left-0 z-50 glass-strong border-b border-white/20 px-4 py-3 safe-area-top">
+        <div className="flex items-center justify-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent">
+            <Smartphone className="h-4 w-4 text-white" />
+          </div>
+          <h1 className="text-lg font-bold gradient-text">ניהול השכרות</h1>
+        </div>
       </header>
 
-      {/* Mobile Overlay */}
-      {isMobileMenuOpen && (
-        <div 
-          className="lg:hidden fixed inset-0 bg-black/30 backdrop-blur-sm z-40"
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
-      )}
-
-      {/* Sidebar - hidden on mobile, visible on desktop */}
-      <div className={`
-        lg:block
-        ${isMobileMenuOpen ? 'block' : 'hidden'}
-      `}>
-        <AppSidebar onNavigate={() => setIsMobileMenuOpen(false)} />
+      {/* Desktop Sidebar */}
+      <div className="hidden lg:block">
+        <AppSidebar />
       </div>
 
       {/* Main Content */}
-      <main className="lg:mr-64 min-h-screen p-4 pt-20 lg:pt-8 lg:p-8">
+      <main className="lg:mr-64 min-h-screen p-4 pt-16 pb-20 lg:pt-8 lg:pb-8 lg:p-8">
         {children}
       </main>
+
+      {/* Mobile Bottom Navigation */}
+      <MobileBottomNav />
     </div>
   );
 }

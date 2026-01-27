@@ -225,7 +225,7 @@
   }
 
   .stat-card {
-    @apply relative overflow-hidden rounded-2xl p-6;
+    @apply relative overflow-hidden rounded-2xl p-4 sm:p-6;
     background: hsl(var(--glass-bg));
     backdrop-filter: blur(var(--glass-blur));
     -webkit-backdrop-filter: blur(var(--glass-blur));
@@ -239,5 +239,57 @@
     background: var(--gradient-primary);
     filter: blur(60px);
     border-radius: 50%;
+  }
+
+  /* Safe area for mobile devices with notch/home indicator */
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Touch-friendly targets for mobile */
+  @media (max-width: 1024px) {
+    .touch-target {
+      min-height: 44px;
+      min-width: 44px;
+    }
+
+    /* Larger tap areas */
+    button, a, [role="button"] {
+      min-height: 44px;
+    }
+
+    /* Better spacing for mobile forms */
+    input, select, textarea {
+      font-size: 16px !important; /* Prevents iOS zoom on focus */
+    }
+  }
+
+  /* Mobile-optimized cards */
+  .mobile-card {
+    @apply p-4 rounded-2xl;
+    background: hsl(var(--glass-bg));
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid hsl(var(--glass-border));
+  }
+
+  /* Smooth scrolling for mobile */
+  .scroll-smooth {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+
+  /* Hide scrollbars on mobile but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
   }
 }

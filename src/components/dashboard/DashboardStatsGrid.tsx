@@ -36,7 +36,7 @@ export function DashboardStatsGrid({ stats, inventory }: DashboardStatsGridProps
   const availableItems = inventory.filter(isItemTrulyAvailable);
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-6 sm:mb-8">
       <div className="animate-slide-up" style={{ animationDelay: '0ms' }}>
         <StatCard
           title="השכרות פעילות"
@@ -69,7 +69,7 @@ export function DashboardStatsGrid({ stats, inventory }: DashboardStatsGridProps
           variant="primary"
         />
       </div>
-      <div className="animate-slide-up" style={{ animationDelay: '200ms' }}>
+      <div className="animate-slide-up col-span-2 sm:col-span-1" style={{ animationDelay: '200ms' }}>
         <StatCard
           title="פריטים זמינים"
           value={availableItems.length}

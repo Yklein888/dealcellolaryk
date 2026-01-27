@@ -208,68 +208,69 @@ export default function Customers() {
       </PageHeader>
 
       {/* Search */}
-      <div className="relative mb-6">
+      <div className="relative mb-4 sm:mb-6">
         <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           placeholder="חיפוש לפי שם, טלפון או אימייל..."
-          className="pr-10 max-w-md"
+          className="pr-10"
         />
       </div>
 
       {/* Customers Grid */}
       {filteredCustomers.length === 0 ? (
-        <div className="stat-card text-center py-12">
-          <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <p className="text-lg font-medium text-foreground">אין לקוחות</p>
-          <p className="text-muted-foreground">הוסף לקוחות חדשים כדי להתחיל</p>
+        <div className="stat-card text-center py-8 sm:py-12">
+          <Users className="h-10 w-10 sm:h-12 sm:w-12 mx-auto text-muted-foreground mb-3 sm:mb-4" />
+          <p className="text-base sm:text-lg font-medium text-foreground">אין לקוחות</p>
+          <p className="text-sm text-muted-foreground">הוסף לקוחות חדשים כדי להתחיל</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {filteredCustomers.map((customer) => (
             <div 
               key={customer.id}
               className="stat-card hover:border-primary/30 transition-all duration-200"
             >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/20 text-primary font-bold text-lg">
+              <div className="flex items-start justify-between mb-3 sm:mb-4">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-primary/20 text-primary font-bold text-base sm:text-lg">
                     {customer.name.charAt(0)}
                   </div>
-                  <div>
-                    <p className="font-semibold text-foreground text-lg">{customer.name}</p>
-                    <p className="text-sm text-muted-foreground">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-foreground text-base sm:text-lg truncate">{customer.name}</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground">
                       לקוח מ-{format(parseISO(customer.createdAt), 'MM/yyyy', { locale: he })}
                     </p>
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-2 mb-4">
+              <div className="space-y-1.5 sm:space-y-2 mb-3 sm:mb-4">
                 <div className="flex items-center gap-2 text-sm">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-foreground">{customer.phone}</span>
+                  <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="text-foreground truncate">{customer.phone}</span>
                 </div>
                 {customer.email && (
                   <div className="flex items-center gap-2 text-sm">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-foreground">{customer.email}</span>
+                    <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="text-foreground truncate">{customer.email}</span>
                   </div>
                 )}
                 {customer.address && (
                   <div className="flex items-center gap-2 text-sm">
-                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-foreground">{customer.address}</span>
+                    <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="text-foreground truncate">{customer.address}</span>
                   </div>
                 )}
               </div>
 
-              <div className="flex gap-2 pt-3 border-t border-border">
+              <div className="flex gap-2 pt-2 sm:pt-3 border-t border-border">
                 <Button 
                   variant="ghost" 
                   size="sm"
                   onClick={() => handleEdit(customer)}
+                  className="flex-1"
                 >
                   <Edit2 className="h-4 w-4" />
                   עריכה
@@ -277,7 +278,7 @@ export default function Customers() {
                 <Button 
                   variant="ghost" 
                   size="sm"
-                  className="text-destructive hover:text-destructive"
+                  className="text-destructive hover:text-destructive flex-1"
                   onClick={() => handleDelete(customer.id)}
                 >
                   <Trash2 className="h-4 w-4" />
