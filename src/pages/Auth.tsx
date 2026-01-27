@@ -1,16 +1,18 @@
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Phone, Smartphone, Wifi } from 'lucide-react';
+import { Loader2, Phone, Smartphone, Wifi, UserPlus } from 'lucide-react';
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
   const { signIn, signUp } = useAuth();
   const { toast } = useToast();
@@ -19,22 +21,62 @@ export default function Auth() {
     e.preventDefault();
     setLoading(true);
 
-    const { error } = isLogin 
-      ? await signIn(email, password)
-      : await signUp(email, password);
+    if (isLogin) {
+      const { error } = await signIn(email, password);
+      if (error) {
+        toast({
+          title: 'שגיאה',
+          description: error.message,
+          variant: 'destructive',
+        });
+      }
+    } else {
+      // Validate display name
+      if (!displayName.trim()) {
+        toast({
+          title: 'שגיאה',
+          description: 'יש להזין שם מלא',
+          variant: 'destructive',
+        });
+        setLoading(false);
+        return;
+      }
 
-    if (error) {
-      toast({
-        title: 'שגיאה',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else if (!isLogin) {
-      toast({
-        title: 'הרשמה הצליחה!',
-        description: 'ניתן להתחבר כעת למערכת',
-      });
-      setIsLogin(true);
+      const { error, data } = await signUp(email, password);
+      
+      if (error) {
+        toast({
+          title: 'שגיאה',
+          description: error.message,
+          variant: 'destructive',
+        });
+      } else if (data?.user) {
+        // Insert pending user record with display name
+        const { error: pendingError } = await supabase
+          .from('pending_users')
+          .insert({
+            user_id: data.user.id,
+            display_name: displayName.trim(),
+            email: email
+          });
+
+        if (pendingError) {
+          console.error('Error creating pending user:', pendingError);
+        }
+
+        toast({
+          title: 'נרשמת בהצלחה!',
+          description: 'הבקשה שלך נשלחה לאישור. תוכל להיכנס למערכת לאחר אישור מנהל.',
+        });
+        
+        // Sign out immediately - user needs approval first
+        await supabase.auth.signOut();
+        
+        setIsLogin(true);
+        setEmail('');
+        setPassword('');
+        setDisplayName('');
+      }
     }
 
     setLoading(false);
@@ -60,11 +102,25 @@ export default function Auth() {
             <CardDescription>
               {isLogin 
                 ? 'הזן את פרטי ההתחברות שלך'
-                : 'צור חשבון חדש כדי להתחיל'}
+                : 'צור חשבון חדש - נדרש אישור מנהל'}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {!isLogin && (
+                <div className="space-y-2">
+                  <Label htmlFor="displayName">שם מלא</Label>
+                  <Input
+                    id="displayName"
+                    type="text"
+                    placeholder="ישראל ישראלי"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    required={!isLogin}
+                    className="text-right"
+                  />
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="email">אימייל</Label>
                 <Input
@@ -103,7 +159,12 @@ export default function Auth() {
                     מעבד...
                   </>
                 ) : (
-                  isLogin ? 'התחבר' : 'הרשם'
+                  isLogin ? 'התחבר' : (
+                    <>
+                      <UserPlus className="ml-2 h-4 w-4" />
+                      שלח בקשת הרשמה
+                    </>
+                  )
                 )}
               </Button>
             </form>

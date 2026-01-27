@@ -301,6 +301,30 @@ export type Database = {
           },
         ]
       }
+      pending_users: {
+        Row: {
+          created_at: string
+          display_name: string
+          email: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name: string
+          email: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string
+          email?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       rental_items: {
         Row: {
           created_at: string
@@ -482,18 +506,21 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          is_approved: boolean
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Insert: {
           created_at?: string
           id?: string
+          is_approved?: boolean
           role?: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Update: {
           created_at?: string
           id?: string
+          is_approved?: boolean
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
@@ -587,6 +614,7 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_user_approved: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "user"

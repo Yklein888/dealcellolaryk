@@ -22,7 +22,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Shield, User, Crown, RefreshCw, Mail, Calendar } from 'lucide-react';
+import { Shield, User, Crown, RefreshCw, Calendar, UserPlus, Check, X, Clock } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { he } from 'date-fns/locale';
 
@@ -32,10 +32,20 @@ interface UserWithRole {
   created_at: string;
   role: 'admin' | 'user';
   role_id?: string;
+  is_approved: boolean;
+}
+
+interface PendingUser {
+  id: string;
+  user_id: string;
+  display_name: string;
+  email: string;
+  created_at: string;
 }
 
 export default function UserManagement() {
   const [users, setUsers] = useState<UserWithRole[]>([]);
+  const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -49,25 +59,47 @@ export default function UserManagement() {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      // Fetch user roles - we can only access what RLS allows
+      // Fetch user roles
       const { data: roles, error: rolesError } = await supabase
         .from('user_roles')
-        .select('id, user_id, role, created_at');
+        .select('id, user_id, role, created_at, is_approved');
 
       if (rolesError) {
         throw rolesError;
       }
 
-      // Map to user format - using role data we have access to
-      const usersWithRoles: UserWithRole[] = (roles || []).map((r) => ({
-        id: r.user_id,
-        email: 'משתמש', // We don't have access to auth.users email directly
-        created_at: r.created_at,
-        role: r.role as 'admin' | 'user',
-        role_id: r.id,
-      }));
+      // Fetch pending users
+      const { data: pending, error: pendingError } = await supabase
+        .from('pending_users')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-      setUsers(usersWithRoles);
+      if (pendingError) {
+        console.error('Error fetching pending users:', pendingError);
+      }
+
+      // Map pending users to get email/name for approved users
+      const pendingMap = new Map((pending || []).map(p => [p.user_id, p]));
+
+      // Map to user format
+      const usersWithRoles: UserWithRole[] = (roles || []).map((r) => {
+        const pendingInfo = pendingMap.get(r.user_id);
+        return {
+          id: r.user_id,
+          email: pendingInfo?.email || pendingInfo?.display_name || 'משתמש',
+          created_at: r.created_at,
+          role: r.role as 'admin' | 'user',
+          role_id: r.id,
+          is_approved: r.is_approved,
+        };
+      });
+
+      // Filter out approved users from pending list
+      const approvedUserIds = new Set(usersWithRoles.filter(u => u.is_approved).map(u => u.id));
+      const filteredPending = (pending || []).filter(p => !approvedUserIds.has(p.user_id));
+
+      setUsers(usersWithRoles.filter(u => u.is_approved));
+      setPendingUsers(filteredPending);
     } catch (error) {
       console.error('Error fetching users:', error);
       toast({
@@ -128,6 +160,76 @@ export default function UserManagement() {
     }
   };
 
+  const approveUser = async (pendingUser: PendingUser) => {
+    setUpdating(pendingUser.user_id);
+    try {
+      // Update user_roles to set is_approved = true
+      const { error: approveError } = await supabase
+        .from('user_roles')
+        .update({ is_approved: true })
+        .eq('user_id', pendingUser.user_id);
+
+      if (approveError) throw approveError;
+
+      // Remove from pending_users
+      await supabase
+        .from('pending_users')
+        .delete()
+        .eq('user_id', pendingUser.user_id);
+
+      toast({
+        title: 'המשתמש אושר',
+        description: `${pendingUser.display_name} יכול כעת להיכנס למערכת`,
+      });
+
+      fetchUsers();
+    } catch (error) {
+      console.error('Error approving user:', error);
+      toast({
+        title: 'שגיאה',
+        description: 'לא הצלחנו לאשר את המשתמש',
+        variant: 'destructive',
+      });
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  const rejectUser = async (pendingUser: PendingUser) => {
+    setUpdating(pendingUser.user_id);
+    try {
+      // Delete from user_roles
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .delete()
+        .eq('user_id', pendingUser.user_id);
+
+      if (roleError) throw roleError;
+
+      // Delete from pending_users
+      await supabase
+        .from('pending_users')
+        .delete()
+        .eq('user_id', pendingUser.user_id);
+
+      toast({
+        title: 'המשתמש נדחה',
+        description: 'הבקשה נמחקה מהמערכת',
+      });
+
+      fetchUsers();
+    } catch (error) {
+      console.error('Error rejecting user:', error);
+      toast({
+        title: 'שגיאה',
+        description: 'לא הצלחנו לדחות את המשתמש',
+        variant: 'destructive',
+      });
+    } finally {
+      setUpdating(null);
+    }
+  };
+
   return (
     <RequireAdmin>
       <div className="animate-fade-in">
@@ -147,7 +249,7 @@ export default function UserManagement() {
         </PageHeader>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="grid grid-cols-3 gap-4 mb-6">
           <div className="stat-card">
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/30 to-accent/20">
@@ -175,13 +277,90 @@ export default function UserManagement() {
               </div>
             </div>
           </div>
+
+          <div className="stat-card">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-warning/30 to-warning/20">
+                <Clock className="h-6 w-6 text-warning" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">ממתינים</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {pendingUsers.length}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
+
+        {/* Pending Users */}
+        {pendingUsers.length > 0 && (
+          <div className="stat-card mb-6 border-warning/30 border-2">
+            <div className="flex items-center gap-2 mb-4">
+              <UserPlus className="h-5 w-5 text-warning" />
+              <h2 className="text-lg font-semibold">בקשות הרשמה ממתינות</h2>
+              <Badge variant="secondary" className="bg-warning/20 text-warning">
+                {pendingUsers.length}
+              </Badge>
+            </div>
+
+            <div className="space-y-3">
+              {pendingUsers.map((pending) => (
+                <div
+                  key={pending.id}
+                  className="flex items-center justify-between p-4 rounded-xl glass border border-warning/30 hover:shadow-md transition-all"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-warning/20">
+                      <Clock className="h-6 w-6 text-warning" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground">
+                        {pending.display_name}
+                      </p>
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+                        <span dir="ltr">{pending.email}</span>
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {format(parseISO(pending.created_at), 'dd/MM/yyyy HH:mm', { locale: he })}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="success"
+                      onClick={() => approveUser(pending)}
+                      disabled={updating === pending.user_id}
+                      className="gap-1"
+                    >
+                      <Check className="h-4 w-4" />
+                      אשר
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => rejectUser(pending)}
+                      disabled={updating === pending.user_id}
+                      className="gap-1"
+                    >
+                      <X className="h-4 w-4" />
+                      דחה
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Users List */}
         <div className="stat-card">
           <div className="flex items-center gap-2 mb-4">
             <Shield className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold">משתמשים רשומים</h2>
+            <h2 className="text-lg font-semibold">משתמשים פעילים</h2>
           </div>
 
           {loading ? (
