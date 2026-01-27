@@ -40,7 +40,30 @@ const RentalContext = createContext<RentalContextType | undefined>(undefined);
 
 export function RentalProvider({ children }: { children: ReactNode }) {
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+
+  // Cache inventory locally so a transient network issue won't make inventory “disappear” on refresh.
+  const INVENTORY_CACHE_KEY = 'dealcell_cache_inventory_v1';
+  const loadCachedInventory = (): InventoryItem[] => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = window.localStorage.getItem(INVENTORY_CACHE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? (parsed as InventoryItem[]) : [];
+    } catch {
+      return [];
+    }
+  };
+  const saveCachedInventory = (items: InventoryItem[]) => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(INVENTORY_CACHE_KEY, JSON.stringify(items));
+    } catch {
+      // Ignore storage quota / private mode errors
+    }
+  };
+
+  const [inventory, setInventory] = useState<InventoryItem[]>(() => loadCachedInventory());
   const [rentals, setRentals] = useState<Rental[]>([]);
   const [repairs, setRepairs] = useState<Repair[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,6 +126,7 @@ export function RentalProvider({ children }: { children: ReactNode }) {
       }
 
       const failedParts: string[] = [];
+      let inventoryFailed = false;
 
       // Customers
       if (res.customers.status === 'fulfilled') {
@@ -135,23 +159,25 @@ export function RentalProvider({ children }: { children: ReactNode }) {
       if (res.inventory.status === 'fulfilled') {
         const { data, error } = res.inventory.value as QueryResult<any>;
         if (error) {
+          inventoryFailed = true;
           failedParts.push('מלאי');
         } else {
-        setInventory(
-            (data || []).map((i) => ({
-              id: i.id,
-              category: i.category as ItemCategory,
-              name: i.name,
-              localNumber: i.local_number || undefined,
-              israeliNumber: i.israeli_number || undefined,
-              expiryDate: i.expiry_date || undefined,
-              simNumber: i.sim_number || undefined,
-              status: i.status as 'available' | 'rented' | 'maintenance',
-              notes: i.notes || undefined,
-            }))
-          );
+          const nextInventory = (data || []).map((i) => ({
+            id: i.id,
+            category: i.category as ItemCategory,
+            name: i.name,
+            localNumber: i.local_number || undefined,
+            israeliNumber: i.israeli_number || undefined,
+            expiryDate: i.expiry_date || undefined,
+            simNumber: i.sim_number || undefined,
+            status: i.status as 'available' | 'rented' | 'maintenance',
+            notes: i.notes || undefined,
+          }));
+          setInventory(nextInventory);
+          saveCachedInventory(nextInventory);
         }
       } else {
+        inventoryFailed = true;
         failedParts.push('מלאי');
       }
 
@@ -250,13 +276,24 @@ export function RentalProvider({ children }: { children: ReactNode }) {
       if (failedParts.length > 0) {
         const uniqueFailed = Array.from(new Set(failedParts));
         const allFailed = uniqueFailed.length >= 4; // customers+inventory+rentals+repairs (rentalItems is auxiliary)
-        toast({
-          title: allFailed ? 'שגיאה בטעינת נתונים' : 'חלק מהנתונים לא נטענו',
-          description: allFailed
-            ? 'לא ניתן לטעון את הנתונים מהשרת. נסה לרענן את הדף.'
-            : `נכשל בטעינת: ${uniqueFailed.join(', ')}. שאר הנתונים נטענו.`,
-          variant: 'destructive',
-        });
+
+        // If ONLY inventory failed but we have cached inventory displayed, don't scare the user with a destructive error.
+        const onlyInventoryFailed = uniqueFailed.length === 1 && uniqueFailed[0] === 'מלאי';
+        const hasCachedInventoryShown = inventoryFailed && inventory.length > 0;
+        if (onlyInventoryFailed && hasCachedInventoryShown) {
+          toast({
+            title: 'המלאי מוצג זמנית מהמטמון',
+            description: 'ננסה לעדכן את המלאי אוטומטית ברקע. אם הבעיה חוזרת, נסה לרענן בעוד דקה.',
+          });
+        } else {
+          toast({
+            title: allFailed ? 'שגיאה בטעינת נתונים' : 'חלק מהנתונים לא נטענו',
+            description: allFailed
+              ? 'לא ניתן לטעון את הנתונים מהשרת. נסה לרענן את הדף.'
+              : `נכשל בטעינת: ${uniqueFailed.join(', ')}. שאר הנתונים נטענו.`,
+            variant: 'destructive',
+          });
+        }
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -410,17 +447,21 @@ export function RentalProvider({ children }: { children: ReactNode }) {
       throw error;
     }
 
-    setInventory(prev => [{
-      id: data.id,
-      category: data.category as ItemCategory,
-      name: data.name,
-      localNumber: data.local_number || undefined,
-      israeliNumber: data.israeli_number || undefined,
-      expiryDate: data.expiry_date || undefined,
-      simNumber: data.sim_number || undefined,
-      status: data.status as 'available' | 'rented' | 'maintenance',
-      notes: data.notes || undefined,
-    }, ...prev]);
+    setInventory((prev) => {
+      const next = [{
+        id: data.id,
+        category: data.category as ItemCategory,
+        name: data.name,
+        localNumber: data.local_number || undefined,
+        israeliNumber: data.israeli_number || undefined,
+        expiryDate: data.expiry_date || undefined,
+        simNumber: data.sim_number || undefined,
+        status: data.status as 'available' | 'rented' | 'maintenance',
+        notes: data.notes || undefined,
+      }, ...prev];
+      saveCachedInventory(next);
+      return next;
+    });
   };
 
   const updateInventoryItem = async (id: string, item: Partial<InventoryItem>) => {
@@ -444,7 +485,11 @@ export function RentalProvider({ children }: { children: ReactNode }) {
       throw error;
     }
 
-    setInventory(prev => prev.map(i => i.id === id ? { ...i, ...item } : i));
+    setInventory((prev) => {
+      const next = prev.map((i) => (i.id === id ? { ...i, ...item } : i));
+      saveCachedInventory(next);
+      return next;
+    });
   };
 
   const deleteInventoryItem = async (id: string) => {
@@ -458,7 +503,11 @@ export function RentalProvider({ children }: { children: ReactNode }) {
       throw error;
     }
 
-    setInventory(prev => prev.filter(i => i.id !== id));
+    setInventory((prev) => {
+      const next = prev.filter((i) => i.id !== id);
+      saveCachedInventory(next);
+      return next;
+    });
   };
 
   const addRental = async (rental: Omit<Rental, 'id' | 'createdAt'>) => {
