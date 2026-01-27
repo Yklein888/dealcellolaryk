@@ -38,7 +38,6 @@ export default function Customers() {
     phone: '',
     address: '',
     email: '',
-    creditCard: '',
     notes: '',
   });
 
@@ -54,7 +53,6 @@ export default function Customers() {
       phone: '',
       address: '',
       email: '',
-      creditCard: '',
       notes: '',
     });
     setEditingCustomer(null);
@@ -95,7 +93,6 @@ export default function Customers() {
       phone: customer.phone,
       address: customer.address || '',
       email: customer.email || '',
-      creditCard: customer.creditCard || '',
       notes: customer.notes || '',
     });
     setIsAddDialogOpen(true);
@@ -170,14 +167,6 @@ export default function Customers() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label>כרטיס אשראי (לפיקדון)</Label>
-                <Input
-                  value={formData.creditCard}
-                  onChange={(e) => setFormData({ ...formData, creditCard: e.target.value })}
-                  placeholder="4 ספרות אחרונות"
-                />
-              </div>
 
               <div className="space-y-2">
                 <Label>הערות</Label>

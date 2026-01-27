@@ -110,20 +110,20 @@ export function RentalProvider({ children }: { children: ReactNode }) {
         if (error) {
           failedParts.push('לקוחות');
         } else {
-          setCustomers(
+        setCustomers(
             (data || []).map((c) => ({
               id: c.id,
               name: c.name,
               address: c.address || undefined,
               phone: c.phone,
               email: c.email || undefined,
-              creditCard: c.credit_card || undefined,
               notes: c.notes || undefined,
               createdAt: String(c.created_at).split('T')[0],
-              paymentToken: c.payment_token || undefined,
+              // Security: payment_token is NEVER exposed to frontend
+              // Only expose last4 and expiry for display, and a boolean flag
+              hasPaymentToken: !!(c.payment_token && c.payment_token.length > 0),
               paymentTokenLast4: c.payment_token_last4 || undefined,
               paymentTokenExpiry: c.payment_token_expiry || undefined,
-              paymentTokenUpdatedAt: c.payment_token_updated_at || undefined,
             }))
           );
         }
@@ -331,7 +331,6 @@ export function RentalProvider({ children }: { children: ReactNode }) {
         address: customer.address || null,
         phone: customer.phone,
         email: customer.email || null,
-        credit_card: customer.creditCard || null,
         notes: customer.notes || null,
       })
       .select()
@@ -348,9 +347,11 @@ export function RentalProvider({ children }: { children: ReactNode }) {
       address: data.address || undefined,
       phone: data.phone,
       email: data.email || undefined,
-      creditCard: data.credit_card || undefined,
       notes: data.notes || undefined,
       createdAt: data.created_at.split('T')[0],
+      hasPaymentToken: false, // New customer has no payment token
+      paymentTokenLast4: undefined,
+      paymentTokenExpiry: undefined,
     }, ...prev]);
   };
 
@@ -362,7 +363,6 @@ export function RentalProvider({ children }: { children: ReactNode }) {
         address: customer.address || null,
         phone: customer.phone,
         email: customer.email || null,
-        credit_card: customer.creditCard || null,
         notes: customer.notes || null,
       })
       .eq('id', id);
