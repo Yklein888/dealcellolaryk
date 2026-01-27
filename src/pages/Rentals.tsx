@@ -38,7 +38,6 @@ import {
   Pencil,
   Printer
 } from 'lucide-react';
-import { generateCallingInstructions } from '@/lib/callingInstructions';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Rental, 
@@ -117,7 +116,6 @@ export default function Rentals() {
   
   // Customer search state
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
-  const [printingInstructions, setPrintingInstructions] = useState<string | null>(null);
   const [callingRentalId, setCallingRentalId] = useState<string | null>(null);
   const [payingRentalId, setPayingRentalId] = useState<string | null>(null);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
@@ -411,8 +409,8 @@ export default function Rentals() {
     return num;
   };
 
-  // Handle printing calling instructions - downloads Word doc for exact template fidelity
-  const handlePrintInstructions = async (itemId: string, israeliNumber?: string, localNumber?: string) => {
+  // Handle printing calling instructions - direct print without file download
+  const handlePrintInstructions = (itemId: string, israeliNumber?: string, localNumber?: string) => {
     if (!israeliNumber && !localNumber) {
       toast({
         title: 'אין מספרים',
@@ -422,23 +420,165 @@ export default function Rentals() {
       return;
     }
 
-    setPrintingInstructions(itemId);
-    try {
-      await generateCallingInstructions(israeliNumber, localNumber);
-      toast({
-        title: 'הקובץ הורד',
-        description: 'פתח את הקובץ והדפס אותו',
-      });
-    } catch (error) {
-      console.error('Error generating instructions:', error);
+    const israeliDisplay = formatPhoneForPrint(israeliNumber);
+    const localDisplay = formatPhoneForPrint(localNumber);
+
+    // Create print window with calling instructions matching the Word template
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
       toast({
         title: 'שגיאה',
-        description: 'לא ניתן ליצור קובץ הוראות חיוג',
+        description: 'לא ניתן לפתוח חלון הדפסה. בדוק שחלונות קופצים מותרים.',
         variant: 'destructive',
       });
-    } finally {
-      setPrintingInstructions(null);
+      return;
     }
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html dir="rtl" lang="he">
+      <head>
+        <meta charset="UTF-8">
+        <title>הוראות חיוג מחו"ל לישראל</title>
+        <style>
+          @page { size: A4; margin: 1cm; }
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body {
+            font-family: David, 'David Libre', Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+            background: white;
+            color: black;
+          }
+          .header {
+            margin-bottom: 30px;
+          }
+          .title {
+            font-size: 32pt;
+            font-weight: bold;
+            color: #FF6600;
+            margin-bottom: 20px;
+          }
+          .phone-section {
+            margin: 25px 0;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 10px;
+          }
+          .phone-label {
+            font-size: 18pt;
+            color: #333;
+            margin-bottom: 8px;
+          }
+          .phone-number {
+            font-size: 32pt;
+            font-weight: bold;
+            direction: ltr;
+            display: inline-block;
+          }
+          .instructions-section {
+            margin-top: 40px;
+            text-align: right;
+            padding: 20px;
+            border: 2px solid #FF6600;
+            border-radius: 10px;
+          }
+          .section-title {
+            font-size: 24pt;
+            font-weight: bold;
+            color: #FF6600;
+            margin-bottom: 15px;
+            text-align: center;
+          }
+          .instruction-list {
+            font-size: 16pt;
+            line-height: 2;
+            list-style-position: inside;
+          }
+          .instruction-list li {
+            margin: 10px 0;
+          }
+          .service-section {
+            margin-top: 40px;
+            padding: 20px;
+            background: #FF6600;
+            color: white;
+            border-radius: 10px;
+          }
+          .service-title {
+            font-size: 24pt;
+            font-weight: bold;
+            margin-bottom: 15px;
+          }
+          .service-numbers {
+            font-size: 20pt;
+            direction: ltr;
+            display: inline-block;
+            margin: 5px 0;
+          }
+          .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 3px solid #FF6600;
+          }
+          .footer-text {
+            color: #FF6600;
+            font-size: 28pt;
+            font-weight: bold;
+            margin: 10px 0;
+          }
+          @media print {
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .no-print { display: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="title">חיוג מחו"ל לישראל</div>
+        </div>
+        
+        <div class="phone-section">
+          <div class="phone-label">מספר ישראלי:</div>
+          <div class="phone-number">${israeliDisplay}</div>
+        </div>
+        
+        <div class="phone-section">
+          <div class="phone-label">מספר מקומי:</div>
+          <div class="phone-number">${localDisplay}</div>
+        </div>
+        
+        <div class="instructions-section">
+          <div class="section-title">הוראות חיוג</div>
+          <ol class="instruction-list">
+            <li>חייגו למספר המקומי (ללא עלות נוספת)</li>
+            <li>המתינו לצליל החיוג</li>
+            <li>הקישו את המספר הישראלי אליו תרצו להתקשר</li>
+            <li>סיימו בלחיצה על # (סולמית)</li>
+          </ol>
+        </div>
+        
+        <div class="service-section">
+          <div class="service-title">מוקד שירות לקוחות</div>
+          <div><span class="service-numbers">0722-163-444</span></div>
+          <div><span class="service-numbers">44-203-129-090200</span></div>
+        </div>
+        
+        <div class="footer">
+          <div class="footer-text">טיסה נעימה ובטוחה!</div>
+          <div class="footer-text">דיל סלולר</div>
+        </div>
+      </body>
+      </html>
+    `);
+    
+    printWindow.document.close();
+    printWindow.focus();
+    
+    // Print after content loads
+    setTimeout(() => {
+      printWindow.print();
+    }, 300);
   };
 
   const isSim = (category: ItemCategory) => 
@@ -1051,14 +1191,9 @@ export default function Rentals() {
                                   inventoryItem.israeliNumber || undefined,
                                   inventoryItem.localNumber || undefined
                                 )}
-                                disabled={printingInstructions === item.inventoryItemId}
                                 className="gap-1 text-xs"
                               >
-                                {printingInstructions === item.inventoryItemId ? (
-                                  <Loader2 className="h-3 w-3 animate-spin" />
-                                ) : (
-                                  <Printer className="h-3 w-3" />
-                                )}
+                                <Printer className="h-3 w-3" />
                                 הדפס הוראות
                               </Button>
                             )}
@@ -1300,12 +1435,11 @@ export default function Rentals() {
                       </div>
                     </div>
                     
-                    {/* Download Button */}
+                    {/* Print Button */}
                     <div className="flex justify-center">
                       <Button
                         variant="outline"
                         size="sm"
-                        disabled={printingInstructions === itemId}
                         onClick={async () => {
                           let israeliNumber = inventoryItem?.israeliNumber;
                           let localNumber = inventoryItem?.localNumber;
@@ -1326,11 +1460,7 @@ export default function Rentals() {
                         }}
                         className="gap-1 text-xs w-full"
                       >
-                        {printingInstructions === itemId ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <Printer className="h-3 w-3" />
-                        )}
+                        <Printer className="h-3 w-3" />
                         הדפס הוראות חיוג
                       </Button>
                     </div>
