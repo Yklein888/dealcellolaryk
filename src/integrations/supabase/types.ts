@@ -89,6 +89,56 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          customer_name: string | null
+          error_message: string | null
+          gateway_response: Json | null
+          id: string
+          rental_id: string | null
+          status: Database["public"]["Enums"]["payment_status"]
+          transaction_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          customer_name?: string | null
+          error_message?: string | null
+          gateway_response?: Json | null
+          id?: string
+          rental_id?: string | null
+          status?: Database["public"]["Enums"]["payment_status"]
+          transaction_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          customer_name?: string | null
+          error_message?: string | null
+          gateway_response?: Json | null
+          id?: string
+          rental_id?: string | null
+          status?: Database["public"]["Enums"]["payment_status"]
+          transaction_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_transactions_rental_id_fkey"
+            columns: ["rental_id"]
+            isOneToOne: false
+            referencedRelation: "rentals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rental_items: {
         Row: {
           created_at: string
@@ -295,6 +345,7 @@ export type Database = {
         | "modem"
         | "netstick"
       item_status: "available" | "rented" | "maintenance"
+      payment_status: "pending" | "success" | "failed" | "declined"
       rental_status: "active" | "overdue" | "returned"
       repair_status: "in_lab" | "ready" | "collected"
     }
@@ -434,6 +485,7 @@ export const Constants = {
         "netstick",
       ],
       item_status: ["available", "rented", "maintenance"],
+      payment_status: ["pending", "success", "failed", "declined"],
       rental_status: ["active", "overdue", "returned"],
       repair_status: ["in_lab", "ready", "collected"],
     },

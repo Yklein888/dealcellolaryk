@@ -187,6 +187,13 @@ export default function Rentals() {
   };
 
   // Handle payment via Pelecard (direct charge)
+  // Generate unique transaction ID for idempotency
+  const generateTransactionId = (rentalId: string): string => {
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(2, 8);
+    return `${rentalId}-${timestamp}-${random}`;
+  };
+
   const handlePayment = async () => {
     if (!paymentRental) return;
     
@@ -201,6 +208,9 @@ export default function Rentals() {
 
     setPayingRentalId(paymentRental.id);
 
+    // Generate unique transaction ID for idempotency
+    const transactionId = generateTransactionId(paymentRental.id);
+
     try {
       const { data, error } = await supabase.functions.invoke('pelecard-pay', {
         body: { 
@@ -210,7 +220,9 @@ export default function Rentals() {
           creditCardExpiry: paymentFormData.creditCardExpiry,
           cvv: paymentFormData.cvv,
           customerId: paymentRental.customerId,
-          description: `השכרה - ${paymentRental.items.map(i => i.itemName).join(', ')}`
+          description: `השכרה - ${paymentRental.items.map(i => i.itemName).join(', ')}`,
+          rentalId: paymentRental.id,
+          transactionId: transactionId
         },
       });
 
@@ -219,7 +231,7 @@ export default function Rentals() {
       if (data?.success) {
         toast({
           title: 'התשלום בוצע בהצלחה',
-          description: `מספר עסקה: ${data.transactionId || 'N/A'}`,
+          description: `מספר עסקה: ${data.transactionId || transactionId}`,
         });
         setIsPaymentDialogOpen(false);
       } else if (data?.error) {
