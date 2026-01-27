@@ -7,6 +7,7 @@ import { RentalProvider } from "@/hooks/useRental";
 import { AuthProvider } from "@/hooks/useAuth";
 import { RoleProvider } from "@/hooks/useRole";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { SessionManager } from "@/components/SessionManager";
 import { AppLayout } from "@/components/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import Rentals from "./pages/Rentals";
@@ -32,6 +33,7 @@ const App = () => (
             <Sonner />
             <BrowserRouter>
               <ProtectedRoute>
+                <SessionManager />
                 <AppLayout>
                   <Routes>
                     <Route path="/" element={<Dashboard />} />
