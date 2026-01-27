@@ -288,6 +288,9 @@ export default function Rentals() {
   const [quickAddData, setQuickAddData] = useState({
     category: 'sim_european' as ItemCategory,
     name: '',
+    localNumber: '',
+    israeliNumber: '',
+    expiryDate: '',
   });
 
   const filteredRentals = rentals.filter(rental => {
@@ -375,15 +378,21 @@ export default function Rentals() {
     addInventoryItem({
       category: quickAddData.category,
       name: quickAddData.name,
+      localNumber: quickAddData.localNumber || undefined,
+      israeliNumber: quickAddData.israeliNumber || undefined,
+      expiryDate: quickAddData.expiryDate || undefined,
       status: 'available',
     });
     toast({
       title: 'פריט נוסף למלאי',
       description: `${quickAddData.name} נוסף למלאי`,
     });
-    setQuickAddData({ category: 'sim_european', name: '' });
+    setQuickAddData({ category: 'sim_european', name: '', localNumber: '', israeliNumber: '', expiryDate: '' });
     setIsQuickAddOpen(false);
   };
+
+  const isSim = (category: ItemCategory) => 
+    category === 'sim_american' || category === 'sim_european';
 
   const handleAddItem = (inventoryItemId: string) => {
     const item = inventory.find(i => i.id === inventoryItemId);
@@ -774,6 +783,38 @@ export default function Rentals() {
                             placeholder="לדוגמה: סים אירופאי #002"
                           />
                         </div>
+
+                        {isSim(quickAddData.category) && (
+                          <>
+                            <div className="space-y-2">
+                              <Label>מספר מקומי</Label>
+                              <Input
+                                value={quickAddData.localNumber}
+                                onChange={(e) => setQuickAddData({ ...quickAddData, localNumber: e.target.value })}
+                                placeholder="+44-7700-900123"
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label>מספר ישראלי</Label>
+                              <Input
+                                value={quickAddData.israeliNumber}
+                                onChange={(e) => setQuickAddData({ ...quickAddData, israeliNumber: e.target.value })}
+                                placeholder="050-0001111"
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label>תוקף</Label>
+                              <Input
+                                type="date"
+                                value={quickAddData.expiryDate}
+                                onChange={(e) => setQuickAddData({ ...quickAddData, expiryDate: e.target.value })}
+                              />
+                            </div>
+                          </>
+                        )}
+
                         <Button onClick={handleQuickAddInventory} className="w-full">
                           הוסף למלאי
                         </Button>
