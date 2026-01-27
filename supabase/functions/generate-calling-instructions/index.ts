@@ -55,6 +55,65 @@ const formatInternationalDisplay = (num: string): string => {
   return num;
 };
 
+// Create XML for the phone numbers header section
+const createPhoneNumbersXml = (israeliDisplay: string, localDisplay: string): string => {
+  return `
+    <w:p>
+      <w:pPr>
+        <w:jc w:val="center"/>
+        <w:rPr>
+          <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
+          <w:b/>
+          <w:bCs/>
+          <w:sz w:val="56"/>
+          <w:szCs w:val="56"/>
+          <w:rtl/>
+        </w:rPr>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
+          <w:b/>
+          <w:bCs/>
+          <w:sz w:val="56"/>
+          <w:szCs w:val="56"/>
+          <w:rtl/>
+        </w:rPr>
+        <w:t>מספר ישראלי: ${israeliDisplay}</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:jc w:val="center"/>
+        <w:rPr>
+          <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
+          <w:b/>
+          <w:bCs/>
+          <w:sz w:val="56"/>
+          <w:szCs w:val="56"/>
+          <w:rtl/>
+        </w:rPr>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
+          <w:b/>
+          <w:bCs/>
+          <w:sz w:val="56"/>
+          <w:szCs w:val="56"/>
+          <w:rtl/>
+        </w:rPr>
+        <w:t>מספר מקומי: ${localDisplay}</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:jc w:val="center"/>
+      </w:pPr>
+    </w:p>
+  `;
+};
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -93,21 +152,25 @@ serve(async (req) => {
     
     console.log("Original document length:", documentXml.length);
 
-    // Replace the phone numbers in the XML
-    // The template has "0722-587-081" as the Israeli number and "44-7429629581" as the local number
+    // Create the phone numbers XML to insert at the beginning
+    const phoneNumbersXml = createPhoneNumbersXml(israeliDisplay, localDisplay);
+
+    // Insert the phone numbers after <w:body> tag
     let modifiedXml = documentXml;
+    const bodyTagMatch = modifiedXml.match(/<w:body[^>]*>/);
     
-    // Replace Israeli number placeholder
-    modifiedXml = modifiedXml.replace(/0722-587-081/g, israeliDisplay);
-    
-    // Replace local number placeholder
-    modifiedXml = modifiedXml.replace(/44-7429629581/g, localDisplay);
-    
-    // Log if replacements were made
-    const israeliReplaced = documentXml.includes('0722-587-081');
-    const localReplaced = documentXml.includes('44-7429629581');
-    console.log("Israeli placeholder found:", israeliReplaced, "Local placeholder found:", localReplaced);
-    console.log("Final Israeli:", israeliDisplay, "Final Local:", localDisplay);
+    if (bodyTagMatch) {
+      const bodyTagEnd = modifiedXml.indexOf(bodyTagMatch[0]) + bodyTagMatch[0].length;
+      modifiedXml = 
+        modifiedXml.slice(0, bodyTagEnd) + 
+        phoneNumbersXml + 
+        modifiedXml.slice(bodyTagEnd);
+      console.log("Inserted phone numbers after <w:body> tag");
+    } else {
+      console.log("Warning: Could not find <w:body> tag");
+    }
+
+    console.log("Modified document length:", modifiedXml.length);
 
     // Update the document.xml in the zip
     zip.file("word/document.xml", modifiedXml);
