@@ -1,6 +1,8 @@
 import { ReactNode } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useApproval } from '@/hooks/useApproval';
 import Auth from '@/pages/Auth';
+import { PendingApproval } from '@/components/PendingApproval';
 import { Loader2 } from 'lucide-react';
 
 interface ProtectedRouteProps {
@@ -9,8 +11,9 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
+  const { isApproved, isLoading: approvalLoading } = useApproval();
 
-  if (loading) {
+  if (loading || approvalLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
@@ -23,6 +26,11 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   if (!user) {
     return <Auth />;
+  }
+
+  // User is logged in but not approved
+  if (!isApproved) {
+    return <PendingApproval userEmail={user.email} />;
   }
 
   return <>{children}</>;
