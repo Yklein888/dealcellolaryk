@@ -1154,6 +1154,32 @@ export default function Rentals() {
                 </p>
               </div>
 
+              {/* Download Instructions for European SIM */}
+              {rental.items.some(item => item.itemCategory === 'sim_european' && !item.isGeneric && item.inventoryItemId) && (
+                <div className="flex justify-center mb-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const europeanSimItem = rental.items.find(item => item.itemCategory === 'sim_european' && !item.isGeneric && item.inventoryItemId);
+                      if (europeanSimItem) {
+                        const inventoryItem = inventory.find(i => i.id === europeanSimItem.inventoryItemId);
+                        if (inventoryItem) {
+                          generateCallingInstructions(
+                            inventoryItem.israeliNumber || undefined,
+                            inventoryItem.localNumber || undefined
+                          );
+                        }
+                      }
+                    }}
+                    className="gap-1 text-xs w-full"
+                  >
+                    <FileDown className="h-3 w-3" />
+                    הורד הוראות חיוג
+                  </Button>
+                </div>
+              )}
+
               {/* Actions - Always visible for active/overdue */}
               {(rental.status === 'active' || rental.status === 'overdue') && (
                 <div className="flex justify-center gap-2 mt-auto pt-3 border-t border-border">
