@@ -1236,46 +1236,85 @@ export default function Rentals() {
                 </p>
               </div>
 
-              {/* Download Instructions for European SIM */}
+              {/* Phone Numbers Display & Download Instructions for European SIM */}
               {rental.items.some(item => item.itemCategory === 'sim_european' && !item.isGeneric && item.inventoryItemId) && (() => {
                 const europeanSimItem = rental.items.find(item => item.itemCategory === 'sim_european' && !item.isGeneric && item.inventoryItemId);
                 const inventoryItem = europeanSimItem ? inventory.find(i => i.id === europeanSimItem.inventoryItemId) : null;
                 const itemId = `rental-${rental.id}`;
+                
+                // Format phone numbers for display
+                const formatDisplayNumber = (num: string | undefined): string => {
+                  if (!num) return '---';
+                  let cleaned = num;
+                  if (num.includes('E') || num.includes('e')) {
+                    const parsed = parseFloat(num);
+                    if (!isNaN(parsed)) cleaned = parsed.toFixed(0);
+                  }
+                  cleaned = cleaned.replace(/\D/g, '');
+                  if (cleaned.length === 10) {
+                    return `${cleaned.slice(0, 4)}-${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
+                  } else if (cleaned.length >= 11 && cleaned.startsWith('44')) {
+                    return `44-${cleaned.slice(2)}`;
+                  } else if (cleaned.length === 9) {
+                    return `0${cleaned.slice(0, 3)}-${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+                  }
+                  return num;
+                };
+                
                 return (
-                  <div className="flex justify-center mb-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={async () => {
-                        // If inventory is loaded, use it. Otherwise fetch from DB
-                        let israeliNumber = inventoryItem?.israeliNumber;
-                        let localNumber = inventoryItem?.localNumber;
-                        
-                        if (!inventoryItem && europeanSimItem?.inventoryItemId) {
-                          // Fetch directly from database
-                          const { data } = await supabase
-                            .from('inventory')
-                            .select('israeli_number, local_number')
-                            .eq('id', europeanSimItem.inventoryItemId)
-                            .maybeSingle();
-                          if (data) {
-                            israeliNumber = data.israeli_number || undefined;
-                            localNumber = data.local_number || undefined;
+                  <div className="mb-3 space-y-2">
+                    {/* Phone Numbers Display */}
+                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-lg p-3 border border-blue-200/50 dark:border-blue-800/50">
+                      <div className="text-center space-y-1">
+                        <div className="flex items-center justify-center gap-2 text-sm">
+                          <span className="text-muted-foreground">🇮🇱 ישראלי:</span>
+                          <span className="font-bold text-primary" dir="ltr">
+                            {formatDisplayNumber(inventoryItem?.israeliNumber)}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-center gap-2 text-sm">
+                          <span className="text-muted-foreground">🌍 מקומי:</span>
+                          <span className="font-bold text-primary" dir="ltr">
+                            {formatDisplayNumber(inventoryItem?.localNumber)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Download Button */}
+                    <div className="flex justify-center">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          let israeliNumber = inventoryItem?.israeliNumber;
+                          let localNumber = inventoryItem?.localNumber;
+                          
+                          if (!inventoryItem && europeanSimItem?.inventoryItemId) {
+                            const { data } = await supabase
+                              .from('inventory')
+                              .select('israeli_number, local_number')
+                              .eq('id', europeanSimItem.inventoryItemId)
+                              .maybeSingle();
+                            if (data) {
+                              israeliNumber = data.israeli_number || undefined;
+                              localNumber = data.local_number || undefined;
+                            }
                           }
-                        }
-                        
-                        handleDownloadInstructions(itemId, israeliNumber || undefined, localNumber || undefined);
-                      }}
-                      disabled={downloadingInstructions === itemId}
-                      className="gap-1 text-xs w-full"
-                    >
-                      {downloadingInstructions === itemId ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <FileDown className="h-3 w-3" />
-                      )}
-                      הורד הוראות חיוג
-                    </Button>
+                          
+                          handleDownloadInstructions(itemId, israeliNumber || undefined, localNumber || undefined);
+                        }}
+                        disabled={downloadingInstructions === itemId}
+                        className="gap-1 text-xs w-full"
+                      >
+                        {downloadingInstructions === itemId ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <FileDown className="h-3 w-3" />
+                        )}
+                        הורד הוראות חיוג
+                      </Button>
+                    </div>
                   </div>
                 );
               })()}
