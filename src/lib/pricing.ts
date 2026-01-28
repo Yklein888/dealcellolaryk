@@ -55,7 +55,7 @@ export function calculateRentalPrice(
   items: Array<{ category: ItemCategory; hasIsraeliNumber?: boolean }>,
   startDate: string,
   endDate: string
-): { total: number; currency: 'ILS' | 'USD'; breakdown: Array<{ item: string; price: number; currency: string }> } {
+): { total: number; currency: 'ILS' | 'USD'; breakdown: Array<{ item: string; price: number; currency: string }>; usdTotal?: number; ilsTotal?: number } {
   const start = parseISO(startDate);
   const end = parseISO(endDate);
   const totalDays = differenceInDays(end, start) + 1;
@@ -106,16 +106,12 @@ export function calculateRentalPrice(
   
   // If there are USD items, return USD total; otherwise ILS
   if (usdTotal > 0 && ilsTotal === 0) {
-    return { total: usdTotal, currency: 'USD', breakdown };
+    return { total: usdTotal, currency: 'USD', breakdown, usdTotal, ilsTotal: 0 };
   }
   
-  // Mixed currencies - convert USD to ILS (approximate rate)
-  if (usdTotal > 0) {
-    const exchangeRate = 3.7; // Approximate USD to ILS
-    ilsTotal += usdTotal * exchangeRate;
-  }
-  
-  return { total: ilsTotal, currency: 'ILS', breakdown };
+  // Mixed currencies - keep them separate, don't convert here
+  // Frontend will handle conversion display with live exchange rate
+  return { total: ilsTotal, currency: 'ILS', breakdown, usdTotal, ilsTotal };
 }
 
 // Format price with currency symbol

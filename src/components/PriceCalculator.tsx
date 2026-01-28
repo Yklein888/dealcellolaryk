@@ -32,6 +32,7 @@ import { he } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { ItemCategory, categoryLabels, categoryIcons } from '@/types/rental';
 import { calculateRentalPrice, formatPrice } from '@/lib/pricing';
+import { useExchangeRate, convertUsdToIls } from '@/hooks/useExchangeRate';
 
 interface SelectedItem {
   id: string;
@@ -51,6 +52,8 @@ export function PriceCalculator({ isOpen, onClose }: PriceCalculatorProps) {
   );
   const [items, setItems] = useState<SelectedItem[]>([]);
   const [newItemCategory, setNewItemCategory] = useState<ItemCategory | ''>('');
+  
+  const { data: exchangeRate } = useExchangeRate();
 
   const addItem = () => {
     if (!newItemCategory) return;
@@ -245,19 +248,49 @@ export function PriceCalculator({ isOpen, onClose }: PriceCalculatorProps) {
                 {priceResult.breakdown.map((item, idx) => (
                   <div key={idx} className="flex justify-between text-sm">
                     <span className="text-muted-foreground">{item.item}</span>
-                    <span>
+                    <span className="flex items-center gap-2">
                       {item.currency}
                       {item.price.toFixed(2)}
+                      {item.currency === '$' && exchangeRate && (
+                        <span className="bg-primary/20 text-primary px-1.5 py-0.5 rounded text-xs">
+                          ≈₪{convertUsdToIls(item.price, exchangeRate).toFixed(2)}
+                        </span>
+                      )}
                     </span>
                   </div>
                 ))}
               </div>
+              
+              {/* Show USD total with ILS equivalent if there are USD items */}
+              {priceResult.usdTotal && priceResult.usdTotal > 0 && exchangeRate && (
+                <div className="flex justify-between items-center py-2 border-t border-primary/20 text-sm">
+                  <span className="text-muted-foreground">סה"כ דולר בשקלים</span>
+                  <span className="font-medium">
+                    ${priceResult.usdTotal.toFixed(2)} = ₪{convertUsdToIls(priceResult.usdTotal, exchangeRate).toFixed(2)}
+                  </span>
+                </div>
+              )}
+              
               <div className="flex justify-between items-center pt-3 border-t border-primary/20">
-                <span className="font-semibold text-lg">סה"כ</span>
-                <span className="text-2xl font-bold text-primary">
-                  {formatPrice(priceResult.total, priceResult.currency)}
-                </span>
+                <span className="font-semibold text-lg">סה"כ לתשלום</span>
+                <div className="text-left">
+                  {priceResult.usdTotal && priceResult.usdTotal > 0 && exchangeRate ? (
+                    <span className="text-2xl font-bold text-primary">
+                      ₪{((priceResult.ilsTotal || 0) + convertUsdToIls(priceResult.usdTotal, exchangeRate)).toFixed(2)}
+                    </span>
+                  ) : (
+                    <span className="text-2xl font-bold text-primary">
+                      {formatPrice(priceResult.total, priceResult.currency)}
+                    </span>
+                  )}
+                </div>
               </div>
+              
+              {exchangeRate && (
+                <div className="text-xs text-muted-foreground mt-2 text-center">
+                  שער יציג: ₪{exchangeRate.toFixed(4)} לדולר
+                </div>
+              )}
             </div>
           )}
 
