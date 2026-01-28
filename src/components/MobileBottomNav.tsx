@@ -5,7 +5,8 @@ import {
   ShoppingCart, 
   Package, 
   Users,
-  MoreHorizontal
+  MoreHorizontal,
+  Store
 } from 'lucide-react';
 import { useState } from 'react';
 import {
@@ -18,19 +19,21 @@ import {
 import { Wrench, CreditCard, FileText, Shield, LogOut } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useRole } from '@/hooks/useRole';
+import { usePermissions } from '@/hooks/usePermissions';
 import { Button } from './ui/button';
 
 const mainNavItems = [
-  { path: '/', label: 'ראשי', icon: LayoutDashboard },
-  { path: '/rentals', label: 'השכרות', icon: ShoppingCart },
-  { path: '/inventory', label: 'מלאי', icon: Package },
-  { path: '/customers', label: 'לקוחות', icon: Users },
+  { path: '/', label: 'ראשי', icon: LayoutDashboard, permission: 'view_dashboard' as const },
+  { path: '/pos', label: 'קופה', icon: Store, permission: 'view_pos' as const },
+  { path: '/rentals', label: 'השכרות', icon: ShoppingCart, permission: 'view_rentals' as const },
+  { path: '/customers', label: 'לקוחות', icon: Users, permission: 'view_customers' as const },
 ];
 
 const moreNavItems = [
-  { path: '/repairs', label: 'תיקונים', icon: Wrench },
-  { path: '/payments', label: 'תשלומים', icon: CreditCard },
-  { path: '/invoices', label: 'חשבוניות', icon: FileText },
+  { path: '/inventory', label: 'מלאי', icon: Package, permission: 'view_inventory' as const },
+  { path: '/repairs', label: 'תיקונים', icon: Wrench, permission: 'view_repairs' as const },
+  { path: '/payments', label: 'תשלומים', icon: CreditCard, permission: 'view_payments' as const },
+  { path: '/invoices', label: 'חשבוניות', icon: FileText, permission: 'view_invoices' as const },
 ];
 
 const adminNavItems = [
@@ -41,15 +44,20 @@ export function MobileBottomNav() {
   const location = useLocation();
   const { user, signOut } = useAuth();
   const { isAdmin } = useRole();
+  const { hasPermission } = usePermissions();
   const [isMoreOpen, setIsMoreOpen] = useState(false);
 
   const isActive = (path: string) => location.pathname === path;
+
+  // Filter nav items by permission (admins see all)
+  const visibleMainItems = mainNavItems.filter(item => isAdmin || hasPermission(item.permission));
+  const visibleMoreItems = moreNavItems.filter(item => isAdmin || hasPermission(item.permission));
   const isMoreActive = [...moreNavItems, ...adminNavItems].some(item => isActive(item.path));
 
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 glass-strong border-t border-white/20 safe-area-bottom">
       <div className="flex items-center justify-around h-16 px-2">
-        {mainNavItems.map((item) => {
+        {visibleMainItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.path);
           
@@ -97,7 +105,7 @@ export function MobileBottomNav() {
             </SheetHeader>
             
             <div className="space-y-2 pb-4">
-              {moreNavItems.map((item) => {
+              {visibleMoreItems.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item.path);
                 
