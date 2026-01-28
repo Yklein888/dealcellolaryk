@@ -1,5 +1,4 @@
 import { ReactNode } from 'react';
-import { Navigate } from 'react-router-dom';
 import { usePermissions, PermissionKey } from '@/hooks/usePermissions';
 import { useRole } from '@/hooks/useRole';
 import { Loader2, Lock } from 'lucide-react';
