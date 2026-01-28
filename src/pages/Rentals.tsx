@@ -56,6 +56,7 @@ import { calculateRentalPrice, formatPrice } from '@/lib/pricing';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
 import { he } from 'date-fns/locale';
+import { DualCurrencyPrice } from '@/components/DualCurrencyPrice';
 
 export default function Rentals() {
   const { 
@@ -1117,12 +1118,20 @@ export default function Rentals() {
                   {previewPrice.breakdown.map((item, idx) => (
                     <div key={idx} className="flex justify-between text-sm">
                       <span>{item.item}</span>
-                      <span>{item.currency}{item.price}</span>
+                      <span>
+                        <DualCurrencyPrice 
+                          amount={item.price} 
+                          currency={item.currency === '$' ? 'USD' : 'ILS'} 
+                          showTooltip={false}
+                        />
+                      </span>
                     </div>
                   ))}
                   <div className="border-t border-primary/20 mt-2 pt-2 flex justify-between font-bold">
                     <span>סה"כ</span>
-                    <span className="text-primary">{formatPrice(previewPrice.total, previewPrice.currency)}</span>
+                    <span className="text-primary">
+                      <DualCurrencyPrice amount={previewPrice.total} currency={previewPrice.currency} />
+                    </span>
                   </div>
                 </div>
               )}
@@ -1283,7 +1292,7 @@ export default function Rentals() {
               {/* Price */}
               <div className="text-center mb-4 py-2 rounded-lg bg-primary/5">
                 <p className="text-xl font-bold text-primary">
-                  {formatPrice(rental.totalPrice, rental.currency)}
+                  <DualCurrencyPrice amount={rental.totalPrice} currency={rental.currency} />
                 </p>
               </div>
 
@@ -1549,7 +1558,7 @@ export default function Rentals() {
               <div className="p-4 rounded-lg bg-muted/50">
                 <p className="font-medium">{paymentRental.customerName}</p>
                 <p className="text-2xl font-bold text-primary">
-                  {formatPrice(paymentRental.totalPrice, paymentRental.currency)}
+                  <DualCurrencyPrice amount={paymentRental.totalPrice} currency={paymentRental.currency} />
                 </p>
               </div>
 
