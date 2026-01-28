@@ -22,9 +22,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Shield, User, Crown, RefreshCw, Calendar, UserPlus, Check, X, Clock, Monitor, Trash2 } from 'lucide-react';
+import { Shield, User, Crown, RefreshCw, Calendar, UserPlus, Check, X, Clock, Monitor, Trash2, Settings } from 'lucide-react';
 import { format, parseISO, formatDistanceToNow } from 'date-fns';
 import { he } from 'date-fns/locale';
+import { UserPermissionsDialog } from '@/components/UserPermissionsDialog';
 
 interface PendingDevice {
   id: string;
@@ -66,6 +67,11 @@ export default function UserManagement() {
     open: boolean;
     userId: string;
     newRole: 'admin' | 'user';
+    userEmail: string;
+  } | null>(null);
+  const [permissionsDialog, setPermissionsDialog] = useState<{
+    open: boolean;
+    userId: string;
     userEmail: string;
   } | null>(null);
   const { toast } = useToast();
@@ -565,31 +571,47 @@ export default function UserManagement() {
                     </div>
                   </div>
 
-                  <Select
-                    value={user.role}
-                    onValueChange={(value: 'admin' | 'user') => 
-                      handleRoleChange(user.id, value, user.email)
-                    }
-                    disabled={updating === user.id}
-                  >
-                    <SelectTrigger className="w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="admin">
-                        <div className="flex items-center gap-2">
-                          <Crown className="h-4 w-4" />
-                          מנהל
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="user">
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4" />
-                          משתמש
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPermissionsDialog({
+                        open: true,
+                        userId: user.id,
+                        userEmail: user.email,
+                      })}
+                      className="gap-1"
+                    >
+                      <Settings className="h-4 w-4" />
+                      הרשאות
+                    </Button>
+
+                    <Select
+                      value={user.role}
+                      onValueChange={(value: 'admin' | 'user') => 
+                        handleRoleChange(user.id, value, user.email)
+                      }
+                      disabled={updating === user.id}
+                    >
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin">
+                          <div className="flex items-center gap-2">
+                            <Crown className="h-4 w-4" />
+                            מנהל
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="user">
+                          <div className="flex items-center gap-2">
+                            <User className="h-4 w-4" />
+                            משתמש
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               ))}
             </div>
@@ -622,6 +644,16 @@ export default function UserManagement() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Permissions Dialog */}
+        {permissionsDialog && (
+          <UserPermissionsDialog
+            open={permissionsDialog.open}
+            onOpenChange={(open) => !open && setPermissionsDialog(null)}
+            userId={permissionsDialog.userId}
+            userEmail={permissionsDialog.userEmail}
+          />
+        )}
       </div>
     </RequireAdmin>
   );

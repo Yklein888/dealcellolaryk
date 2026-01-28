@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useRole } from '@/hooks/useRole';
+import { usePermissions, PermissionKey } from '@/hooks/usePermissions';
 import { Button } from '@/components/ui/button';
 import { 
   LayoutDashboard, 
@@ -19,14 +20,14 @@ import {
 } from 'lucide-react';
 
 const navItems = [
-  { path: '/', label: 'דאשבורד', icon: LayoutDashboard },
-  { path: '/pos', label: 'קופה', icon: Store },
-  { path: '/rentals', label: 'השכרות', icon: ShoppingCart },
-  { path: '/customers', label: 'לקוחות', icon: Users },
-  { path: '/inventory', label: 'מלאי', icon: Package },
-  { path: '/repairs', label: 'תיקונים', icon: Wrench },
-  { path: '/payments', label: 'תשלומים', icon: CreditCard },
-  { path: '/invoices', label: 'חשבוניות', icon: FileText },
+  { path: '/', label: 'דאשבורד', icon: LayoutDashboard, permission: 'view_dashboard' as PermissionKey },
+  { path: '/pos', label: 'קופה', icon: Store, permission: 'view_pos' as PermissionKey },
+  { path: '/rentals', label: 'השכרות', icon: ShoppingCart, permission: 'view_rentals' as PermissionKey },
+  { path: '/customers', label: 'לקוחות', icon: Users, permission: 'view_customers' as PermissionKey },
+  { path: '/inventory', label: 'מלאי', icon: Package, permission: 'view_inventory' as PermissionKey },
+  { path: '/repairs', label: 'תיקונים', icon: Wrench, permission: 'view_repairs' as PermissionKey },
+  { path: '/payments', label: 'תשלומים', icon: CreditCard, permission: 'view_payments' as PermissionKey },
+  { path: '/invoices', label: 'חשבוניות', icon: FileText, permission: 'view_invoices' as PermissionKey },
 ];
 
 const adminNavItems = [
@@ -41,6 +42,10 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
   const location = useLocation();
   const { user, signOut } = useAuth();
   const { isAdmin } = useRole();
+  const { hasPermission } = usePermissions();
+
+  // Filter nav items by permission (admins see all)
+  const visibleNavItems = navItems.filter(item => isAdmin || hasPermission(item.permission));
 
   return (
     <aside className="fixed right-0 top-0 z-40 h-screen w-64 glass-strong border-l border-white/20 shadow-[var(--shadow-glass)]">
@@ -57,7 +62,7 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
 
       {/* Navigation */}
       <nav className="flex flex-col gap-1.5 p-4">
-        {navItems.map((item) => {
+        {visibleNavItems.map((item) => {
           const isActive = location.pathname === item.path;
           const Icon = item.icon;
           
