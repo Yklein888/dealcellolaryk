@@ -37,7 +37,6 @@ import {
   UserPlus,
   Pencil,
   FileDown,
-  Loader2 as LoaderIcon,
   Wifi,
 } from 'lucide-react';
 import { generateCallingInstructions } from '@/lib/callingInstructions';
@@ -1088,7 +1087,7 @@ export default function Rentals() {
                                 className="gap-1 text-xs"
                               >
                                 {downloadingInstructions === item.inventoryItemId ? (
-                                  <LoaderIcon className="h-3 w-3 animate-spin" />
+                                  <Loader2 className="h-3 w-3 animate-spin" />
                                 ) : (
                                   <FileDown className="h-3 w-3" />
                                 )}
@@ -1367,7 +1366,7 @@ export default function Rentals() {
                           className="gap-1 text-xs w-full"
                         >
                           {downloadingInstructions === itemId ? (
-                            <LoaderIcon className="h-3 w-3 animate-spin" />
+                            <Loader2 className="h-3 w-3 animate-spin" />
                           ) : (
                             <FileDown className="h-3 w-3" />
                           )}
