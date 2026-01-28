@@ -325,6 +325,182 @@ export type Database = {
         }
         Relationships: []
       }
+      pos_audit_log: {
+        Row: {
+          action: string
+          created_at: string
+          details: Json | null
+          id: string
+          sale_id: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          sale_id?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          sale_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_audit_log_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "pos_sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pos_products: {
+        Row: {
+          category: string | null
+          created_at: string
+          display_order: number
+          id: string
+          image_url: string | null
+          is_active: boolean
+          name: string
+          price: number
+          sku: string | null
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          display_order?: number
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          name: string
+          price?: number
+          sku?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          display_order?: number
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          name?: string
+          price?: number
+          sku?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      pos_sale_items: {
+        Row: {
+          created_at: string
+          id: string
+          line_total: number
+          product_id: string | null
+          product_name: string
+          quantity: number
+          sale_id: string
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          line_total: number
+          product_id?: string | null
+          product_name: string
+          quantity?: number
+          sale_id: string
+          unit_price: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          line_total?: number
+          product_id?: string | null
+          product_name?: string
+          quantity?: number
+          sale_id?: string
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_sale_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "pos_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_sale_items_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "pos_sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pos_sales: {
+        Row: {
+          cash_change: number | null
+          cash_received: number | null
+          cashier_id: string
+          completed_at: string | null
+          created_at: string
+          id: string
+          payment_method: string | null
+          payment_reference: string | null
+          sale_number: number
+          status: Database["public"]["Enums"]["pos_sale_status"]
+          total_amount: number
+          updated_at: string
+          ypay_document_number: string | null
+          ypay_document_type: string | null
+          ypay_document_url: string | null
+        }
+        Insert: {
+          cash_change?: number | null
+          cash_received?: number | null
+          cashier_id: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          payment_method?: string | null
+          payment_reference?: string | null
+          sale_number?: number
+          status?: Database["public"]["Enums"]["pos_sale_status"]
+          total_amount?: number
+          updated_at?: string
+          ypay_document_number?: string | null
+          ypay_document_type?: string | null
+          ypay_document_url?: string | null
+        }
+        Update: {
+          cash_change?: number | null
+          cash_received?: number | null
+          cashier_id?: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          payment_method?: string | null
+          payment_reference?: string | null
+          sale_number?: number
+          status?: Database["public"]["Enums"]["pos_sale_status"]
+          total_amount?: number
+          updated_at?: string
+          ypay_document_number?: string | null
+          ypay_document_type?: string | null
+          ypay_document_url?: string | null
+        }
+        Relationships: []
+      }
       rental_items: {
         Row: {
           created_at: string
@@ -677,6 +853,13 @@ export type Database = {
         | "netstick"
       item_status: "available" | "rented" | "maintenance"
       payment_status: "pending" | "success" | "failed" | "declined"
+      pos_sale_status:
+        | "created"
+        | "awaiting_payment"
+        | "payment_approved"
+        | "document_generated"
+        | "completed"
+        | "failed"
       rental_status: "active" | "overdue" | "returned"
       repair_status: "in_lab" | "ready" | "collected"
     }
@@ -817,6 +1000,14 @@ export const Constants = {
       ],
       item_status: ["available", "rented", "maintenance"],
       payment_status: ["pending", "success", "failed", "declined"],
+      pos_sale_status: [
+        "created",
+        "awaiting_payment",
+        "payment_approved",
+        "document_generated",
+        "completed",
+        "failed",
+      ],
       rental_status: ["active", "overdue", "returned"],
       repair_status: ["in_lab", "ready", "collected"],
     },
