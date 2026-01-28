@@ -37,7 +37,8 @@ import {
   UserPlus,
   Pencil,
   FileDown,
-  Loader2 as LoaderIcon
+  Loader2 as LoaderIcon,
+  Wifi,
 } from 'lucide-react';
 import { generateCallingInstructions } from '@/lib/callingInstructions';
 import { supabase } from '@/integrations/supabase/client';
@@ -129,6 +130,8 @@ export default function Rentals() {
     cvv: '',
   });
   const [useStoredCard, setUseStoredCard] = useState(false);
+  const [isTerminalMode, setIsTerminalMode] = useState(false);
+  const [terminalStatus, setTerminalStatus] = useState<'idle' | 'waiting' | 'success' | 'error'>('idle');
 
   // Notify customer about rental return reminder
   const notifyRentalCustomer = async (rental: Rental) => {
@@ -194,7 +197,37 @@ export default function Rentals() {
     // Check if customer has stored token (using the secure hasPaymentToken flag)
     const customer = customers.find(c => c.id === rental.customerId);
     setUseStoredCard(!!customer?.hasPaymentToken);
+    setIsTerminalMode(false);
+    setTerminalStatus('idle');
     setIsPaymentDialogOpen(true);
+  };
+
+  // Handle terminal payment
+  const handleTerminalPayment = async () => {
+    if (!paymentRental) return;
+    
+    setTerminalStatus('waiting');
+    
+    // Note: This requires Pelecard ECR terminal integration
+    // Currently showing a placeholder - real implementation needs:
+    // 1. Terminal IP/connection configuration  
+    // 2. Pelecard ECR protocol implementation
+    // 3. Webhook or polling for transaction result
+    
+    toast({
+      title: 'שידור למסוף',
+      description: 'נשלחה בקשה למסוף הסליקה. אנא השתמש בכרטיס במסוף.',
+    });
+    
+    // Simulate terminal processing (placeholder)
+    setTimeout(() => {
+      setTerminalStatus('idle');
+      toast({
+        title: 'הערה',
+        description: 'שילוב מסוף פיזי דורש הגדרת חיבור עם פלאכארד. פנה לתמיכה.',
+        variant: 'default',
+      });
+    }, 3000);
   };
 
   // Get customer for current payment rental
@@ -1521,92 +1554,166 @@ export default function Rentals() {
                 </p>
               </div>
 
-              {/* Stored card option */}
-              {hasStoredToken && (
-                <div className="p-3 rounded-lg border border-primary/20 bg-primary/5">
-                  <div className="flex items-center gap-3">
-                    <Checkbox
-                      id="useStoredCard"
-                      checked={useStoredCard}
-                      onCheckedChange={(checked) => setUseStoredCard(!!checked)}
-                    />
-                    <Label htmlFor="useStoredCard" className="flex-1 cursor-pointer">
-                      <span className="font-medium">השתמש בכרטיס שמור</span>
-                      <span className="block text-sm text-muted-foreground" dir="ltr">
-                        •••• {customer.paymentTokenLast4} | {customer.paymentTokenExpiry}
-                      </span>
-                    </Label>
-                    <CreditCard className="h-5 w-5 text-primary" />
+              {/* Payment method tabs */}
+              <div className="flex gap-2 p-1 bg-muted rounded-lg">
+                <button
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-all ${
+                    !isTerminalMode 
+                      ? 'bg-background shadow text-foreground' 
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                  onClick={() => setIsTerminalMode(false)}
+                >
+                  <CreditCard className="h-4 w-4" />
+                  הקלדה ידנית
+                </button>
+                <button
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-all ${
+                    isTerminalMode 
+                      ? 'bg-background shadow text-foreground' 
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                  onClick={() => setIsTerminalMode(true)}
+                >
+                  <Wifi className="h-4 w-4" />
+                  שידור למסוף
+                </button>
+              </div>
+
+              {/* Terminal mode */}
+              {isTerminalMode ? (
+                <div className="space-y-4">
+                  <div className="p-6 rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 text-center">
+                    {terminalStatus === 'waiting' ? (
+                      <>
+                        <Loader2 className="h-12 w-12 animate-spin mx-auto mb-3 text-primary" />
+                        <p className="font-medium text-lg">ממתין לתשלום במסוף...</p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          בקש מהלקוח להעביר את הכרטיס במסוף
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <Wifi className="h-12 w-12 mx-auto mb-3 text-primary" />
+                        <p className="font-medium text-lg">שידור למסוף פלאכארד</p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          לחץ על הכפתור לשידור העסקה למסוף הפיזי
+                        </p>
+                      </>
+                    )}
                   </div>
+                  
+                  <Button 
+                    onClick={handleTerminalPayment}
+                    className="w-full"
+                    disabled={terminalStatus === 'waiting' || payingRentalId === paymentRental.id}
+                    variant="glow"
+                  >
+                    {terminalStatus === 'waiting' ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ממתין למסוף...
+                      </>
+                    ) : (
+                      <>
+                        <Wifi className="h-4 w-4 mr-2" />
+                        שדר למסוף
+                      </>
+                    )}
+                  </Button>
                 </div>
-              )}
-
-              {/* Manual card entry - hidden when using stored card */}
-              {!useStoredCard && (
+              ) : (
                 <>
-                  <div className="space-y-2">
-                    <Label>מספר כרטיס אשראי</Label>
-                    <Input
-                      value={paymentFormData.creditCard}
-                      onChange={(e) => setPaymentFormData({ ...paymentFormData, creditCard: e.target.value })}
-                      placeholder="1234 5678 9012 3456"
-                      maxLength={19}
-                      dir="ltr"
-                    />
-                  </div>
+                  {/* Stored card option */}
+                  {hasStoredToken && (
+                    <div className="p-3 rounded-lg border border-primary/20 bg-primary/5">
+                      <div className="flex items-center gap-3">
+                        <Checkbox
+                          id="useStoredCard"
+                          checked={useStoredCard}
+                          onCheckedChange={(checked) => setUseStoredCard(!!checked)}
+                        />
+                        <Label htmlFor="useStoredCard" className="flex-1 cursor-pointer">
+                          <span className="font-medium">השתמש בכרטיס שמור</span>
+                          <span className="block text-sm text-muted-foreground" dir="ltr">
+                            •••• {customer.paymentTokenLast4} | {customer.paymentTokenExpiry}
+                          </span>
+                        </Label>
+                        <CreditCard className="h-5 w-5 text-primary" />
+                      </div>
+                    </div>
+                  )}
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>תוקף (MMYY)</Label>
-                      <Input
-                        value={paymentFormData.creditCardExpiry}
-                        onChange={(e) => setPaymentFormData({ ...paymentFormData, creditCardExpiry: e.target.value })}
-                        placeholder="0126"
-                        maxLength={4}
-                        dir="ltr"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>CVV</Label>
-                      <Input
-                        value={paymentFormData.cvv}
-                        onChange={(e) => setPaymentFormData({ ...paymentFormData, cvv: e.target.value })}
-                        placeholder="123"
-                        maxLength={4}
-                        type="password"
-                        dir="ltr"
-                      />
-                    </div>
-                  </div>
+                  {/* Manual card entry - hidden when using stored card */}
+                  {!useStoredCard && (
+                    <>
+                      <div className="space-y-2">
+                        <Label>מספר כרטיס אשראי</Label>
+                        <Input
+                          value={paymentFormData.creditCard}
+                          onChange={(e) => setPaymentFormData({ ...paymentFormData, creditCard: e.target.value })}
+                          placeholder="1234 5678 9012 3456"
+                          maxLength={19}
+                          dir="ltr"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>תוקף (MMYY)</Label>
+                          <Input
+                            value={paymentFormData.creditCardExpiry}
+                            onChange={(e) => setPaymentFormData({ ...paymentFormData, creditCardExpiry: e.target.value })}
+                            placeholder="0126"
+                            maxLength={4}
+                            dir="ltr"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>CVV</Label>
+                          <Input
+                            value={paymentFormData.cvv}
+                            onChange={(e) => setPaymentFormData({ ...paymentFormData, cvv: e.target.value })}
+                            placeholder="123"
+                            maxLength={4}
+                            type="password"
+                            dir="ltr"
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </>
               )}
 
-              <div className="flex gap-3 pt-4">
-                <Button 
-                  onClick={handlePayment} 
-                  className="flex-1"
-                  disabled={payingRentalId === paymentRental.id}
-                >
-                  {payingRentalId === paymentRental.id ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      מעבד תשלום...
-                    </>
-                  ) : (
-                    <>
-                      <CreditCard className="h-4 w-4 mr-2" />
-                      {useStoredCard ? 'חייב כרטיס שמור' : 'בצע תשלום'}
-                    </>
-                  )}
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => setIsPaymentDialogOpen(false)}
-                  disabled={payingRentalId === paymentRental.id}
-                >
-                  ביטול
-                </Button>
-              </div>
+              {!isTerminalMode && (
+                <div className="flex gap-3 pt-4">
+                  <Button 
+                    onClick={handlePayment} 
+                    className="flex-1"
+                    disabled={payingRentalId === paymentRental.id}
+                  >
+                    {payingRentalId === paymentRental.id ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        מעבד תשלום...
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        {useStoredCard ? 'חייב כרטיס שמור' : 'בצע תשלום'}
+                      </>
+                    )}
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setIsPaymentDialogOpen(false)}
+                    disabled={payingRentalId === paymentRental.id}
+                  >
+                    ביטול
+                  </Button>
+                </div>
+              )}
             </div>
             );
           })()}
