@@ -22,9 +22,22 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Shield, User, Crown, RefreshCw, Calendar, UserPlus, Check, X, Clock } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { Shield, User, Crown, RefreshCw, Calendar, UserPlus, Check, X, Clock, Monitor, Trash2 } from 'lucide-react';
+import { format, parseISO, formatDistanceToNow } from 'date-fns';
 import { he } from 'date-fns/locale';
+
+interface PendingDevice {
+  id: string;
+  user_id: string;
+  device_fingerprint: string;
+  device_name: string | null;
+  browser: string | null;
+  os: string | null;
+  is_approved: boolean;
+  last_used_at: string;
+  created_at: string;
+  user_email?: string;
+}
 
 interface UserWithRole {
   id: string;
@@ -46,6 +59,7 @@ interface PendingUser {
 export default function UserManagement() {
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
+  const [pendingDevices, setPendingDevices] = useState<PendingDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -78,6 +92,17 @@ export default function UserManagement() {
         console.error('Error fetching pending users:', pendingError);
       }
 
+      // Fetch pending devices (unapproved)
+      const { data: devices, error: devicesError } = await supabase
+        .from('user_devices')
+        .select('*')
+        .eq('is_approved', false)
+        .order('created_at', { ascending: false });
+
+      if (devicesError) {
+        console.error('Error fetching pending devices:', devicesError);
+      }
+
       // Map pending users to get email/name for approved users
       const pendingMap = new Map((pending || []).map(p => [p.user_id, p]));
 
@@ -98,8 +123,18 @@ export default function UserManagement() {
       const approvedUserIds = new Set(usersWithRoles.filter(u => u.is_approved).map(u => u.id));
       const filteredPending = (pending || []).filter(p => !approvedUserIds.has(p.user_id));
 
+      // Map pending devices with user emails
+      const pendingDevicesWithEmail: PendingDevice[] = (devices || []).map(d => {
+        const pendingInfo = pendingMap.get(d.user_id);
+        return {
+          ...d,
+          user_email: pendingInfo?.email || 'משתמש',
+        };
+      });
+
       setUsers(usersWithRoles.filter(u => u.is_approved));
       setPendingUsers(filteredPending);
+      setPendingDevices(pendingDevicesWithEmail);
     } catch (error) {
       console.error('Error fetching users:', error);
       toast({
@@ -226,6 +261,62 @@ export default function UserManagement() {
         variant: 'destructive',
       });
     } finally {
+    setUpdating(null);
+    }
+  };
+
+  const approveDevice = async (device: PendingDevice) => {
+    setUpdating(device.id);
+    try {
+      const { error } = await supabase
+        .from('user_devices')
+        .update({ is_approved: true })
+        .eq('id', device.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'המכשיר אושר',
+        description: `${device.device_name || 'המכשיר'} אושר לשימוש`,
+      });
+
+      fetchUsers();
+    } catch (error) {
+      console.error('Error approving device:', error);
+      toast({
+        title: 'שגיאה',
+        description: 'לא הצלחנו לאשר את המכשיר',
+        variant: 'destructive',
+      });
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  const rejectDevice = async (device: PendingDevice) => {
+    setUpdating(device.id);
+    try {
+      const { error } = await supabase
+        .from('user_devices')
+        .delete()
+        .eq('id', device.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'המכשיר נדחה',
+        description: 'המכשיר הוסר מרשימת ההמתנה',
+      });
+
+      fetchUsers();
+    } catch (error) {
+      console.error('Error rejecting device:', error);
+      toast({
+        title: 'שגיאה',
+        description: 'לא הצלחנו לדחות את המכשיר',
+        variant: 'destructive',
+      });
+    } finally {
       setUpdating(null);
     }
   };
@@ -286,7 +377,7 @@ export default function UserManagement() {
               <div>
                 <p className="text-sm text-muted-foreground">ממתינים</p>
                 <p className="text-2xl font-bold text-foreground">
-                  {pendingUsers.length}
+                  {pendingUsers.length + pendingDevices.length}
                 </p>
               </div>
             </div>
@@ -344,6 +435,70 @@ export default function UserManagement() {
                       variant="destructive"
                       onClick={() => rejectUser(pending)}
                       disabled={updating === pending.user_id}
+                      className="gap-1"
+                    >
+                      <X className="h-4 w-4" />
+                      דחה
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Pending Devices */}
+        {pendingDevices.length > 0 && (
+          <div className="stat-card mb-6 border-primary/30 border-2">
+            <div className="flex items-center gap-2 mb-4">
+              <Monitor className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-semibold">מכשירים ממתינים לאישור</h2>
+              <Badge variant="secondary" className="bg-primary/20 text-primary">
+                {pendingDevices.length}
+              </Badge>
+            </div>
+
+            <div className="space-y-3">
+              {pendingDevices.map((device) => (
+                <div
+                  key={device.id}
+                  className="flex items-center justify-between p-4 rounded-xl glass border border-primary/30 hover:shadow-md transition-all"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/20">
+                      <Monitor className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground">
+                        {device.device_name || 'מכשיר לא מזוהה'}
+                      </p>
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1 flex-wrap">
+                        <span dir="ltr">{device.user_email}</span>
+                        <span>{device.browser} | {device.os}</span>
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {formatDistanceToNow(parseISO(device.created_at), { addSuffix: true, locale: he })}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="success"
+                      onClick={() => approveDevice(device)}
+                      disabled={updating === device.id}
+                      className="gap-1"
+                    >
+                      <Check className="h-4 w-4" />
+                      אשר
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => rejectDevice(device)}
+                      disabled={updating === device.id}
                       className="gap-1"
                     >
                       <X className="h-4 w-4" />
