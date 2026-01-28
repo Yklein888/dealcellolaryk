@@ -14,11 +14,13 @@ import {
   LogOut,
   Shield,
   CreditCard,
-  FileText
+  FileText,
+  Store
 } from 'lucide-react';
 
 const navItems = [
   { path: '/', label: 'דאשבורד', icon: LayoutDashboard },
+  { path: '/pos', label: 'קופה', icon: Store },
   { path: '/rentals', label: 'השכרות', icon: ShoppingCart },
   { path: '/customers', label: 'לקוחות', icon: Users },
   { path: '/inventory', label: 'מלאי', icon: Package },
