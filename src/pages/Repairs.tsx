@@ -291,12 +291,12 @@ export default function Repairs() {
         
         <div class="field">
           <div class="label">דגם המכשיר:</div>
-          <div class="value">${repair.deviceModel || repair.deviceType}</div>
+          <div class="value">${repair.deviceModel || repair.deviceType} | ${repair.problemDescription}</div>
         </div>
 
         ${repair.deviceCost ? `
         <div class="field">
-          <div class="label">עלות המכשיר:</div>
+          <div class="label">עלות התיקון:</div>
           <div class="value">₪${repair.deviceCost}</div>
         </div>
         ` : ''}
@@ -309,11 +309,6 @@ export default function Repairs() {
         <div class="field">
           <div class="label">טלפון:</div>
           <div class="value">${repair.customerPhone || 'לא צוין'}</div>
-        </div>
-        
-        <div class="field">
-          <div class="label">תיאור הבעיה:</div>
-          <div class="value">${repair.problemDescription}</div>
         </div>
         
         ${repair.notes ? `
@@ -448,7 +443,7 @@ export default function Repairs() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label>עלות המכשיר (₪)</Label>
+                  <Label>עלות התיקון (₪)</Label>
                   <Input
                     type="number"
                     value={formData.deviceCost}
