@@ -287,9 +287,24 @@ export default function Repairs() {
             text-align: center;
             margin-bottom: 4mm;
           }
-          .field { margin-bottom: 2mm; padding: 2mm; background: #f5f5f5; border-radius: 4px; }
-          .label { font-weight: bold; color: #555; font-size: 8pt; }
-          .value { font-size: 9pt; color: #333; }
+          .field { 
+            margin-bottom: 2mm; 
+            padding: 2mm; 
+            background: #f5f5f5; 
+            border-radius: 4px; 
+            text-align: center;
+          }
+          .label { 
+            font-weight: bold; 
+            color: #555; 
+            font-size: 8pt; 
+            text-align: center;
+          }
+          .value { 
+            font-size: 9pt; 
+            color: #333; 
+            text-align: center;
+          }
           .footer { margin-top: 3mm; text-align: center; color: #888; font-size: 7pt; }
           @media print {
             body { 
@@ -304,7 +319,7 @@ export default function Repairs() {
         <div class="title">טופס קבלת מכשיר לתיקון ${repair.isWarranty ? '<span class="warranty-badge">באחריות</span>' : ''}</div>
         
         <div class="field">
-          <div class="label">דגם המכשיר:</div>
+          <div class="label">דגם המכשיר | תיאור הבעיה:</div>
           <div class="value">${repair.deviceModel || repair.deviceType} | ${repair.problemDescription}</div>
         </div>
 
