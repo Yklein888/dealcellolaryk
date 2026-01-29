@@ -253,12 +253,12 @@ export default function Repairs() {
             font-size: 9pt;
           }
           .repair-number-huge { 
-            font-size: 72pt; 
+            font-size: 48pt; 
             font-weight: 900; 
             color: #0d9488; 
-            text-align: center; 
+            text-align: right; 
             padding: 0;
-            margin: 0 0 3mm 0;
+            margin: 0 0 2mm 0;
             border: none;
             background: none;
             line-height: 1;
