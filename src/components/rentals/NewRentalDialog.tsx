@@ -466,14 +466,15 @@ export function NewRentalDialog({
         onOpenChange(open);
         if (!open) resetForm();
       }}>
-        <DialogContent className="max-w-6xl w-[98vw] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-xl">יצירת השכרה חדשה</DialogTitle>
+        <DialogContent className="max-w-7xl w-[95vw] h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader className="flex-shrink-0 pb-4 border-b">
+            <DialogTitle className="text-2xl font-bold">יצירת השכרה חדשה</DialogTitle>
             <DialogDescription>מלא את הפרטים ליצירת השכרה חדשה</DialogDescription>
           </DialogHeader>
           
-          {/* Two-column layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
+          {/* Two-column layout - scrollable content */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 py-6 px-2">
             {/* Left Column - Customer & Dates */}
             <div className="space-y-6">
               {/* Customer Selection */}
@@ -911,6 +912,7 @@ export function NewRentalDialog({
                 </div>
               </div>
             </div>
+          </div>
           </div>
         </DialogContent>
       </Dialog>
