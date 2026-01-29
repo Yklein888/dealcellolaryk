@@ -56,18 +56,18 @@ const formatInternationalDisplay = (num: string): string => {
 };
 
 // Create XML for the phone numbers header section
+// Font size 13 = 26 in Word half-points, aligned left, bold
 const createPhoneNumbersXml = (israeliDisplay: string, localDisplay: string): string => {
   return `
     <w:p>
       <w:pPr>
-        <w:jc w:val="center"/>
+        <w:jc w:val="left"/>
         <w:rPr>
           <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
           <w:b/>
           <w:bCs/>
-          <w:sz w:val="56"/>
-          <w:szCs w:val="56"/>
-          <w:rtl/>
+          <w:sz w:val="26"/>
+          <w:szCs w:val="26"/>
         </w:rPr>
       </w:pPr>
       <w:r>
@@ -75,23 +75,21 @@ const createPhoneNumbersXml = (israeliDisplay: string, localDisplay: string): st
           <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
           <w:b/>
           <w:bCs/>
-          <w:sz w:val="56"/>
-          <w:szCs w:val="56"/>
-          <w:rtl/>
+          <w:sz w:val="26"/>
+          <w:szCs w:val="26"/>
         </w:rPr>
         <w:t>מספר ישראלי: ${israeliDisplay}</w:t>
       </w:r>
     </w:p>
     <w:p>
       <w:pPr>
-        <w:jc w:val="center"/>
+        <w:jc w:val="left"/>
         <w:rPr>
           <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
           <w:b/>
           <w:bCs/>
-          <w:sz w:val="56"/>
-          <w:szCs w:val="56"/>
-          <w:rtl/>
+          <w:sz w:val="26"/>
+          <w:szCs w:val="26"/>
         </w:rPr>
       </w:pPr>
       <w:r>
@@ -99,16 +97,15 @@ const createPhoneNumbersXml = (israeliDisplay: string, localDisplay: string): st
           <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
           <w:b/>
           <w:bCs/>
-          <w:sz w:val="56"/>
-          <w:szCs w:val="56"/>
-          <w:rtl/>
+          <w:sz w:val="26"/>
+          <w:szCs w:val="26"/>
         </w:rPr>
         <w:t>מספר מקומי: ${localDisplay}</w:t>
       </w:r>
     </w:p>
     <w:p>
       <w:pPr>
-        <w:jc w:val="center"/>
+        <w:jc w:val="left"/>
       </w:pPr>
     </w:p>
   `;
