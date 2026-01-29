@@ -56,12 +56,13 @@ const formatInternationalDisplay = (num: string): string => {
 };
 
 // Create XML for the phone numbers header section
-// Font size 13 = 26 in Word half-points, aligned left, bold
+// Font size 13 = 26 in Word half-points, aligned left, bold, no spacing before/after
 const createPhoneNumbersXml = (israeliDisplay: string, localDisplay: string): string => {
   return `
     <w:p>
       <w:pPr>
         <w:jc w:val="left"/>
+        <w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/>
         <w:rPr>
           <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
           <w:b/>
@@ -84,6 +85,7 @@ const createPhoneNumbersXml = (israeliDisplay: string, localDisplay: string): st
     <w:p>
       <w:pPr>
         <w:jc w:val="left"/>
+        <w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/>
         <w:rPr>
           <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
           <w:b/>
@@ -102,11 +104,6 @@ const createPhoneNumbersXml = (israeliDisplay: string, localDisplay: string): st
         </w:rPr>
         <w:t>מספר מקומי: ${localDisplay}</w:t>
       </w:r>
-    </w:p>
-    <w:p>
-      <w:pPr>
-        <w:jc w:val="left"/>
-      </w:pPr>
     </w:p>
   `;
 };
