@@ -14,6 +14,63 @@ export type Database = {
   }
   public: {
     Tables: {
+      call_logs: {
+        Row: {
+          call_message: string | null
+          call_status: string
+          call_type: string
+          campaign_id: string | null
+          created_at: string
+          customer_id: string | null
+          customer_phone: string
+          entity_id: string
+          entity_type: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          call_message?: string | null
+          call_status?: string
+          call_type?: string
+          campaign_id?: string | null
+          created_at?: string
+          customer_id?: string | null
+          customer_phone: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          call_message?: string | null
+          call_status?: string
+          call_type?: string
+          campaign_id?: string | null
+          created_at?: string
+          customer_id?: string | null
+          customer_phone?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_logs_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_logs_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_secure"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           address: string | null

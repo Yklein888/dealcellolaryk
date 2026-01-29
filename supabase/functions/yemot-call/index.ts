@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,6 +11,11 @@ interface YemotCallRequest {
   message: string;
   callerId?: string;
   campaignType?: 'repair_ready' | 'rental_reminder';
+  // New fields for call logging
+  entityType?: 'rental' | 'repair';
+  entityId?: string;
+  customerId?: string;
+  callType?: 'manual' | 'automatic';
 }
 
 serve(async (req) => {
@@ -21,12 +27,14 @@ serve(async (req) => {
   try {
     const systemNumber = Deno.env.get('YEMOT_SYSTEM_NUMBER');
     const password = Deno.env.get('YEMOT_PASSWORD');
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
     if (!systemNumber || !password) {
       throw new Error('Yemot credentials not configured');
     }
 
-    const { phone, message, callerId, campaignType } = await req.json() as YemotCallRequest;
+    const { phone, message, callerId, campaignType, entityType, entityId, customerId, callType } = await req.json() as YemotCallRequest;
 
     if (!phone || !message) {
       return new Response(
@@ -64,8 +72,11 @@ serve(async (req) => {
 
     // Parse Yemot response
     let result;
+    let campaignId: string | null = null;
     try {
       result = JSON.parse(responseText);
+      // Extract campaign ID from response if available
+      campaignId = result.campaignId || result.campaign_id || result.CampaignId || null;
     } catch {
       result = { raw: responseText };
     }
@@ -75,11 +86,38 @@ serve(async (req) => {
                       (result.success !== undefined && result.success) ||
                       (!result.responseStatus && !result.error);
 
+    // Save call log to database if we have entity info and Supabase is configured
+    if (supabaseUrl && supabaseServiceKey && entityType && entityId) {
+      try {
+        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+        
+        const { error: logError } = await supabase.from('call_logs').insert({
+          entity_type: entityType,
+          entity_id: entityId,
+          customer_id: customerId || null,
+          customer_phone: cleanPhone,
+          call_status: 'pending',
+          campaign_id: campaignId,
+          call_type: callType || 'manual',
+          call_message: message,
+        });
+
+        if (logError) {
+          console.error('Error saving call log:', logError);
+        } else {
+          console.log('Call log saved successfully');
+        }
+      } catch (logErr) {
+        console.error('Error saving call log:', logErr);
+      }
+    }
+
     return new Response(
       JSON.stringify({ 
         success: isSuccess, 
         message: isSuccess ? 'Call initiated successfully' : 'Call may have failed',
-        result 
+        result,
+        campaignId,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

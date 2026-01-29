@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useRental } from '@/hooks/useRental';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
+import { CallHistoryBadge } from '@/components/CallHistoryBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -86,6 +87,9 @@ export default function Repairs() {
           body: JSON.stringify({
             phone: repair.customerPhone,
             message,
+            entityType: 'repair',
+            entityId: repair.id,
+            callType: 'manual',
           }),
         }
       );
@@ -705,15 +709,21 @@ export default function Repairs() {
                   )}
                   {repair.status === 'ready' && (
                     <>
-                      <Button 
-                        variant="default" 
-                        size="sm"
-                        onClick={() => notifyCustomer(repair)}
-                        disabled={callingRepairId === repair.id}
-                      >
-                        <Phone className="h-4 w-4" />
-                        {callingRepairId === repair.id ? 'מתקשר...' : 'הודע ללקוח'}
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button 
+                          variant="default" 
+                          size="sm"
+                          onClick={() => notifyCustomer(repair)}
+                          disabled={callingRepairId === repair.id}
+                        >
+                          <Phone className="h-4 w-4" />
+                          {callingRepairId === repair.id ? 'מתקשר...' : 'הודע ללקוח'}
+                        </Button>
+                        <CallHistoryBadge 
+                          entityType="repair" 
+                          entityId={repair.id}
+                        />
+                      </div>
                       <Button 
                         variant="outline" 
                         size="sm"
