@@ -19,19 +19,23 @@ import {
   Users,
   Phone,
   Mail,
-  MapPin
+  MapPin,
+  CreditCard,
+  Loader2
 } from 'lucide-react';
 import { Customer } from '@/types/rental';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
 import { he } from 'date-fns/locale';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Customers() {
-  const { customers, addCustomer, updateCustomer, deleteCustomer } = useRental();
+  const { customers, addCustomer, updateCustomer, deleteCustomer, refreshData } = useRental();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [isSavingCard, setIsSavingCard] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -39,6 +43,8 @@ export default function Customers() {
     address: '',
     email: '',
     notes: '',
+    creditCard: '',
+    creditCardExpiry: '',
   });
 
   const filteredCustomers = customers.filter(customer => 
@@ -54,11 +60,13 @@ export default function Customers() {
       address: '',
       email: '',
       notes: '',
+      creditCard: '',
+      creditCardExpiry: '',
     });
     setEditingCustomer(null);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formData.name && !formData.phone) {
       toast({
         title: 'שגיאה',
@@ -68,22 +76,96 @@ export default function Customers() {
       return;
     }
 
-    if (editingCustomer) {
-      updateCustomer(editingCustomer.id, formData);
+    try {
+      let customerId: string | undefined;
+      
+      if (editingCustomer) {
+        await updateCustomer(editingCustomer.id, {
+          name: formData.name,
+          phone: formData.phone,
+          address: formData.address,
+          email: formData.email,
+          notes: formData.notes,
+        });
+        customerId = editingCustomer.id;
+        toast({
+          title: 'לקוח עודכן',
+          description: 'פרטי הלקוח עודכנו בהצלחה',
+        });
+      } else {
+        await addCustomer({
+          name: formData.name,
+          phone: formData.phone,
+          address: formData.address,
+          email: formData.email,
+          notes: formData.notes,
+        });
+        toast({
+          title: 'לקוח נוסף',
+          description: 'הלקוח נוסף למערכת בהצלחה',
+        });
+      }
+
+      // If credit card details were provided, save the token
+      if (formData.creditCard && formData.creditCardExpiry) {
+        setIsSavingCard(true);
+        
+        // Find the customer ID (either from editing or newly created)
+        let targetCustomerId = customerId;
+        if (!targetCustomerId && !editingCustomer) {
+          // Get the latest customer that was just created
+          await refreshData();
+          const latestCustomer = customers.find(c => c.phone === formData.phone && c.name === formData.name);
+          targetCustomerId = latestCustomer?.id;
+        }
+        
+        if (targetCustomerId) {
+          try {
+            const { data, error } = await supabase.functions.invoke('pelecard-pay', {
+              body: {
+                amount: 1, // Minimal amount for token validation
+                customerName: formData.name,
+                customerId: targetCustomerId,
+                description: 'שמירת כרטיס אשראי',
+                creditCard: formData.creditCard,
+                creditCardExpiry: formData.creditCardExpiry,
+                cvv: '000', // Placeholder - Pelecard may require this for tokenization
+                saveTokenOnly: true, // Custom flag to indicate token-only operation
+                transactionId: `token-${targetCustomerId}-${Date.now()}`,
+              },
+            });
+
+            if (error) throw error;
+
+            if (data?.success || data?.tokenSaved) {
+              toast({
+                title: 'כרטיס נשמר',
+                description: 'פרטי הכרטיס נשמרו בהצלחה',
+              });
+              await refreshData();
+            }
+          } catch (cardError) {
+            console.error('Error saving card:', cardError);
+            toast({
+              title: 'הערה',
+              description: 'הלקוח נוסף אך לא ניתן היה לשמור את הכרטיס',
+              variant: 'default',
+            });
+          }
+        }
+        setIsSavingCard(false);
+      }
+
+      resetForm();
+      setIsAddDialogOpen(false);
+    } catch (error) {
+      console.error('Error saving customer:', error);
       toast({
-        title: 'לקוח עודכן',
-        description: 'פרטי הלקוח עודכנו בהצלחה',
-      });
-    } else {
-      addCustomer(formData);
-      toast({
-        title: 'לקוח נוסף',
-        description: 'הלקוח נוסף למערכת בהצלחה',
+        title: 'שגיאה',
+        description: 'לא ניתן לשמור את הלקוח',
+        variant: 'destructive',
       });
     }
-
-    resetForm();
-    setIsAddDialogOpen(false);
   };
 
   const handleEdit = (customer: Customer) => {
@@ -94,6 +176,8 @@ export default function Customers() {
       address: customer.address || '',
       email: customer.email || '',
       notes: customer.notes || '',
+      creditCard: '',
+      creditCardExpiry: customer.paymentTokenExpiry || '',
     });
     setIsAddDialogOpen(true);
   };
@@ -177,9 +261,51 @@ export default function Customers() {
                 />
               </div>
 
+              {/* Credit Card Section */}
+              <div className="border-t pt-4 mt-4">
+                <Label className="flex items-center gap-2 mb-3 text-muted-foreground">
+                  <CreditCard className="h-4 w-4" />
+                  כרטיס אשראי (אופציונלי)
+                </Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-xs">מספר כרטיס</Label>
+                    <Input
+                      value={formData.creditCard}
+                      onChange={(e) => setFormData({ ...formData, creditCard: e.target.value })}
+                      placeholder="1234567890123456"
+                      maxLength={16}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">תוקף (MMYY)</Label>
+                    <Input
+                      value={formData.creditCardExpiry}
+                      onChange={(e) => setFormData({ ...formData, creditCardExpiry: e.target.value })}
+                      placeholder="0126"
+                      maxLength={4}
+                    />
+                  </div>
+                </div>
+                {editingCustomer?.hasPaymentToken && (
+                  <p className="text-xs text-success mt-2 flex items-center gap-1">
+                    <CreditCard className="h-3 w-3" />
+                    כרטיס שמור: **** {editingCustomer.paymentTokenLast4}
+                    {editingCustomer.paymentTokenExpiry && ` (${editingCustomer.paymentTokenExpiry})`}
+                  </p>
+                )}
+              </div>
+
               <div className="flex gap-3 pt-4">
-                <Button onClick={handleSubmit} className="flex-1">
-                  {editingCustomer ? 'עדכן' : 'הוסף'}
+                <Button onClick={handleSubmit} className="flex-1" disabled={isSavingCard}>
+                  {isSavingCard ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      שומר...
+                    </>
+                  ) : (
+                    editingCustomer ? 'עדכן' : 'הוסף'
+                  )}
                 </Button>
                 <Button 
                   variant="outline" 
@@ -187,6 +313,7 @@ export default function Customers() {
                     resetForm();
                     setIsAddDialogOpen(false);
                   }}
+                  disabled={isSavingCard}
                 >
                   ביטול
                 </Button>
