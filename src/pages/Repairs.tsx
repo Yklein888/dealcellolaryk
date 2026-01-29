@@ -275,9 +275,18 @@ export default function Repairs() {
             padding: 2px 8px;
             border-radius: 10px;
             font-size: 8pt;
-            margin-right: 5px;
+            margin-inline-start: 6px;
           }
-          .title { font-size: 11pt; color: #333; text-align: center; margin-bottom: 4mm; }
+          .title {
+            font-size: 11pt;
+            color: #333;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            margin-bottom: 4mm;
+          }
           .field { margin-bottom: 2mm; padding: 2mm; background: #f5f5f5; border-radius: 4px; }
           .label { font-weight: bold; color: #555; font-size: 8pt; }
           .value { font-size: 9pt; color: #333; }
