@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useRental } from '@/hooks/useRental';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -54,7 +55,7 @@ import {
 } from '@/types/rental';
 import { calculateRentalPrice, formatPrice } from '@/lib/pricing';
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isBefore, isAfter, addDays } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { DualCurrencyPrice } from '@/components/DualCurrencyPrice';
 
@@ -71,6 +72,7 @@ export default function Rentals() {
     getAvailableItems 
   } = useRental();
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
@@ -329,11 +331,51 @@ export default function Rentals() {
     expiryDate: '',
   });
 
+  // Read URL params on mount
+  useEffect(() => {
+    const statusParam = searchParams.get('status');
+    if (statusParam) {
+      setFilterStatus(statusParam);
+      // Clear the URL param after applying
+      setSearchParams({}, { replace: true });
+    }
+  }, []);
+
+  // Custom filter logic to handle special statuses like ending_today and upcoming
   const filteredRentals = rentals.filter(rental => {
     const matchesSearch = 
       rental.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       rental.items.some(i => i.itemName.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesStatus = filterStatus === 'all' || rental.status === filterStatus;
+    
+    // Handle special filter statuses
+    let matchesStatus = true;
+    if (filterStatus === 'all') {
+      matchesStatus = true;
+    } else if (filterStatus === 'ending_today') {
+      // Rentals ending exactly today
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const startOfTomorrow = addDays(today, 1);
+      const endDate = parseISO(rental.endDate);
+      matchesStatus = rental.status === 'active' && !isBefore(endDate, today) && isBefore(endDate, startOfTomorrow);
+    } else if (filterStatus === 'upcoming') {
+      // Upcoming returns (next 3 days, not including today)
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const startOfTomorrow = addDays(today, 1);
+      const threeDaysFromNow = addDays(today, 3);
+      const endDate = parseISO(rental.endDate);
+      matchesStatus = rental.status === 'active' && !isBefore(endDate, startOfTomorrow) && isBefore(endDate, threeDaysFromNow);
+    } else if (filterStatus === 'overdue') {
+      // Overdue = endDate before today
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const endDate = parseISO(rental.endDate);
+      matchesStatus = rental.status === 'active' && isBefore(endDate, today);
+    } else {
+      matchesStatus = rental.status === filterStatus;
+    }
+    
     const matchesCategory = filterCategory === 'all' || rental.items.some(i => i.itemCategory === filterCategory);
     return matchesSearch && matchesStatus && matchesCategory;
   });

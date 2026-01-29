@@ -105,6 +105,7 @@ export interface DashboardStats {
   overdueReturns: number;
   repairsInProgress: number;
   upcomingReturns: number;
+  endingToday: number;
 }
 
 // Hebrew labels for categories

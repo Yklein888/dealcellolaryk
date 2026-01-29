@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useRental } from '@/hooks/useRental';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -37,11 +38,23 @@ import { InventoryCategorySection } from '@/components/inventory/InventoryCatego
 export default function Inventory() {
   const { inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem } = useRental();
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+
+  // Read URL params on mount
+  useEffect(() => {
+    const statusParam = searchParams.get('status');
+    if (statusParam) {
+      setFilterStatus(statusParam);
+      // Clear the URL param after applying
+      setSearchParams({}, { replace: true });
+    }
+  }, []);
 
   const [formData, setFormData] = useState({
     category: 'sim_european' as ItemCategory,
@@ -58,9 +71,11 @@ export default function Inventory() {
   const filteredInventory = inventory.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.localNumber?.includes(searchTerm) ||
-      item.israeliNumber?.includes(searchTerm);
+      item.israeliNumber?.includes(searchTerm) ||
+      item.simNumber?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = filterCategory === 'all' || item.category === filterCategory;
-    return matchesSearch && matchesCategory;
+    const matchesStatus = filterStatus === 'all' || item.status === filterStatus;
+    return matchesSearch && matchesCategory && matchesStatus;
   });
 
   // Group filtered inventory by category
@@ -305,23 +320,36 @@ export default function Inventory() {
           <Input
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="חיפוש לפי שם, מספר..."
+            placeholder="חיפוש לפי שם, מספר טלפון, מספר סים..."
             className="pr-10"
           />
         </div>
-        <Select value={filterCategory} onValueChange={setFilterCategory}>
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="כל הקטגוריות" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">כל הקטגוריות</SelectItem>
-            {Object.entries(categoryLabels).map(([key, label]) => (
-              <SelectItem key={key} value={key}>
-                {categoryIcons[key as ItemCategory]} {label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex gap-2">
+          <Select value={filterCategory} onValueChange={setFilterCategory}>
+            <SelectTrigger className="flex-1">
+              <SelectValue placeholder="כל הקטגוריות" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">כל הקטגוריות</SelectItem>
+              {Object.entries(categoryLabels).map(([key, label]) => (
+                <SelectItem key={key} value={key}>
+                  {categoryIcons[key as ItemCategory]} {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger className="flex-1">
+              <SelectValue placeholder="כל הסטטוסים" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">כל הסטטוסים</SelectItem>
+              <SelectItem value="available">זמין</SelectItem>
+              <SelectItem value="rented">מושכר</SelectItem>
+              <SelectItem value="maintenance">בתחזוקה</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Inventory by Category */}
