@@ -256,7 +256,7 @@ export default function Repairs() {
             font-size: 48pt; 
             font-weight: 900; 
             color: #0d9488; 
-            text-align: right; 
+            text-align: center; 
             padding: 0;
             margin: 0 0 2mm 0;
             border: none;
