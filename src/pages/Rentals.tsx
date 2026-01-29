@@ -4,6 +4,7 @@ import { useRental } from '@/hooks/useRental';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
 import { CallHistoryBadge } from '@/components/CallHistoryBadge';
+import { NewRentalDialog } from '@/components/rentals/NewRentalDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,7 +15,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import {
   Select,
@@ -30,13 +30,10 @@ import {
   RotateCcw,
   Calendar,
   User,
-  Package,
-  PackagePlus,
   Phone,
   CreditCard,
   Loader2,
   Trash2,
-  UserPlus,
   Pencil,
   FileDown,
   Wifi,
@@ -47,16 +44,12 @@ import {
   Rental, 
   RentalItem, 
   ItemCategory,
-  BundleType,
   categoryLabels, 
   categoryIcons,
-  bundleLabels,
-  bundleIcons,
   rentalStatusLabels 
 } from '@/types/rental';
-import { calculateRentalPrice, formatPrice } from '@/lib/pricing';
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO, isBefore, isAfter, addDays } from 'date-fns';
+import { format, parseISO, isBefore, addDays } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { DualCurrencyPrice } from '@/components/DualCurrencyPrice';
 
@@ -78,8 +71,6 @@ export default function Rentals() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
-  const [isQuickAddCustomerOpen, setIsQuickAddCustomerOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingRental, setEditingRental] = useState<Rental | null>(null);
   const [editFormData, setEditFormData] = useState({
@@ -93,35 +84,6 @@ export default function Rentals() {
     autoChargeEnabled: false,
   });
 
-  const [formData, setFormData] = useState({
-    customerId: '',
-    startDate: '',
-    endDate: '',
-    deposit: '',
-    notes: '',
-  });
-
-  // Quick add customer form
-  const [quickCustomerData, setQuickCustomerData] = useState({
-    name: '',
-    phone: '',
-    address: '',
-  });
-
-  const [selectedItems, setSelectedItems] = useState<Array<{
-    inventoryItemId: string;
-    category: ItemCategory;
-    name: string;
-    hasIsraeliNumber: boolean;
-    isGeneric?: boolean;
-  }>>([]);
-
-  // Item selection state
-  const [itemSearchTerm, setItemSearchTerm] = useState('');
-  const [itemCategoryFilter, setItemCategoryFilter] = useState<string>('all');
-  
-  // Customer search state
-  const [customerSearchTerm, setCustomerSearchTerm] = useState('');
   const [callingRentalId, setCallingRentalId] = useState<string | null>(null);
   const [downloadingInstructions, setDownloadingInstructions] = useState<string | null>(null);
   const [payingRentalId, setPayingRentalId] = useState<string | null>(null);
@@ -387,94 +349,7 @@ export default function Rentals() {
 
   const availableItems = getAvailableItems();
 
-  // Filter available items by search and category
-  const filteredAvailableItems = availableItems.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(itemSearchTerm.toLowerCase()) ||
-      categoryLabels[item.category].includes(itemSearchTerm);
-    const matchesCategory = itemCategoryFilter === 'all' || item.category === itemCategoryFilter;
-    return matchesSearch && matchesCategory;
-  });
-
-  // Filter customers by search
-  const filteredCustomers = customers.filter(customer => {
-    const searchLower = customerSearchTerm.toLowerCase();
-    return customer.name.toLowerCase().includes(searchLower) ||
-           customer.phone.includes(customerSearchTerm);
-  });
-
-  const resetForm = () => {
-    setFormData({
-      customerId: '',
-      startDate: '',
-      endDate: '',
-      deposit: '',
-      notes: '',
-    });
-    setSelectedItems([]);
-    setItemSearchTerm('');
-    setItemCategoryFilter('all');
-    setCustomerSearchTerm('');
-  };
-
-  // Add bundle items
-  const handleAddBundle = (bundleType: BundleType) => {
-    const bundleId = `bundle-${Date.now()}`;
-    if (bundleType === 'european_sim_simple') {
-      setSelectedItems([...selectedItems, 
-        { inventoryItemId: `${bundleId}-sim`, category: 'sim_european', name: 'סים אירופאי (באנדל)', hasIsraeliNumber: false, isGeneric: true },
-        { inventoryItemId: `${bundleId}-device`, category: 'device_simple', name: 'מכשיר פשוט (באנדל)', hasIsraeliNumber: false, isGeneric: true },
-      ]);
-    } else if (bundleType === 'european_sim_smartphone') {
-      setSelectedItems([...selectedItems, 
-        { inventoryItemId: `${bundleId}-sim`, category: 'sim_european', name: 'סים אירופאי (באנדל)', hasIsraeliNumber: false, isGeneric: true },
-        { inventoryItemId: `${bundleId}-device`, category: 'device_smartphone', name: 'סמארטפון (באנדל)', hasIsraeliNumber: false, isGeneric: true },
-      ]);
-    }
-    toast({
-      title: 'באנדל נוסף',
-      description: bundleLabels[bundleType],
-    });
-  };
-
-  // Add generic item (not linked to inventory)
-  const handleAddGenericItem = (category: ItemCategory) => {
-    const genericId = `generic-${Date.now()}`;
-    setSelectedItems([...selectedItems, {
-      inventoryItemId: genericId,
-      category,
-      name: `${categoryLabels[category]} (כללי)`,
-      hasIsraeliNumber: false,
-      isGeneric: true,
-    }]);
-  };
-
-  // Quick add new inventory item
-  const handleQuickAddInventory = () => {
-    if (!quickAddData.name) {
-      toast({
-        title: 'שגיאה',
-        description: 'יש להזין שם לפריט',
-        variant: 'destructive',
-      });
-      return;
-    }
-    addInventoryItem({
-      category: quickAddData.category,
-      name: quickAddData.name,
-      localNumber: quickAddData.localNumber || undefined,
-      israeliNumber: quickAddData.israeliNumber || undefined,
-      expiryDate: quickAddData.expiryDate || undefined,
-      status: 'available',
-    });
-    toast({
-      title: 'פריט נוסף למלאי',
-      description: `${quickAddData.name} נוסף למלאי`,
-    });
-    setQuickAddData({ category: 'sim_european', name: '', localNumber: '', israeliNumber: '', expiryDate: '' });
-    setIsQuickAddOpen(false);
-  };
-
-  // Handle downloading calling instructions - downloads the exact Word template
+  // Handle downloading calling instructions for rental cards
   const handleDownloadInstructions = async (itemId: string, israeliNumber?: string, localNumber?: string) => {
     if (!israeliNumber && !localNumber) {
       toast({
@@ -503,129 +378,6 @@ export default function Rentals() {
     } finally {
       setDownloadingInstructions(null);
     }
-  };
-
-  const isSim = (category: ItemCategory) => 
-    category === 'sim_american' || category === 'sim_european';
-
-  const handleAddItem = (inventoryItemId: string) => {
-    const item = inventory.find(i => i.id === inventoryItemId);
-    if (!item) return;
-
-    if (selectedItems.some(i => i.inventoryItemId === inventoryItemId)) {
-      toast({
-        title: 'הפריט כבר נבחר',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setSelectedItems([...selectedItems, {
-      inventoryItemId: item.id,
-      category: item.category,
-      name: item.name,
-      hasIsraeliNumber: false,
-    }]);
-  };
-
-  const handleRemoveItem = (inventoryItemId: string) => {
-    setSelectedItems(selectedItems.filter(i => i.inventoryItemId !== inventoryItemId));
-  };
-
-  const handleToggleIsraeliNumber = (inventoryItemId: string) => {
-    setSelectedItems(selectedItems.map(i => 
-      i.inventoryItemId === inventoryItemId 
-        ? { ...i, hasIsraeliNumber: !i.hasIsraeliNumber }
-        : i
-    ));
-  };
-
-  const calculatePreviewPrice = () => {
-    if (!formData.startDate || !formData.endDate || selectedItems.length === 0) {
-      return null;
-    }
-
-    return calculateRentalPrice(
-      selectedItems.map(i => ({ 
-        category: i.category, 
-        hasIsraeliNumber: i.hasIsraeliNumber 
-      })),
-      formData.startDate,
-      formData.endDate
-    );
-  };
-
-  const previewPrice = calculatePreviewPrice();
-
-  const handleSubmit = () => {
-    if (!formData.customerId) {
-      toast({
-        title: 'שגיאה',
-        description: 'יש לבחור לקוח',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (!formData.startDate || !formData.endDate) {
-      toast({
-        title: 'שגיאה',
-        description: 'יש לבחור תאריכי השכרה',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (selectedItems.length === 0) {
-      toast({
-        title: 'שגיאה',
-        description: 'יש לבחור לפחות פריט אחד להשכרה',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    const customer = customers.find(c => c.id === formData.customerId);
-    if (!customer) return;
-
-    const pricing = calculateRentalPrice(
-      selectedItems.map(i => ({ category: i.category, hasIsraeliNumber: i.hasIsraeliNumber })),
-      formData.startDate,
-      formData.endDate
-    );
-
-    const rentalItems: RentalItem[] = selectedItems.map(item => ({
-      inventoryItemId: item.inventoryItemId,
-      itemCategory: item.category,
-      itemName: item.name,
-      hasIsraeliNumber: item.hasIsraeliNumber,
-      isGeneric: item.isGeneric,
-    }));
-
-    addRental({
-      customerId: customer.id,
-      customerName: customer.name,
-      items: rentalItems,
-      startDate: formData.startDate,
-      endDate: formData.endDate,
-      totalPrice: pricing.total,
-      currency: pricing.currency,
-      status: 'active',
-      deposit: formData.deposit ? parseFloat(formData.deposit) : undefined,
-      notes: formData.notes,
-    });
-
-    toast({
-      title: 'השכרה נוצרה',
-      description: `השכרה חדשה נוצרה עבור ${customer.name}`,
-    });
-
-    // Close dialog first, then reset form
-    setIsAddDialogOpen(false);
-    // Reset form after a short delay to ensure state is cleared properly
-    setTimeout(() => {
-      resetForm();
-    }, 100);
   };
 
   const handleReturn = (rentalId: string) => {
@@ -702,39 +454,6 @@ export default function Rentals() {
     }
   };
 
-  const handleQuickAddCustomer = async () => {
-    if (!quickCustomerData.name || !quickCustomerData.phone) {
-      toast({
-        title: 'שגיאה',
-        description: 'יש להזין שם וטלפון',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    try {
-      await addCustomer({
-        name: quickCustomerData.name,
-        phone: quickCustomerData.phone,
-        address: quickCustomerData.address || undefined,
-      });
-      
-      // Get the newly added customer (it should be first in the list after refresh)
-      toast({
-        title: 'לקוח נוסף',
-        description: `${quickCustomerData.name} נוסף בהצלחה`,
-      });
-      
-      setQuickCustomerData({ name: '', phone: '', address: '' });
-      setIsQuickAddCustomerOpen(false);
-    } catch (error) {
-      toast({
-        title: 'שגיאה',
-        description: 'לא ניתן להוסיף לקוח',
-        variant: 'destructive',
-      });
-    }
-  };
 
   const getStatusVariant = (status: Rental['status']) => {
     switch (status) {
@@ -751,476 +470,20 @@ export default function Rentals() {
         title="ניהול השכרות" 
         description="יצירה וניהול השכרות קיימות"
       >
-        <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
-          setIsAddDialogOpen(open);
-          if (!open) resetForm();
-        }}>
-          <DialogTrigger asChild>
-            <Button variant="glow" size="lg">
-              <Plus className="h-5 w-5" />
-              השכרה חדשה
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>יצירת השכרה חדשה</DialogTitle>
-              <DialogDescription>מלא את הפרטים ליצירת השכרה חדשה</DialogDescription>
-            </DialogHeader>
-            
-            <div className="space-y-6 mt-4">
-              {/* Customer Selection with Search */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label className="flex items-center gap-2">
-                    <User className="h-4 w-4 text-primary" />
-                    בחר לקוח *
-                  </Label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setIsQuickAddCustomerOpen(true)}
-                    className="h-7 text-xs"
-                  >
-                    <UserPlus className="h-3 w-3" />
-                    הוסף לקוח חדש
-                  </Button>
-                </div>
-                
-                {/* Customer Search Input */}
-                <div className="relative">
-                  <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    value={customerSearchTerm}
-                    onChange={(e) => setCustomerSearchTerm(e.target.value)}
-                    placeholder="חפש לקוח לפי שם או טלפון..."
-                    className="pr-10"
-                  />
-                </div>
-
-                {/* Customer List */}
-                <div className="max-h-40 overflow-y-auto border rounded-lg bg-muted/30">
-                  {filteredCustomers.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-4 text-sm">
-                      {customers.length === 0 ? 'אין לקוחות במערכת' : 'לא נמצאו לקוחות'}
-                    </p>
-                  ) : (
-                    filteredCustomers.map((customer) => (
-                      <button
-                        key={customer.id}
-                        type="button"
-                        onClick={() => setFormData({ ...formData, customerId: customer.id })}
-                        className={`w-full flex items-center justify-between p-3 hover:bg-muted text-right transition-colors border-b last:border-b-0 ${
-                          formData.customerId === customer.id ? 'bg-primary/10 border-primary/30' : ''
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
-                            <User className="h-5 w-5 text-primary" />
-                          </div>
-                          <div>
-                            <p className="font-medium text-foreground">{customer.name}</p>
-                            <p className="text-xs text-muted-foreground flex items-center gap-1">
-                              <Phone className="h-3 w-3" />
-                              {customer.phone}
-                            </p>
-                          </div>
-                        </div>
-                        {formData.customerId === customer.id && (
-                          <span className="text-xs text-primary font-medium">נבחר ✓</span>
-                        )}
-                      </button>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {/* Dates */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>תאריך התחלה *</Label>
-                  <Input
-                    type="date"
-                    value={formData.startDate}
-                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>תאריך סיום *</Label>
-                  <Input
-                    type="date"
-                    value={formData.endDate}
-                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                  />
-                </div>
-              </div>
-
-
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label className="flex items-center gap-2">
-                    <Package className="h-4 w-4 text-primary" />
-                    בחר פריטים להשכרה *
-                  </Label>
-                  <Dialog open={isQuickAddOpen} onOpenChange={setIsQuickAddOpen}>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" size="sm" className="gap-1">
-                        <PackagePlus className="h-4 w-4" />
-                        הוסף למלאי
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-sm">
-                      <DialogHeader>
-                        <DialogTitle>הוספה מהירה למלאי</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4 mt-4">
-                        <div className="space-y-2">
-                          <Label>קטגוריה</Label>
-                          <Select 
-                            value={quickAddData.category} 
-                            onValueChange={(value: ItemCategory) => setQuickAddData({ ...quickAddData, category: value })}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {Object.entries(categoryLabels).map(([key, label]) => (
-                                <SelectItem key={key} value={key}>
-                                  {categoryIcons[key as ItemCategory]} {label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>שם הפריט</Label>
-                          <Input
-                            value={quickAddData.name}
-                            onChange={(e) => setQuickAddData({ ...quickAddData, name: e.target.value })}
-                            placeholder="לדוגמה: סים אירופאי #002"
-                          />
-                        </div>
-
-                        {isSim(quickAddData.category) && (
-                          <>
-                            <div className="space-y-2">
-                              <Label>מספר מקומי</Label>
-                              <Input
-                                value={quickAddData.localNumber}
-                                onChange={(e) => setQuickAddData({ ...quickAddData, localNumber: e.target.value })}
-                                placeholder="+44-7700-900123"
-                              />
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label>מספר ישראלי</Label>
-                              <Input
-                                value={quickAddData.israeliNumber}
-                                onChange={(e) => setQuickAddData({ ...quickAddData, israeliNumber: e.target.value })}
-                                placeholder="050-0001111"
-                              />
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label>תוקף</Label>
-                              <Input
-                                type="date"
-                                value={quickAddData.expiryDate}
-                                onChange={(e) => setQuickAddData({ ...quickAddData, expiryDate: e.target.value })}
-                              />
-                            </div>
-                          </>
-                        )}
-
-                        <Button onClick={handleQuickAddInventory} className="w-full">
-                          הוסף למלאי
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-
-                {/* Quick Bundles - Prominent Cards */}
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => handleAddBundle('european_sim_simple')}
-                    className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 hover:bg-primary/10 hover:border-primary/50 transition-all"
-                  >
-                    <div className="flex items-center gap-2 text-2xl">
-                      <span>🇪🇺</span>
-                      <span>+</span>
-                      <span>📱</span>
-                    </div>
-                    <span className="text-sm font-medium text-primary">סים אירופאי + מכשיר פשוט</span>
-                    <span className="text-xs text-muted-foreground">באנדל מוזל</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleAddBundle('european_sim_smartphone')}
-                    className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-dashed border-secondary/50 bg-secondary/10 hover:bg-secondary/20 hover:border-secondary transition-all"
-                  >
-                    <div className="flex items-center gap-2 text-2xl">
-                      <span>🇪🇺</span>
-                      <span>+</span>
-                      <span>📲</span>
-                    </div>
-                    <span className="text-sm font-medium text-foreground">סים אירופאי + סמארטפון</span>
-                    <span className="text-xs text-muted-foreground">באנדל מוזל</span>
-                  </button>
-                </div>
-
-                {/* Generic Items - Category Cards */}
-                <div>
-                  <p className="text-sm text-muted-foreground mb-2">או הוסף פריט כללי:</p>
-                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                    {Object.entries(categoryLabels).map(([key, label]) => (
-                      <button 
-                        key={key}
-                        type="button"
-                        onClick={() => handleAddGenericItem(key as ItemCategory)}
-                        className="flex flex-col items-center gap-1 p-3 rounded-lg border border-border bg-card hover:bg-muted transition-colors"
-                      >
-                        <span className="text-2xl">{categoryIcons[key as ItemCategory]}</span>
-                        <span className="text-xs text-center leading-tight">{label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                
-                {/* Inventory Items Section */}
-                <div className="border rounded-xl p-4 bg-card">
-                  <p className="text-sm font-medium mb-3 flex items-center gap-2">
-                    <ShoppingCart className="h-4 w-4" />
-                    בחר מהמלאי
-                  </p>
-                  
-                  {/* Search and Filter */}
-                  <div className="flex flex-col sm:flex-row gap-2 mb-3">
-                    <Select value={itemCategoryFilter} onValueChange={setItemCategoryFilter}>
-                      <SelectTrigger className="w-full sm:w-48">
-                        <SelectValue placeholder="כל הקטגוריות" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">כל הקטגוריות</SelectItem>
-                        <SelectItem value="sim_american">🇺🇸 סים אמריקאי</SelectItem>
-                        <SelectItem value="sim_european">🇪🇺 סים אירופאי</SelectItem>
-                        <SelectItem value="device_simple">📱 מכשיר פשוט</SelectItem>
-                        <SelectItem value="device_smartphone">📲 סמארטפון</SelectItem>
-                        <SelectItem value="modem">📡 מודם</SelectItem>
-                        <SelectItem value="netstick">📶 נטסטיק</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    
-                    <div className="relative flex-1">
-                      <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        value={itemSearchTerm}
-                        onChange={(e) => setItemSearchTerm(e.target.value)}
-                        placeholder="חפש מוצר..."
-                        className="pr-10"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Items Grid */}
-                  <div className="max-h-48 overflow-y-auto">
-                    {filteredAvailableItems.length === 0 ? (
-                      <div className="text-center py-8">
-                        <Package className="h-12 w-12 mx-auto text-muted-foreground/30 mb-2" />
-                        <p className="text-muted-foreground text-sm">
-                          {availableItems.length === 0 ? 'אין פריטים זמינים במלאי' : 'לא נמצאו פריטים'}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {filteredAvailableItems.map((item) => {
-                          const isSelected = selectedItems.some(i => i.inventoryItemId === item.id);
-                          const hasPhoneNumber = item.localNumber || item.israeliNumber;
-                          return (
-                            <button
-                              key={item.id}
-                              type="button"
-                              onClick={() => handleAddItem(item.id)}
-                              disabled={isSelected}
-                              className={`flex items-center gap-3 p-3 rounded-lg text-right transition-all ${
-                                isSelected 
-                                  ? 'bg-primary/10 border-2 border-primary/30 cursor-default' 
-                                  : 'bg-muted/50 hover:bg-muted border-2 border-transparent hover:border-primary/20'
-                              }`}
-                            >
-                              <div className="h-10 w-10 rounded-lg bg-background flex items-center justify-center text-xl shrink-0">
-                                {categoryIcons[item.category]}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium text-foreground text-sm truncate">{item.name}</p>
-                                <p className="text-xs text-muted-foreground">{categoryLabels[item.category]}</p>
-                                {hasPhoneNumber && (
-                                  <div className="flex items-center gap-2 mt-1">
-                                    {item.israeliNumber && (
-                                      <span className="text-xs text-primary flex items-center gap-1">
-                                        <Phone className="h-3 w-3" />
-                                        🇮🇱 {item.israeliNumber}
-                                      </span>
-                                    )}
-                                    {item.localNumber && (
-                                      <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                        📞 {item.localNumber}
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                              {isSelected ? (
-                                <span className="text-xs text-primary font-medium shrink-0">✓</span>
-                              ) : (
-                                <Plus className="h-4 w-4 text-muted-foreground shrink-0" />
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Selected Items */}
-              {selectedItems.length > 0 && (
-                <div className="space-y-2">
-                  <Label>פריטים נבחרים</Label>
-                  <div className="space-y-2">
-                    {selectedItems.map((item) => {
-                      // Check if this is a European SIM from inventory (not generic)
-                      const isEuropeanSimFromInventory = item.category === 'sim_european' && !item.isGeneric;
-                      const inventoryItem = isEuropeanSimFromInventory 
-                        ? inventory.find(i => i.id === item.inventoryItemId)
-                        : null;
-
-                      return (
-                        <div 
-                          key={item.inventoryItemId}
-                          className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
-                        >
-                          <div className="flex items-center gap-3">
-                            <span className="text-xl">{categoryIcons[item.category]}</span>
-                            <div>
-                              <p className="font-medium text-foreground">{item.name}</p>
-                              <p className="text-sm text-muted-foreground">{categoryLabels[item.category]}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {item.category === 'sim_american' && (
-                              <div className="flex items-center gap-2">
-                                <Checkbox
-                                  checked={item.hasIsraeliNumber}
-                                  onCheckedChange={() => handleToggleIsraeliNumber(item.inventoryItemId)}
-                                />
-                                <Label className="text-sm">מספר ישראלי (+$10)</Label>
-                              </div>
-                            )}
-                            {/* Download calling instructions for European SIM from inventory */}
-                            {isEuropeanSimFromInventory && inventoryItem && (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                disabled={downloadingInstructions === item.inventoryItemId}
-                                onClick={() => handleDownloadInstructions(
-                                  item.inventoryItemId,
-                                  inventoryItem.israeliNumber || undefined,
-                                  inventoryItem.localNumber || undefined
-                                )}
-                                className="gap-1 text-xs"
-                              >
-                                {downloadingInstructions === item.inventoryItemId ? (
-                                  <Loader2 className="h-3 w-3 animate-spin" />
-                                ) : (
-                                  <FileDown className="h-3 w-3" />
-                                )}
-                                הורד הוראות
-                              </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-destructive hover:text-destructive"
-                              onClick={() => handleRemoveItem(item.inventoryItemId)}
-                            >
-                              הסר
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Price Preview */}
-              {previewPrice && (
-                <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
-                  <p className="text-sm text-muted-foreground mb-2">פירוט מחיר:</p>
-                  {previewPrice.breakdown.map((item, idx) => (
-                    <div key={idx} className="flex justify-between text-sm">
-                      <span>{item.item}</span>
-                      <span>
-                        <DualCurrencyPrice 
-                          amount={item.price} 
-                          currency={item.currency === '$' ? 'USD' : 'ILS'} 
-                          showTooltip={false}
-                        />
-                      </span>
-                    </div>
-                  ))}
-                  <div className="border-t border-primary/20 mt-2 pt-2 flex justify-between font-bold">
-                    <span>סה"כ</span>
-                    <span className="text-primary">
-                      <DualCurrencyPrice amount={previewPrice.total} currency={previewPrice.currency} />
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Deposit */}
-              <div className="space-y-2">
-                <Label>פיקדון</Label>
-                <Input
-                  type="number"
-                  value={formData.deposit}
-                  onChange={(e) => setFormData({ ...formData, deposit: e.target.value })}
-                  placeholder="סכום הפיקדון"
-                />
-              </div>
-
-              {/* Notes */}
-              <div className="space-y-2">
-                <Label>הערות</Label>
-                <Input
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  placeholder="הערות נוספות..."
-                />
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <Button onClick={handleSubmit} className="flex-1">
-                  צור השכרה
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => {
-                    resetForm();
-                    setIsAddDialogOpen(false);
-                  }}
-                >
-                  ביטול
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <Button variant="glow" size="lg" onClick={() => setIsAddDialogOpen(true)}>
+          <Plus className="h-5 w-5" />
+          השכרה חדשה
+        </Button>
+        <NewRentalDialog
+          isOpen={isAddDialogOpen}
+          onOpenChange={setIsAddDialogOpen}
+          customers={customers}
+          inventory={inventory}
+          availableItems={availableItems}
+          onAddRental={addRental}
+          onAddCustomer={addCustomer}
+          onAddInventoryItem={addInventoryItem}
+        />
       </PageHeader>
 
       {/* Filters */}
@@ -1783,63 +1046,6 @@ export default function Rentals() {
         </DialogContent>
       </Dialog>
 
-      {/* Quick Add Customer Dialog */}
-      <Dialog open={isQuickAddCustomerOpen} onOpenChange={setIsQuickAddCustomerOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <UserPlus className="h-5 w-5" />
-              הוספת לקוח חדש
-            </DialogTitle>
-            <DialogDescription>הוסף לקוח חדש במהירות לבחירה בהשכרה</DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 mt-4">
-            <div className="space-y-2">
-              <Label>שם הלקוח *</Label>
-              <Input
-                value={quickCustomerData.name}
-                onChange={(e) => setQuickCustomerData({ ...quickCustomerData, name: e.target.value })}
-                placeholder="שם מלא"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label>טלפון *</Label>
-              <Input
-                value={quickCustomerData.phone}
-                onChange={(e) => setQuickCustomerData({ ...quickCustomerData, phone: e.target.value })}
-                placeholder="050-1234567"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label>כתובת</Label>
-              <Input
-                value={quickCustomerData.address}
-                onChange={(e) => setQuickCustomerData({ ...quickCustomerData, address: e.target.value })}
-                placeholder="כתובת (אופציונלי)"
-              />
-            </div>
-            
-            <div className="flex gap-3 pt-2">
-              <Button onClick={handleQuickAddCustomer} className="flex-1">
-                <UserPlus className="h-4 w-4" />
-                הוסף לקוח
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  setQuickCustomerData({ name: '', phone: '', address: '' });
-                  setIsQuickAddCustomerOpen(false);
-                }}
-              >
-                ביטול
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
