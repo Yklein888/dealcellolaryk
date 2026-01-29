@@ -601,16 +601,16 @@ export default function Repairs() {
         </button>
         
         <button
-          onClick={() => setFilterStatus('all')}
-          className={`stat-card p-4 text-center transition-all hover:border-primary/50 cursor-pointer ${filterStatus === 'all' ? 'border-primary bg-primary/10' : ''}`}
+          onClick={() => setFilterStatus('collected')}
+          className={`stat-card p-4 text-center transition-all hover:border-muted-foreground/50 cursor-pointer ${filterStatus === 'collected' ? 'border-muted-foreground bg-muted' : ''}`}
         >
           <div className="flex items-center justify-center gap-2 mb-1">
-            <Package className="h-5 w-5 text-primary" />
-            <span className="text-2xl font-bold text-primary">
-              {repairs.length}
+            <Package className="h-5 w-5 text-muted-foreground" />
+            <span className="text-2xl font-bold text-muted-foreground">
+              {repairs.filter(r => r.status === 'collected').length}
             </span>
           </div>
-          <p className="text-sm text-muted-foreground">סה"כ</p>
+          <p className="text-sm text-muted-foreground">נאספו</p>
         </button>
       </div>
 
