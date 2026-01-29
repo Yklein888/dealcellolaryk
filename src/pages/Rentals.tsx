@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useRental } from '@/hooks/useRental';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
+import { CallHistoryBadge } from '@/components/CallHistoryBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -166,6 +167,10 @@ export default function Rentals() {
             phone: customerPhone,
             message,
             campaignType: 'rental_reminder',
+            entityType: 'rental',
+            entityId: rental.id,
+            customerId: rental.customerId,
+            callType: 'manual',
           }),
         }
       );
@@ -1448,14 +1453,22 @@ export default function Rentals() {
                       </>
                     )}
                   </Button>
-                  <Button 
-                    variant="outline"
-                    size="sm"
-                    onClick={() => notifyRentalCustomer(rental)}
-                    disabled={callingRentalId === rental.id}
-                  >
-                    <Phone className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center">
+                    <Button 
+                      variant="outline"
+                      size="sm"
+                      onClick={() => notifyRentalCustomer(rental)}
+                      disabled={callingRentalId === rental.id}
+                      className="rounded-l-none border-r-0"
+                    >
+                      <Phone className="h-4 w-4" />
+                    </Button>
+                    <CallHistoryBadge 
+                      entityType="rental" 
+                      entityId={rental.id}
+                      className="rounded-r-none border border-input bg-background"
+                    />
+                  </div>
                   <Button 
                     variant="outline"
                     size="sm"

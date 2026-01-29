@@ -81,6 +81,20 @@ export interface OverdueCharge {
   createdAt: string;
 }
 
+export interface CallLog {
+  id: string;
+  entityType: 'rental' | 'repair';
+  entityId: string;
+  customerId?: string;
+  customerPhone: string;
+  callStatus: 'pending' | 'answered' | 'no_answer' | 'busy' | 'callback';
+  campaignId?: string;
+  callType: 'manual' | 'automatic';
+  callMessage?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export interface Repair {
   id: string;
   repairNumber: string;

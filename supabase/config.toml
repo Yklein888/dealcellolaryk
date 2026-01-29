@@ -1,1 +1,7 @@
 project_id = "qifcynwnxmtoxzpskmmt"
+
+[functions.yemot-callback]
+verify_jwt = false
+
+[functions.process-overdue-calls]
+verify_jwt = false
