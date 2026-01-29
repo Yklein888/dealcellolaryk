@@ -466,19 +466,19 @@ export function NewRentalDialog({
         onOpenChange(open);
         if (!open) resetForm();
       }}>
-        <DialogContent className="max-w-7xl w-[95vw] h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader className="flex-shrink-0 pb-4 border-b">
+        <DialogContent className="w-[98vw] max-w-[1400px] h-[95vh] max-h-[900px] p-0 overflow-hidden flex flex-col rounded-2xl">
+          <DialogHeader className="flex-shrink-0 px-8 py-6 border-b bg-muted/30">
             <DialogTitle className="text-2xl font-bold">יצירת השכרה חדשה</DialogTitle>
             <DialogDescription>מלא את הפרטים ליצירת השכרה חדשה</DialogDescription>
           </DialogHeader>
           
           {/* Two-column layout - scrollable content */}
-          <div className="flex-1 overflow-y-auto">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 py-6 px-2">
+          <div className="flex-1 overflow-y-auto px-8 py-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
             {/* Left Column - Customer & Dates */}
             <div className="space-y-6">
               {/* Customer Selection */}
-              <div className="space-y-3 p-4 rounded-xl border bg-card">
+              <div className="space-y-3 p-5 rounded-2xl border bg-card shadow-sm">
                 <div className="flex items-center justify-between">
                   <Label className="flex items-center gap-2 text-base font-semibold">
                     <User className="h-5 w-5 text-primary" />
@@ -508,7 +508,7 @@ export function NewRentalDialog({
                 </div>
 
                 {/* Customer List */}
-                <div className="max-h-48 overflow-y-auto border rounded-lg bg-background">
+                <div className="max-h-60 overflow-y-auto border rounded-lg bg-background">
                   {filteredCustomers.length === 0 ? (
                     <p className="text-center text-muted-foreground py-6 text-sm">
                       {customers.length === 0 ? 'אין לקוחות במערכת' : 'לא נמצאו לקוחות'}
@@ -546,7 +546,7 @@ export function NewRentalDialog({
               </div>
 
               {/* Date Selection with Visual Calendar */}
-              <div className="space-y-3 p-4 rounded-xl border bg-card">
+              <div className="space-y-3 p-5 rounded-2xl border bg-card shadow-sm">
                 <Label className="flex items-center gap-2 text-base font-semibold">
                   <CalendarIcon className="h-5 w-5 text-primary" />
                   תאריכי השכרה
@@ -607,12 +607,12 @@ export function NewRentalDialog({
 
               {/* Selected Items Summary */}
               {selectedItems.length > 0 && (
-                <div className="space-y-3 p-4 rounded-xl border bg-card">
+                <div className="space-y-3 p-5 rounded-2xl border bg-card shadow-sm">
                   <Label className="flex items-center gap-2 text-base font-semibold">
                     <ShoppingCart className="h-5 w-5 text-primary" />
                     פריטים נבחרים ({selectedItems.length})
                   </Label>
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
                     {selectedItems.map((item) => {
                       const isEuropeanSimFromInventory = item.category === 'sim_european' && !item.isGeneric;
                       const inventoryItem = isEuropeanSimFromInventory 
@@ -798,7 +798,7 @@ export function NewRentalDialog({
               </div>
 
               {/* Inventory Items Visual Grid */}
-              <div className="space-y-3 p-4 rounded-xl border bg-card">
+              <div className="space-y-3 p-5 rounded-2xl border bg-card shadow-sm">
                 <div className="flex items-center justify-between">
                   <Label className="flex items-center gap-2 text-base font-semibold">
                     <Package className="h-5 w-5 text-primary" />
@@ -851,7 +851,7 @@ export function NewRentalDialog({
                 </div>
 
                 {/* Visual Grid by Category */}
-                <div className="max-h-[400px] overflow-y-auto space-y-4">
+                <div className="max-h-[500px] overflow-y-auto space-y-4">
                   {filteredAvailableItems.length === 0 ? (
                     <div className="text-center py-12">
                       <Package className="h-16 w-16 mx-auto text-muted-foreground/30 mb-3" />
