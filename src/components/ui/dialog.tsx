@@ -27,40 +27,57 @@ const DialogOverlay = React.forwardRef<
 ));
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
+interface DialogContentProps extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
+  size?: 'default' | 'lg' | 'xl' | 'full';
+}
+
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
-  <DialogPortal>
-    <DialogOverlay className="bg-black/40 backdrop-blur-sm" />
-    <DialogPrimitive.Content
-      ref={ref}
-      className={cn(
-        "fixed z-50 grid w-full gap-4 p-4 sm:p-6 shadow-2xl duration-300",
-        "bg-white/95 backdrop-blur-xl border border-white/40",
-        // Mobile: full-width bottom sheet style
-        "inset-x-0 bottom-0 rounded-t-3xl max-h-[90vh] overflow-y-auto",
-        // Desktop: centered dialog
-        "sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:max-w-lg sm:rounded-2xl sm:max-h-[85vh]",
-        "data-[state=open]:animate-in data-[state=closed]:animate-out",
-        // Mobile animations
-        "data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
-        // Desktop animations
-        "sm:data-[state=closed]:fade-out-0 sm:data-[state=open]:fade-in-0 sm:data-[state=closed]:zoom-out-95 sm:data-[state=open]:zoom-in-95 sm:data-[state=closed]:slide-out-to-left-1/2 sm:data-[state=closed]:slide-out-to-top-[48%] sm:data-[state=open]:slide-in-from-left-1/2 sm:data-[state=open]:slide-in-from-top-[48%]",
-        className,
-      )}
-      {...props}
-    >
-      {/* Mobile drag handle */}
-      <div className="sm:hidden mx-auto w-12 h-1.5 rounded-full bg-muted-foreground/30 mb-2" />
-      {children}
-      <DialogPrimitive.Close className="absolute left-4 top-4 rounded-xl p-2 opacity-70 ring-offset-background transition-all hover:opacity-100 hover:bg-white/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
-        <X className="h-5 w-5" />
-        <span className="sr-only">Close</span>
-      </DialogPrimitive.Close>
-    </DialogPrimitive.Content>
-  </DialogPortal>
-));
+  DialogContentProps
+>(({ className, children, size = 'default', ...props }, ref) => {
+  const sizeClasses = {
+    default: 'sm:max-w-lg',
+    lg: 'sm:max-w-4xl',
+    xl: 'sm:max-w-6xl',
+    full: 'sm:w-[98vw] sm:max-w-[1400px]'
+  };
+
+  return (
+    <DialogPortal>
+      <DialogOverlay className="bg-black/40 backdrop-blur-sm" />
+      <DialogPrimitive.Content
+        ref={ref}
+        className={cn(
+          "fixed z-50 grid w-full gap-4 p-4 sm:p-6 shadow-2xl duration-300",
+          "bg-white/95 backdrop-blur-xl border border-white/40",
+          // Mobile: full-width bottom sheet style
+          "inset-x-0 bottom-0 rounded-t-3xl max-h-[90vh] overflow-y-auto",
+          // Desktop: centered dialog
+          "sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-2xl sm:max-h-[85vh]",
+          sizeClasses[size],
+          size === 'full' && 'sm:p-0 sm:max-h-[95vh]',
+          "data-[state=open]:animate-in data-[state=closed]:animate-out",
+          // Mobile animations
+          "data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
+          // Desktop animations
+          "sm:data-[state=closed]:fade-out-0 sm:data-[state=open]:fade-in-0 sm:data-[state=closed]:zoom-out-95 sm:data-[state=open]:zoom-in-95 sm:data-[state=closed]:slide-out-to-left-1/2 sm:data-[state=closed]:slide-out-to-top-[48%] sm:data-[state=open]:slide-in-from-left-1/2 sm:data-[state=open]:slide-in-from-top-[48%]",
+          className,
+        )}
+        {...props}
+      >
+        {/* Mobile drag handle - hidden for full size */}
+        {size !== 'full' && (
+          <div className="sm:hidden mx-auto w-12 h-1.5 rounded-full bg-muted-foreground/30 mb-2" />
+        )}
+        {children}
+        <DialogPrimitive.Close className="absolute left-4 top-4 rounded-xl p-2 opacity-70 ring-offset-background transition-all hover:opacity-100 hover:bg-white/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
+          <X className="h-5 w-5" />
+          <span className="sr-only">Close</span>
+        </DialogPrimitive.Close>
+      </DialogPrimitive.Content>
+    </DialogPortal>
+  );
+});
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
 const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (

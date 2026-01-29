@@ -466,7 +466,7 @@ export function NewRentalDialog({
         onOpenChange(open);
         if (!open) resetForm();
       }}>
-        <DialogContent className="w-[98vw] max-w-[1400px] h-[95vh] max-h-[900px] p-0 overflow-hidden flex flex-col rounded-2xl">
+        <DialogContent size="full" className="h-[95vh] max-h-[900px] flex flex-col">
           <DialogHeader className="flex-shrink-0 px-8 py-6 border-b bg-muted/30">
             <DialogTitle className="text-2xl font-bold">יצירת השכרה חדשה</DialogTitle>
             <DialogDescription>מלא את הפרטים ליצירת השכרה חדשה</DialogDescription>
