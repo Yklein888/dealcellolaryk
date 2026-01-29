@@ -1,5 +1,6 @@
 import { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useNavigate } from 'react-router-dom';
 
 interface StatCardProps {
   title: string;
@@ -10,6 +11,8 @@ interface StatCardProps {
     isPositive: boolean;
   };
   variant?: 'default' | 'primary' | 'warning' | 'success' | 'destructive';
+  href?: string;
+  onClick?: () => void;
 }
 
 const variantStyles = {
@@ -28,12 +31,30 @@ const iconVariantStyles = {
   destructive: 'bg-gradient-to-br from-destructive/30 to-red-400/20 text-destructive',
 };
 
-export function StatCard({ title, value, icon: Icon, trend, variant = 'default' }: StatCardProps) {
+export function StatCard({ title, value, icon: Icon, trend, variant = 'default', href, onClick }: StatCardProps) {
+  const navigate = useNavigate();
+  const isClickable = !!href || !!onClick;
+
+  const handleClick = () => {
+    if (onClick) {
+      onClick();
+    } else if (href) {
+      navigate(href);
+    }
+  };
+
   return (
-    <div className={cn(
-      'stat-card animate-fade-in card-glow group',
-      variantStyles[variant]
-    )}>
+    <div 
+      className={cn(
+        'stat-card animate-fade-in card-glow group',
+        variantStyles[variant],
+        isClickable && 'cursor-pointer hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] transition-all duration-200'
+      )}
+      onClick={isClickable ? handleClick : undefined}
+      role={isClickable ? 'button' : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      onKeyDown={isClickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') handleClick(); } : undefined}
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <p className="text-xs sm:text-sm font-medium text-muted-foreground truncate">{title}</p>

@@ -330,17 +330,33 @@ export function RentalProvider({ children }: { children: ReactNode }) {
 
   const calculateStats = (): DashboardStats => {
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startOfTomorrow = addDays(today, 1);
     const threeDaysFromNow = addDays(today, 3);
     
     const activeRentals = rentals.filter(r => r.status === 'active').length;
-    const overdueReturns = rentals.filter(r => 
-      r.status === 'active' && isBefore(parseISO(r.endDate), today)
-    ).length;
-    const upcomingReturns = rentals.filter(r => 
-      r.status === 'active' && 
-      isAfter(parseISO(r.endDate), today) && 
-      isBefore(parseISO(r.endDate), threeDaysFromNow)
-    ).length;
+    
+    // Overdue = endDate is BEFORE today (strictly before start of today)
+    const overdueReturns = rentals.filter(r => {
+      if (r.status !== 'active') return false;
+      const endDate = parseISO(r.endDate);
+      return isBefore(endDate, today);
+    }).length;
+    
+    // Ending today = endDate is exactly today
+    const endingToday = rentals.filter(r => {
+      if (r.status !== 'active') return false;
+      const endDate = parseISO(r.endDate);
+      return !isBefore(endDate, today) && isBefore(endDate, startOfTomorrow);
+    }).length;
+    
+    // Upcoming = endDate is after today but within 3 days (tomorrow, day after, etc.)
+    const upcomingReturns = rentals.filter(r => {
+      if (r.status !== 'active') return false;
+      const endDate = parseISO(r.endDate);
+      return !isBefore(endDate, startOfTomorrow) && isBefore(endDate, threeDaysFromNow);
+    }).length;
+    
     const repairsInProgress = repairs.filter(r => r.status === 'in_lab').length;
     // Count only truly available items (with valid expiry for SIMs)
     const itemsInStock = inventory.filter(isItemTrulyAvailable).length;
@@ -352,6 +368,7 @@ export function RentalProvider({ children }: { children: ReactNode }) {
       overdueReturns,
       repairsInProgress,
       upcomingReturns,
+      endingToday,
     };
   };
 

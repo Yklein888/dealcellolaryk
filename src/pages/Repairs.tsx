@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useRental } from '@/hooks/useRental';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -49,10 +50,21 @@ const deviceTypes = [
 export default function Repairs() {
   const { repairs, addRepair, updateRepair, deleteRepair } = useRental();
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [callingRepairId, setCallingRepairId] = useState<string | null>(null);
+
+  // Read URL params on mount
+  useEffect(() => {
+    const statusParam = searchParams.get('status');
+    if (statusParam) {
+      setFilterStatus(statusParam);
+      // Clear the URL param after applying
+      setSearchParams({}, { replace: true });
+    }
+  }, []);
 
   const notifyCustomer = async (repair: Repair) => {
     if (!repair.customerPhone) {
