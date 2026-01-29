@@ -568,6 +568,48 @@ export default function Repairs() {
         </div>
       </PageHeader>
 
+      {/* Status Stats - Quick Access */}
+      <div className="grid grid-cols-3 gap-3 mb-6">
+        <button
+          onClick={() => setFilterStatus('in_lab')}
+          className={`stat-card p-4 text-center transition-all hover:border-warning/50 cursor-pointer ${filterStatus === 'in_lab' ? 'border-warning bg-warning/10' : ''}`}
+        >
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <Wrench className="h-5 w-5 text-warning" />
+            <span className="text-2xl font-bold text-warning">
+              {repairs.filter(r => r.status === 'in_lab').length}
+            </span>
+          </div>
+          <p className="text-sm text-muted-foreground">במעבדה</p>
+        </button>
+        
+        <button
+          onClick={() => setFilterStatus('ready')}
+          className={`stat-card p-4 text-center transition-all hover:border-success/50 cursor-pointer ${filterStatus === 'ready' ? 'border-success bg-success/10' : ''}`}
+        >
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <CheckCircle className="h-5 w-5 text-success" />
+            <span className="text-2xl font-bold text-success">
+              {repairs.filter(r => r.status === 'ready').length}
+            </span>
+          </div>
+          <p className="text-sm text-muted-foreground">מוכנים</p>
+        </button>
+        
+        <button
+          onClick={() => setFilterStatus('all')}
+          className={`stat-card p-4 text-center transition-all hover:border-primary/50 cursor-pointer ${filterStatus === 'all' ? 'border-primary bg-primary/10' : ''}`}
+        >
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <Package className="h-5 w-5 text-primary" />
+            <span className="text-2xl font-bold text-primary">
+              {repairs.length}
+            </span>
+          </div>
+          <p className="text-sm text-muted-foreground">סה"כ</p>
+        </button>
+      </div>
+
       {/* Filters */}
       <div className="flex flex-col md:flex-row gap-4 mb-6">
         <div className="relative flex-1">

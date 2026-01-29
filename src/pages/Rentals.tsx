@@ -756,7 +756,7 @@ export default function Rentals() {
               השכרה חדשה
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>יצירת השכרה חדשה</DialogTitle>
               <DialogDescription>מלא את הפרטים ליצירת השכרה חדשה</DialogDescription>
