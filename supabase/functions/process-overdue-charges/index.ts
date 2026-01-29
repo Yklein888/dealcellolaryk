@@ -23,12 +23,66 @@ interface Customer {
   payment_token: string | null;
 }
 
+// Check if today is Shabbat or an Israeli holiday
+async function isShabbatOrHoliday(): Promise<boolean> {
+  // Check if today is Saturday (Shabbat)
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+  if (dayOfWeek === 6) {
+    console.log('Today is Shabbat, skipping processing');
+    return true;
+  }
+
+  // Check for Israeli holidays using Hebcal API
+  try {
+    const dateStr = today.toISOString().split('T')[0];
+    const response = await fetch(
+      `https://www.hebcal.com/hebcal?v=1&cfg=json&maj=on&min=off&mod=off&start=${dateStr}&end=${dateStr}&geo=none`
+    );
+    
+    if (!response.ok) {
+      console.warn('Hebcal API request failed, proceeding with processing');
+      return false;
+    }
+
+    const data = await response.json();
+    
+    // Check if any item is yomtov (major holiday)
+    const isHoliday = data.items?.some((item: { yomtov?: boolean; category?: string }) => 
+      item.yomtov === true || item.category === 'holiday'
+    ) ?? false;
+
+    if (isHoliday) {
+      console.log('Today is an Israeli holiday, skipping processing');
+    }
+
+    return isHoliday;
+  } catch (error) {
+    console.warn('Error checking Hebcal API:', error);
+    // If API fails, proceed with processing
+    return false;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // Check for Shabbat/holiday first
+    if (await isShabbatOrHoliday()) {
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: 'Skipped processing - Shabbat or Israeli holiday',
+          processed: 0,
+          skipped: true,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 

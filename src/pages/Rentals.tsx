@@ -37,6 +37,9 @@ import {
   Pencil,
   FileDown,
   Wifi,
+  AlertTriangle,
+  CheckCircle,
+  Package,
 } from 'lucide-react';
 import { generateCallingInstructions } from '@/lib/callingInstructions';
 import { supabase } from '@/integrations/supabase/client';
@@ -486,6 +489,53 @@ export default function Rentals() {
         />
       </PageHeader>
 
+      {/* Status Quick Access */}
+      <div className="grid grid-cols-3 gap-3 mb-6">
+        <button
+          onClick={() => setFilterStatus(filterStatus === 'active' ? 'all' : 'active')}
+          className={`stat-card p-4 text-center transition-all hover:border-primary/50 cursor-pointer ${filterStatus === 'active' ? 'border-primary bg-primary/10' : ''}`}
+        >
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <ShoppingCart className="h-5 w-5 text-primary" />
+            <span className="text-2xl font-bold text-primary">
+              {rentals.filter(r => r.status === 'active').length}
+            </span>
+          </div>
+          <p className="text-sm text-muted-foreground">פעילות</p>
+        </button>
+        
+        <button
+          onClick={() => setFilterStatus(filterStatus === 'overdue' ? 'all' : 'overdue')}
+          className={`stat-card p-4 text-center transition-all hover:border-destructive/50 cursor-pointer ${filterStatus === 'overdue' ? 'border-destructive bg-destructive/10' : ''}`}
+        >
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+            <span className="text-2xl font-bold text-destructive">
+              {rentals.filter(r => {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const endDate = parseISO(r.endDate);
+                return r.status === 'active' && isBefore(endDate, today);
+              }).length}
+            </span>
+          </div>
+          <p className="text-sm text-muted-foreground">באיחור</p>
+        </button>
+        
+        <button
+          onClick={() => setFilterStatus(filterStatus === 'returned' ? 'all' : 'returned')}
+          className={`stat-card p-4 text-center transition-all hover:border-success/50 cursor-pointer ${filterStatus === 'returned' ? 'border-success bg-success/10' : ''}`}
+        >
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <CheckCircle className="h-5 w-5 text-success" />
+            <span className="text-2xl font-bold text-success">
+              {rentals.filter(r => r.status === 'returned').length}
+            </span>
+          </div>
+          <p className="text-sm text-muted-foreground">הוחזרו</p>
+        </button>
+      </div>
+
       {/* Filters */}
       <div className="flex flex-col md:flex-row gap-4 mb-6">
         <div className="relative flex-1">
@@ -571,12 +621,18 @@ export default function Rentals() {
                 </div>
               </div>
 
-              {/* Customer */}
+              {/* Customer + Item Count */}
               <div className="flex items-center gap-3 mb-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20 shrink-0">
                   <User className="h-5 w-5 text-primary" />
                 </div>
-                <p className="font-bold text-base text-foreground truncate flex-1">{rental.customerName}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-base text-foreground truncate">{rental.customerName}</p>
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Package className="h-3 w-3" />
+                    <span>{rental.items.length} פריטים</span>
+                  </div>
+                </div>
               </div>
 
               {/* Dates */}
@@ -607,12 +663,15 @@ export default function Rentals() {
               </div>
 
               {/* Phone Numbers Display & Download Instructions for SIM cards (European or American) */}
-              {rental.items.some(item => (item.itemCategory === 'sim_european' || item.itemCategory === 'sim_american') && !item.isGeneric && item.inventoryItemId) && (() => {
-                const simItem = rental.items.find(item => (item.itemCategory === 'sim_european' || item.itemCategory === 'sim_american') && !item.isGeneric && item.inventoryItemId);
-                const inventoryItem = simItem ? inventory.find(i => i.id === simItem.inventoryItemId) : null;
-                const itemId = `rental-${rental.id}`;
-                const isEuropeanSim = simItem?.itemCategory === 'sim_european';
-                const isAmericanSim = simItem?.itemCategory === 'sim_american';
+              {(() => {
+                // Get all SIM items (European or American) that have inventory IDs
+                const simItems = rental.items.filter(
+                  item => (item.itemCategory === 'sim_european' || item.itemCategory === 'sim_american') && 
+                          !item.isGeneric && 
+                          item.inventoryItemId
+                );
+                
+                if (simItems.length === 0) return null;
                 
                 // Format phone numbers for display
                 const formatDisplayNumber = (num: string | undefined): string => {
@@ -636,63 +695,81 @@ export default function Rentals() {
                 };
                 
                 return (
-                  <div className="mb-3 space-y-2">
-                    {/* Phone Numbers Display */}
-                    <div className={`bg-gradient-to-r ${isAmericanSim ? 'from-red-50 to-blue-50 dark:from-red-950/30 dark:to-blue-950/30 border-red-200/50 dark:border-red-800/50' : 'from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-200/50 dark:border-blue-800/50'} rounded-lg p-3 border`}>
-                      <div className="text-center space-y-1">
-                        {inventoryItem?.israeliNumber && (
-                          <div className="flex items-center justify-center gap-2 text-sm">
-                            <span className="text-muted-foreground">🇮🇱 ישראלי:</span>
-                            <span className="font-bold text-primary" dir="ltr">
-                              {formatDisplayNumber(inventoryItem?.israeliNumber)}
-                            </span>
-                          </div>
-                        )}
-                        <div className="flex items-center justify-center gap-2 text-sm">
-                          <span className="text-muted-foreground">{isAmericanSim ? '🇺🇸' : '🌍'} {isAmericanSim ? 'אמריקאי:' : 'מקומי:'}</span>
-                          <span className="font-bold text-primary" dir="ltr">
-                            {formatDisplayNumber(inventoryItem?.localNumber)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Download Button - Only for European SIMs */}
-                    {isEuropeanSim && (
-                      <div className="flex justify-center">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={downloadingInstructions === itemId}
-                          onClick={async () => {
-                            let israeliNumber = inventoryItem?.israeliNumber;
-                            let localNumber = inventoryItem?.localNumber;
-                            
-                            if (!inventoryItem && simItem?.inventoryItemId) {
-                              const { data } = await supabase
-                                .from('inventory')
-                                .select('israeli_number, local_number')
-                                .eq('id', simItem.inventoryItemId)
-                                .maybeSingle();
-                              if (data) {
-                                israeliNumber = data.israeli_number || undefined;
-                                localNumber = data.local_number || undefined;
-                              }
-                            }
-                            
-                            handleDownloadInstructions(itemId, israeliNumber || undefined, localNumber || undefined);
-                          }}
-                          className="gap-1 text-xs w-full"
-                        >
-                          {downloadingInstructions === itemId ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <FileDown className="h-3 w-3" />
+                  <div className="mb-3 space-y-3">
+                    {simItems.map((simItem, idx) => {
+                      const inventoryItem = inventory.find(i => i.id === simItem.inventoryItemId);
+                      const itemId = `rental-${rental.id}-sim-${idx}`;
+                      const isEuropeanSim = simItem.itemCategory === 'sim_european';
+                      const isAmericanSim = simItem.itemCategory === 'sim_american';
+                      
+                      return (
+                        <div key={idx} className="space-y-2">
+                          {/* SIM Label when multiple SIMs */}
+                          {simItems.length > 1 && (
+                            <p className="text-xs font-medium text-muted-foreground">
+                              {isAmericanSim ? '🇺🇸' : '🇪🇺'} {simItem.itemName}
+                            </p>
                           )}
-                          הורד הוראות חיוג
-                        </Button>
-                      </div>
-                    )}
+                          
+                          {/* Phone Numbers Display */}
+                          <div className={`bg-gradient-to-r ${isAmericanSim ? 'from-red-50 to-blue-50 dark:from-red-950/30 dark:to-blue-950/30 border-red-200/50 dark:border-red-800/50' : 'from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-200/50 dark:border-blue-800/50'} rounded-lg p-3 border`}>
+                            <div className="text-center space-y-1">
+                              {inventoryItem?.israeliNumber && (
+                                <div className="flex items-center justify-center gap-2 text-sm">
+                                  <span className="text-muted-foreground">🇮🇱 ישראלי:</span>
+                                  <span className="font-bold text-primary" dir="ltr">
+                                    {formatDisplayNumber(inventoryItem?.israeliNumber)}
+                                  </span>
+                                </div>
+                              )}
+                              <div className="flex items-center justify-center gap-2 text-sm">
+                                <span className="text-muted-foreground">{isAmericanSim ? '🇺🇸' : '🌍'} {isAmericanSim ? 'אמריקאי:' : 'מקומי:'}</span>
+                                <span className="font-bold text-primary" dir="ltr">
+                                  {formatDisplayNumber(inventoryItem?.localNumber)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Download Button - Only for European SIMs */}
+                          {isEuropeanSim && (
+                            <div className="flex justify-center">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={downloadingInstructions === itemId}
+                                onClick={async () => {
+                                  let israeliNumber = inventoryItem?.israeliNumber;
+                                  let localNumber = inventoryItem?.localNumber;
+                                  
+                                  if (!inventoryItem && simItem.inventoryItemId) {
+                                    const { data } = await supabase
+                                      .from('inventory')
+                                      .select('israeli_number, local_number')
+                                      .eq('id', simItem.inventoryItemId)
+                                      .maybeSingle();
+                                    if (data) {
+                                      israeliNumber = data.israeli_number || undefined;
+                                      localNumber = data.local_number || undefined;
+                                    }
+                                  }
+                                  
+                                  handleDownloadInstructions(itemId, israeliNumber || undefined, localNumber || undefined);
+                                }}
+                                className="gap-1 text-xs w-full"
+                              >
+                                {downloadingInstructions === itemId ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <FileDown className="h-3 w-3" />
+                                )}
+                                הורד הוראות חיוג{simItems.length > 1 ? ` - ${simItem.itemName}` : ''}
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 );
               })()}
