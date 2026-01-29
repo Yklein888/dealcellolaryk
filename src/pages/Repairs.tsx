@@ -39,13 +39,7 @@ import { useToast } from '@/hooks/use-toast';
 import { format, parseISO, isToday } from 'date-fns';
 import { he } from 'date-fns/locale';
 
-const deviceTypes = [
-  'סמארטפון',
-  'מכשיר פשוט',
-  'מודם',
-  'נטסטיק',
-  'אחר',
-];
+// deviceTypes removed - using deviceModel input only
 
 export default function Repairs() {
   const { repairs, addRepair, updateRepair, deleteRepair } = useRental();
@@ -196,10 +190,10 @@ export default function Repairs() {
   };
 
   const handleSubmit = () => {
-    if (!formData.repairNumber || !formData.deviceType || !formData.customerName || !formData.problemDescription) {
+    if (!formData.repairNumber || !formData.deviceModel || !formData.customerName || !formData.problemDescription) {
       toast({
         title: 'שגיאה',
-        description: 'יש למלא מספר תיקון, סוג מכשיר, שם לקוח ותיאור הבעיה',
+        description: 'יש למלא מספר תיקון, דגם מכשיר, שם לקוח ותיאור הבעיה',
         variant: 'destructive',
       });
       return;
@@ -207,8 +201,8 @@ export default function Repairs() {
 
     const newRepairData = {
       repairNumber: formData.repairNumber,
-      deviceType: formData.deviceType,
-      deviceModel: formData.deviceModel || undefined,
+      deviceType: formData.deviceModel, // Use deviceModel as deviceType for DB compatibility
+      deviceModel: formData.deviceModel,
       deviceCost: formData.deviceCost ? parseFloat(formData.deviceCost) : undefined,
       customerName: formData.customerName,
       customerPhone: formData.customerPhone,
@@ -263,16 +257,11 @@ export default function Repairs() {
             font-weight: 900; 
             color: #0d9488; 
             text-align: center; 
-            padding: 8mm 5mm;
-            margin: 0 auto 5mm auto;
-            border: 3px solid #0d9488;
-            border-radius: 10px;
-            background: linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%);
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+            padding: 0;
+            margin: 0 0 3mm 0;
+            border: none;
+            background: none;
             line-height: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
           }
           .warranty-badge {
             display: inline-block;
@@ -301,8 +290,8 @@ export default function Repairs() {
         <div class="title">טופס קבלת מכשיר לתיקון ${repair.isWarranty ? '<span class="warranty-badge">באחריות</span>' : ''}</div>
         
         <div class="field">
-          <div class="label">סוג המכשיר:</div>
-          <div class="value">${repair.deviceType}${repair.deviceModel ? ` - ${repair.deviceModel}` : ''}</div>
+          <div class="label">דגם המכשיר:</div>
+          <div class="value">${repair.deviceModel || repair.deviceType}</div>
         </div>
 
         ${repair.deviceCost ? `
@@ -427,9 +416,51 @@ export default function Repairs() {
               <DialogTitle>הוספת תיקון חדש</DialogTitle>
             </DialogHeader>
             
-            <div className="space-y-4 mt-4 max-h-[70vh] overflow-y-auto">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
+            <div className="space-y-3 mt-4 max-h-[70vh] overflow-y-auto">
+              {/* Row 1: Customer Name + Phone */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>שם הלקוח *</Label>
+                  <Input
+                    value={formData.customerName}
+                    onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
+                    placeholder="שם מלא"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>טלפון</Label>
+                  <Input
+                    value={formData.customerPhone}
+                    onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
+                    placeholder="050-1234567"
+                  />
+                </div>
+              </div>
+
+              {/* Row 2: Device Model + Device Cost */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>דגם המכשיר *</Label>
+                  <Input
+                    value={formData.deviceModel}
+                    onChange={(e) => setFormData({ ...formData, deviceModel: e.target.value })}
+                    placeholder="לדוגמה: iPhone 14"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>עלות המכשיר (₪)</Label>
+                  <Input
+                    type="number"
+                    value={formData.deviceCost}
+                    onChange={(e) => setFormData({ ...formData, deviceCost: e.target.value })}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+
+              {/* Row 3: Repair Number + Status */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
                   <Label>מספר תיקון *</Label>
                   <Input
                     value={formData.repairNumber}
@@ -437,8 +468,7 @@ export default function Repairs() {
                     placeholder="לדוגמה: 1"
                   />
                 </div>
-
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <Label>סטטוס</Label>
                   <Select 
                     value={formData.status} 
@@ -456,64 +486,29 @@ export default function Repairs() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>שם הלקוח *</Label>
-                <Input
-                  value={formData.customerName}
-                  onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
-                  placeholder="שם מלא"
+              {/* Row 4: Problem Description (full width) */}
+              <div className="space-y-1">
+                <Label>תיאור הבעיה *</Label>
+                <Textarea
+                  value={formData.problemDescription}
+                  onChange={(e) => setFormData({ ...formData, problemDescription: e.target.value })}
+                  placeholder="תאר את הבעיה..."
+                  rows={2}
+                  className="min-h-[60px]"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label>טלפון</Label>
-                <Input
-                  value={formData.customerPhone}
-                  onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
-                  placeholder="050-1234567"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>סוג המכשיר *</Label>
-                  <Select 
-                    value={formData.deviceType} 
-                    onValueChange={(value) => setFormData({ ...formData, deviceType: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="בחר סוג מכשיר" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {deviceTypes.map((type) => (
-                        <SelectItem key={type} value={type}>{type}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>דגם המכשיר</Label>
+              {/* Row 5: Notes + Warranty */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>הערות</Label>
                   <Input
-                    value={formData.deviceModel}
-                    onChange={(e) => setFormData({ ...formData, deviceModel: e.target.value })}
-                    placeholder="לדוגמה: iPhone 14"
+                    value={formData.notes}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    placeholder="הערות נוספות..."
                   />
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>עלות המכשיר (₪)</Label>
-                  <Input
-                    type="number"
-                    value={formData.deviceCost}
-                    onChange={(e) => setFormData({ ...formData, deviceCost: e.target.value })}
-                    placeholder="0"
-                  />
-                </div>
-
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <Label>באחריות</Label>
                   <div className="flex items-center gap-2 h-10">
                     <Switch
@@ -521,33 +516,15 @@ export default function Repairs() {
                       onCheckedChange={(checked) => setFormData({ ...formData, isWarranty: checked })}
                     />
                     <span className="text-sm text-muted-foreground">
-                      {formData.isWarranty ? 'כן, באחריות' : 'לא באחריות'}
+                      {formData.isWarranty ? 'כן' : 'לא'}
                     </span>
                     {formData.isWarranty && <Shield className="h-4 w-4 text-success" />}
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>תיאור הבעיה *</Label>
-                <Textarea
-                  value={formData.problemDescription}
-                  onChange={(e) => setFormData({ ...formData, problemDescription: e.target.value })}
-                  placeholder="תאר את הבעיה..."
-                  rows={3}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>הערות</Label>
-                <Input
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  placeholder="הערות נוספות..."
-                />
-              </div>
-
-              <div className="flex gap-3 pt-4">
+              {/* Row 6: Buttons */}
+              <div className="flex gap-3 pt-2">
                 <Button onClick={handleSubmit} className="flex-1">
                   הוסף תיקון
                 </Button>
