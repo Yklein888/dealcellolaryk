@@ -21,6 +21,7 @@ import PaymentHistory from "./pages/PaymentHistory";
 import Invoices from "./pages/Invoices";
 import POS from "./pages/POS";
 import NotFound from "./pages/NotFound";
+import Install from "./pages/Install";
 
 const queryClient = new QueryClient();
 
@@ -33,25 +34,33 @@ const App = () => (
             <Toaster />
             <Sonner />
             <BrowserRouter>
-              <ProtectedRoute>
-                <SessionManager />
-                <AppLayout>
-                  <Routes>
-                    <Route path="/" element={<Dashboard />} />
-                    <Route path="/rentals" element={<Rentals />} />
-                    <Route path="/customers" element={<Customers />} />
-                    <Route path="/inventory" element={<Inventory />} />
-                    <Route path="/repairs" element={<Repairs />} />
-                    <Route path="/users" element={<UserManagement />} />
-                    <Route path="/payments" element={<PaymentHistory />} />
-                    <Route path="/invoices" element={<Invoices />} />
-                    <Route path="/pos" element={<POS />} />
-                    <Route path="/payment-success" element={<PaymentSuccess />} />
-                    <Route path="/payment-error" element={<PaymentError />} />
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </AppLayout>
-              </ProtectedRoute>
+              <Routes>
+                {/* Install page - accessible without auth */}
+                <Route path="/install" element={<Install />} />
+                
+                {/* Protected routes */}
+                <Route path="/*" element={
+                  <ProtectedRoute>
+                    <SessionManager />
+                    <AppLayout>
+                      <Routes>
+                        <Route path="/" element={<Dashboard />} />
+                        <Route path="/rentals" element={<Rentals />} />
+                        <Route path="/customers" element={<Customers />} />
+                        <Route path="/inventory" element={<Inventory />} />
+                        <Route path="/repairs" element={<Repairs />} />
+                        <Route path="/users" element={<UserManagement />} />
+                        <Route path="/payments" element={<PaymentHistory />} />
+                        <Route path="/invoices" element={<Invoices />} />
+                        <Route path="/pos" element={<POS />} />
+                        <Route path="/payment-success" element={<PaymentSuccess />} />
+                        <Route path="/payment-error" element={<PaymentError />} />
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
+                    </AppLayout>
+                  </ProtectedRoute>
+                } />
+              </Routes>
             </BrowserRouter>
           </RentalProvider>
         </RoleProvider>
