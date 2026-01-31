@@ -22,6 +22,7 @@ export interface InventoryItem {
   simNumber?: string;
   status: 'available' | 'rented' | 'maintenance';
   notes?: string;
+  barcode?: string;
 }
 
 export interface Customer {

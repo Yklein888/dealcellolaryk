@@ -128,6 +128,28 @@ serve(async (req) => {
 
     for (const rental of overdueRentals) {
       try {
+        // Check if rental includes at least one SIM card
+        const { data: rentalItems, error: itemsError } = await supabase
+          .from('rental_items')
+          .select('item_category')
+          .eq('rental_id', rental.id);
+
+        if (itemsError) {
+          console.error(`Error fetching rental items for ${rental.id}:`, itemsError);
+          results.push({ rentalId: rental.id, success: false, error: itemsError.message });
+          continue;
+        }
+
+        const hasSim = rentalItems?.some(item => 
+          item.item_category === 'sim_european' || item.item_category === 'sim_american'
+        );
+
+        if (!hasSim) {
+          console.log(`Rental ${rental.id} has no SIM cards, skipping call`);
+          results.push({ rentalId: rental.id, success: true, error: 'No SIM cards in rental' });
+          continue;
+        }
+
         // Check if we already called today for this rental
         const { data: existingCalls, error: callsError } = await supabase
           .from('call_logs')
