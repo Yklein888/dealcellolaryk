@@ -40,6 +40,7 @@ import {
   AlertTriangle,
   CheckCircle,
   Package,
+  CalendarPlus,
 } from 'lucide-react';
 import { generateCallingInstructions } from '@/lib/callingInstructions';
 import { supabase } from '@/integrations/supabase/client';
@@ -100,6 +101,12 @@ export default function Rentals() {
   const [useStoredCard, setUseStoredCard] = useState(false);
   const [isTerminalMode, setIsTerminalMode] = useState(false);
   const [terminalStatus, setTerminalStatus] = useState<'idle' | 'waiting' | 'success' | 'error'>('idle');
+
+  // Extension dialog state
+  const [extendDialogOpen, setExtendDialogOpen] = useState(false);
+  const [extendingRental, setExtendingRental] = useState<Rental | null>(null);
+  const [extendDays, setExtendDays] = useState(7);
+  const [isExtending, setIsExtending] = useState(false);
 
   // Notify customer about rental return reminder
   const notifyRentalCustomer = async (rental: Rental) => {
@@ -457,6 +464,52 @@ export default function Rentals() {
     }
   };
 
+  // Open extend dialog
+  const openExtendDialog = (rental: Rental) => {
+    setExtendingRental(rental);
+    setExtendDays(7);
+    setExtendDialogOpen(true);
+  };
+
+  // Handle extend rental
+  const handleExtendRental = async () => {
+    if (!extendingRental) return;
+
+    setIsExtending(true);
+    const currentEndDate = parseISO(extendingRental.endDate);
+    const newEndDate = addDays(currentEndDate, extendDays);
+
+    try {
+      const { error } = await supabase
+        .from('rentals')
+        .update({
+          end_date: format(newEndDate, 'yyyy-MM-dd'),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', extendingRental.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'ההשכרה הוארכה',
+        description: `תאריך ההחזרה החדש: ${format(newEndDate, 'dd/MM/yyyy', { locale: he })}`,
+      });
+      setExtendDialogOpen(false);
+      setExtendingRental(null);
+      // Refresh data
+      window.location.reload();
+    } catch (error) {
+      console.error('Error extending rental:', error);
+      toast({
+        title: 'שגיאה',
+        description: 'לא ניתן להאריך את ההשכרה',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsExtending(false);
+    }
+  };
+
 
   const getStatusVariant = (status: Rental['status']) => {
     switch (status) {
@@ -776,46 +829,59 @@ export default function Rentals() {
 
               {/* Actions - Always visible for active/overdue */}
               {(rental.status === 'active' || rental.status === 'overdue') && (
-                <div className="flex justify-center gap-2 mt-auto pt-3 border-t border-border">
-                  <Button 
-                    variant="default"
-                    size="sm"
-                    onClick={() => openPaymentDialog(rental)}
-                    disabled={payingRentalId === rental.id}
-                    className="flex-1"
-                  >
-                    {payingRentalId === rental.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <>
-                        <CreditCard className="h-4 w-4 ml-1" />
-                        תשלום
-                      </>
-                    )}
-                  </Button>
-                  <div className="flex items-center">
+                <div className="space-y-2 mt-auto pt-3 border-t border-border">
+                  <div className="flex justify-center gap-2">
+                    <Button 
+                      variant="default"
+                      size="sm"
+                      onClick={() => openPaymentDialog(rental)}
+                      disabled={payingRentalId === rental.id}
+                      className="flex-1"
+                    >
+                      {payingRentalId === rental.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <CreditCard className="h-4 w-4 ml-1" />
+                          תשלום
+                        </>
+                      )}
+                    </Button>
+                    <div className="flex items-center">
+                      <Button 
+                        variant="outline"
+                        size="sm"
+                        onClick={() => notifyRentalCustomer(rental)}
+                        disabled={callingRentalId === rental.id}
+                        className="rounded-l-none border-r-0"
+                      >
+                        <Phone className="h-4 w-4" />
+                      </Button>
+                      <CallHistoryBadge 
+                        entityType="rental" 
+                        entityId={rental.id}
+                        className="rounded-r-none border border-input bg-background"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-center gap-2">
                     <Button 
                       variant="outline"
                       size="sm"
-                      onClick={() => notifyRentalCustomer(rental)}
-                      disabled={callingRentalId === rental.id}
-                      className="rounded-l-none border-r-0"
+                      onClick={() => openExtendDialog(rental)}
+                      className="flex-1"
                     >
-                      <Phone className="h-4 w-4" />
+                      <CalendarPlus className="h-4 w-4 ml-1" />
+                      הארכה
                     </Button>
-                    <CallHistoryBadge 
-                      entityType="rental" 
-                      entityId={rental.id}
-                      className="rounded-r-none border border-input bg-background"
-                    />
+                    <Button 
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleReturn(rental.id)}
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </Button>
                   </div>
-                  <Button 
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleReturn(rental.id)}
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                  </Button>
                 </div>
               )}
             </div>
@@ -1120,6 +1186,88 @@ export default function Rentals() {
             </div>
             );
           })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Extend Rental Dialog */}
+      <Dialog open={extendDialogOpen} onOpenChange={setExtendDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarPlus className="h-5 w-5" />
+              הארכת השכרה
+            </DialogTitle>
+            <DialogDescription>
+              {extendingRental && `הארכת השכרה של ${extendingRental.customerName}`}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {extendingRental && (
+            <div className="space-y-4">
+              {/* Current end date */}
+              <div className="p-3 rounded-lg bg-muted/50 text-center">
+                <p className="text-sm text-muted-foreground">תאריך החזרה נוכחי</p>
+                <p className="text-lg font-bold">
+                  {format(parseISO(extendingRental.endDate), 'dd/MM/yyyy', { locale: he })}
+                </p>
+              </div>
+              
+              {/* Extension options */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium">בחר תקופת הארכה:</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {[3, 7, 14, 30].map(days => (
+                    <Button
+                      key={days}
+                      variant={extendDays === days ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setExtendDays(days)}
+                      className="flex-col h-auto py-2"
+                    >
+                      <span className="text-lg font-bold">{days}</span>
+                      <span className="text-xs">ימים</span>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              
+              {/* New end date preview */}
+              <div className="p-3 rounded-lg bg-primary/10 text-center border border-primary/20">
+                <p className="text-sm text-muted-foreground">תאריך החזרה חדש</p>
+                <p className="text-lg font-bold text-primary">
+                  {format(addDays(parseISO(extendingRental.endDate), extendDays), 'dd/MM/yyyy', { locale: he })}
+                </p>
+              </div>
+              
+              {/* Actions */}
+              <div className="flex gap-2 pt-2">
+                <Button 
+                  onClick={handleExtendRental} 
+                  className="flex-1"
+                  disabled={isExtending}
+                >
+                  {isExtending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin ml-2" />
+                      מאריך...
+                    </>
+                  ) : (
+                    <>
+                      <CalendarPlus className="h-4 w-4 ml-2" />
+                      הארך ב-{extendDays} ימים
+                    </>
+                  )}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setExtendDialogOpen(false)}
+                  disabled={isExtending}
+                >
+                  ביטול
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

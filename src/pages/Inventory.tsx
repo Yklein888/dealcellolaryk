@@ -121,6 +121,16 @@ export default function Inventory() {
       return;
     }
 
+    // Validate SIM number for SIM categories
+    if (isSim(formData.category) && !formData.simNumber) {
+      toast({
+        title: 'שגיאה',
+        description: 'יש להזין מספר סים (ICCID) לפריט מסוג סים',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (editingItem) {
       updateInventoryItem(editingItem.id, formData);
       toast({
@@ -252,7 +262,9 @@ export default function Inventory() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>מספר סים (ICCID)</Label>
+                    <Label>
+                      מספר סים (ICCID) <span className="text-destructive">*</span>
+                    </Label>
                     <Input
                       value={formData.simNumber}
                       onChange={(e) => setFormData({ ...formData, simNumber: e.target.value })}

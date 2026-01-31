@@ -173,6 +173,7 @@ export function RentalProvider({ children }: { children: ReactNode }) {
             simNumber: i.sim_number || undefined,
             status: i.status as 'available' | 'rented' | 'maintenance',
             notes: i.notes || undefined,
+            barcode: i.barcode || undefined,
           }));
           setInventory(nextInventory);
           saveCachedInventory(nextInventory);
@@ -476,6 +477,7 @@ export function RentalProvider({ children }: { children: ReactNode }) {
         simNumber: data.sim_number || undefined,
         status: data.status as 'available' | 'rented' | 'maintenance',
         notes: data.notes || undefined,
+        barcode: data.barcode || undefined,
       }, ...prev];
       saveCachedInventory(next);
       return next;

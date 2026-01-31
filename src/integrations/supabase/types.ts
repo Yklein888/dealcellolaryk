@@ -118,6 +118,7 @@ export type Database = {
       }
       inventory: {
         Row: {
+          barcode: string | null
           category: Database["public"]["Enums"]["item_category"]
           created_at: string
           expiry_date: string | null
@@ -131,6 +132,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          barcode?: string | null
           category: Database["public"]["Enums"]["item_category"]
           created_at?: string
           expiry_date?: string | null
@@ -144,6 +146,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          barcode?: string | null
           category?: Database["public"]["Enums"]["item_category"]
           created_at?: string
           expiry_date?: string | null
@@ -883,6 +886,7 @@ export type Database = {
       get_stock_items: {
         Args: never
         Returns: {
+          barcode: string | null
           category: Database["public"]["Enums"]["item_category"]
           created_at: string
           expiry_date: string | null
