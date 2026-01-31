@@ -135,22 +135,19 @@ export function RentalProvider({ children }: { children: ReactNode }) {
         if (error) {
           failedParts.push('לקוחות');
         } else {
-        setCustomers(
-            (data || []).map((c) => ({
-              id: c.id,
-              name: c.name,
-              address: c.address || undefined,
-              phone: c.phone,
-              email: c.email || undefined,
-              notes: c.notes || undefined,
-              createdAt: String(c.created_at).split('T')[0],
-              // Security: payment_token is NEVER exposed to frontend
-              // Only expose last4 and expiry for display, and a boolean flag
-              hasPaymentToken: !!(c.payment_token && c.payment_token.length > 0),
-              paymentTokenLast4: c.payment_token_last4 || undefined,
-              paymentTokenExpiry: c.payment_token_expiry || undefined,
-            }))
-          );
+          const customerData = (data || []).map((c) => ({
+            id: c.id,
+            name: c.name,
+            address: c.address || undefined,
+            phone: c.phone,
+            email: c.email || undefined,
+            notes: c.notes || undefined,
+            createdAt: String(c.created_at).split('T')[0],
+            hasPaymentToken: !!(c.payment_token && c.payment_token.length > 0),
+            paymentTokenLast4: c.payment_token_last4 || undefined,
+            paymentTokenExpiry: c.payment_token_expiry || undefined,
+          }));
+          setCustomers(customerData);
         }
       } else {
         failedParts.push('לקוחות');

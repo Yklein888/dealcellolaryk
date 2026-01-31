@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Phone, Smartphone, Wifi, UserPlus } from 'lucide-react';
+import { useBiometricAuth } from '@/hooks/useBiometricAuth';
+import { Loader2, Phone, Smartphone, Wifi, UserPlus, Fingerprint } from 'lucide-react';
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
@@ -16,6 +17,22 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const { signIn, signUp } = useAuth();
   const { toast } = useToast();
+  const { isSupported: isBiometricSupported, isLoading: biometricLoading, authenticateWithBiometric } = useBiometricAuth();
+
+  // Handle biometric login
+  const handleBiometricLogin = async () => {
+    const userId = await authenticateWithBiometric();
+    if (userId) {
+      // User authenticated via biometric - they should already have a session
+      // The WebAuthn credential is tied to their account
+      toast({
+        title: 'התחברת בהצלחה!',
+        description: 'ברוך הבא למערכת',
+      });
+      // Refresh the page to trigger auth state check
+      window.location.reload();
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -168,6 +185,34 @@ export default function Auth() {
                 )}
               </Button>
             </form>
+
+            {/* Biometric Login Button */}
+            {isLogin && isBiometricSupported && (
+              <div className="mt-4">
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">או</span>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full mt-4 h-12 text-base"
+                  onClick={handleBiometricLogin}
+                  disabled={biometricLoading}
+                >
+                  {biometricLoading ? (
+                    <Loader2 className="ml-2 h-5 w-5 animate-spin" />
+                  ) : (
+                    <Fingerprint className="ml-2 h-5 w-5" />
+                  )}
+                  התחבר עם טביעת אצבע
+                </Button>
+              </div>
+            )}
 
             <div className="mt-6 text-center">
               <button

@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Calendar } from '@/components/ui/calendar';
+import { DateRangePicker } from '@/components/DateRangePicker';
 import {
   Dialog,
   DialogContent,
@@ -12,11 +12,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -57,7 +52,7 @@ import { format, differenceInDays } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { DualCurrencyPrice } from '@/components/DualCurrencyPrice';
 import { cn } from '@/lib/utils';
-import { DateRange } from 'react-day-picker';
+import { getFullHebrewDate } from '@/components/ui/hebrew-calendar';
 
 // Category color mappings
 const categoryColors: Record<ItemCategory, { bg: string; border: string; hover: string }> = {
@@ -149,8 +144,9 @@ export function NewRentalDialog({
     notes: '',
   });
 
-  // Date range state
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  // Date state - separate start and end dates for dual calendar
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
 
   // Selected items state
@@ -185,7 +181,8 @@ export function NewRentalDialog({
   // Reset form
   const resetForm = () => {
     setFormData({ customerId: '', deposit: '', notes: '' });
-    setDateRange(undefined);
+    setStartDate(undefined);
+    setEndDate(undefined);
     setSelectedItems([]);
     setCustomerSearchTerm('');
     setItemSearchTerm('');
@@ -371,7 +368,7 @@ export function NewRentalDialog({
 
   // Calculate preview price
   const calculatePreviewPrice = () => {
-    if (!dateRange?.from || !dateRange?.to || selectedItems.length === 0) {
+    if (!startDate || !endDate || selectedItems.length === 0) {
       return null;
     }
 
@@ -380,14 +377,14 @@ export function NewRentalDialog({
         category: i.category, 
         hasIsraeliNumber: i.hasIsraeliNumber 
       })),
-      format(dateRange.from, 'yyyy-MM-dd'),
-      format(dateRange.to, 'yyyy-MM-dd')
+      format(startDate, 'yyyy-MM-dd'),
+      format(endDate, 'yyyy-MM-dd')
     );
   };
 
   const previewPrice = calculatePreviewPrice();
-  const rentalDays = dateRange?.from && dateRange?.to 
-    ? differenceInDays(dateRange.to, dateRange.from) + 1 
+  const rentalDays = startDate && endDate 
+    ? differenceInDays(endDate, startDate) + 1 
     : 0;
 
   // Submit
@@ -401,7 +398,7 @@ export function NewRentalDialog({
       return;
     }
 
-    if (!dateRange?.from || !dateRange?.to) {
+    if (!startDate || !endDate) {
       toast({
         title: 'שגיאה',
         description: 'יש לבחור תאריכי השכרה',
@@ -424,8 +421,8 @@ export function NewRentalDialog({
 
     const pricing = calculateRentalPrice(
       selectedItems.map(i => ({ category: i.category, hasIsraeliNumber: i.hasIsraeliNumber })),
-      format(dateRange.from, 'yyyy-MM-dd'),
-      format(dateRange.to, 'yyyy-MM-dd')
+      format(startDate, 'yyyy-MM-dd'),
+      format(endDate, 'yyyy-MM-dd')
     );
 
     const rentalItems: RentalItem[] = selectedItems.map(item => ({
@@ -440,8 +437,8 @@ export function NewRentalDialog({
       customerId: customer.id,
       customerName: customer.name,
       items: rentalItems,
-      startDate: format(dateRange.from, 'yyyy-MM-dd'),
-      endDate: format(dateRange.to, 'yyyy-MM-dd'),
+      startDate: format(startDate, 'yyyy-MM-dd'),
+      endDate: format(endDate, 'yyyy-MM-dd'),
       totalPrice: pricing.total,
       currency: pricing.currency,
       status: 'active',
@@ -545,57 +542,45 @@ export function NewRentalDialog({
                 </div>
               </div>
 
-              {/* Date Selection with Visual Calendar */}
+              {/* Date Selection with Dual Hebrew Calendar */}
               <div className="space-y-3 p-4 sm:p-5 rounded-xl sm:rounded-2xl border bg-card shadow-sm">
                 <Label className="flex items-center gap-2 text-sm sm:text-base font-semibold">
                   <CalendarIcon className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                   תאריכי השכרה
                 </Label>
                 
-                <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-right h-12 text-base",
-                        !dateRange?.from && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="ml-2 h-5 w-5" />
-                      {dateRange?.from ? (
-                        dateRange.to ? (
-                          <>
-                            {format(dateRange.from, "dd/MM/yyyy", { locale: he })} - {format(dateRange.to, "dd/MM/yyyy", { locale: he })}
-                            <span className="mr-auto text-primary font-medium">
-                              ({rentalDays} ימים)
-                            </span>
-                          </>
-                        ) : (
-                          format(dateRange.from, "dd/MM/yyyy", { locale: he })
-                        )
-                      ) : (
-                        <span>בחר טווח תאריכים</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      initialFocus
-                      mode="range"
-                      defaultMonth={dateRange?.from}
-                      selected={dateRange}
-                      onSelect={setDateRange}
-                      numberOfMonths={typeof window !== 'undefined' && window.innerWidth < 640 ? 1 : 2}
-                      locale={he}
-                      dir="rtl"
-                      className={cn("p-2 sm:p-3 pointer-events-auto")}
-                    />
-                  </PopoverContent>
-                </Popover>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-right h-12 text-base",
+                    !startDate && "text-muted-foreground"
+                  )}
+                  onClick={() => setIsDatePickerOpen(true)}
+                >
+                  <CalendarIcon className="ml-2 h-5 w-5" />
+                  {startDate ? (
+                    endDate ? (
+                      <>
+                        {format(startDate, "dd/MM/yyyy", { locale: he })} - {format(endDate, "dd/MM/yyyy", { locale: he })}
+                        <span className="mr-auto text-primary font-medium">
+                          ({rentalDays} ימים)
+                        </span>
+                      </>
+                    ) : (
+                      format(startDate, "dd/MM/yyyy", { locale: he })
+                    )
+                  ) : (
+                    <span>בחר טווח תאריכים</span>
+                  )}
+                </Button>
 
-                {/* Duration display */}
-                {rentalDays > 0 && (
-                  <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
+                {/* Hebrew date display */}
+                {startDate && endDate && (
+                  <div className="p-3 rounded-lg bg-primary/10 border border-primary/20 space-y-1">
+                    <p className="text-xs text-muted-foreground text-center">
+                      {getFullHebrewDate(startDate)} - {getFullHebrewDate(endDate)}
+                    </p>
                     <p className="text-sm text-center">
                       <span className="text-muted-foreground">משך השכרה: </span>
                       <span className="font-bold text-primary text-lg">{rentalDays}</span>
@@ -603,6 +588,17 @@ export function NewRentalDialog({
                     </p>
                   </div>
                 )}
+
+                <DateRangePicker
+                  isOpen={isDatePickerOpen}
+                  onOpenChange={setIsDatePickerOpen}
+                  startDate={startDate}
+                  endDate={endDate}
+                  onSelect={(start, end) => {
+                    setStartDate(start);
+                    setEndDate(end);
+                  }}
+                />
               </div>
 
               {/* Selected Items Summary */}

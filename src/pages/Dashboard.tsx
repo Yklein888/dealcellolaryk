@@ -7,11 +7,16 @@ import { QuickActions } from '@/components/QuickActions';
 import { PriceCalculator } from '@/components/PriceCalculator';
 import { NotificationSettings } from '@/components/NotificationSettings';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { useToast } from '@/hooks/use-toast';
+import { BarcodeScanner } from '@/components/BarcodeScanner';
+import { QuickActionDialog } from '@/components/inventory/QuickActionDialog';
+import { InventoryItem } from '@/types/rental';
 import { 
   Search,
   Plus,
   Calculator,
   Activity,
+  ScanLine,
 } from 'lucide-react';
 import { format, parseISO, isBefore, differenceInDays } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -31,7 +36,26 @@ export default function Dashboard() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isQuickActionsOpen, setIsQuickActionsOpen] = useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [selectedInventoryItem, setSelectedInventoryItem] = useState<InventoryItem | null>(null);
+  const [isQuickActionDialogOpen, setIsQuickActionDialogOpen] = useState(false);
   const { isSubscribed, notifyRentalDue, isSupported } = usePushNotifications();
+  const { toast } = useToast();
+
+  // Handle barcode scan result
+  const handleBarcodeScan = (barcode: string) => {
+    const item = inventory.find(i => i.barcode === barcode);
+    if (item) {
+      setSelectedInventoryItem(item);
+      setIsQuickActionDialogOpen(true);
+    } else {
+      toast({
+        title: 'לא נמצא',
+        description: `לא נמצא מוצר עם ברקוד: ${barcode}`,
+        variant: 'destructive',
+      });
+    }
+  };
 
   // Check for rentals due soon and send notifications
   useEffect(() => {
@@ -98,6 +122,14 @@ export default function Dashboard() {
           </Button>
           <Button 
             variant="outline" 
+            onClick={() => setIsScannerOpen(true)}
+            className="gap-2"
+          >
+            <ScanLine className="h-4 w-4" />
+            <span className="hidden sm:inline">סרוק</span>
+          </Button>
+          <Button 
+            variant="outline" 
             onClick={() => setIsCalculatorOpen(true)}
             className="gap-2"
           >
@@ -152,6 +184,21 @@ export default function Dashboard() {
       <GlobalSearch isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
       <QuickActions isOpen={isQuickActionsOpen} onClose={() => setIsQuickActionsOpen(false)} />
       <PriceCalculator isOpen={isCalculatorOpen} onClose={() => setIsCalculatorOpen(false)} />
+      <BarcodeScanner 
+        isOpen={isScannerOpen} 
+        onClose={() => setIsScannerOpen(false)} 
+        onScan={handleBarcodeScan}
+      />
+      {selectedInventoryItem && (
+        <QuickActionDialog
+          isOpen={isQuickActionDialogOpen}
+          onClose={() => {
+            setIsQuickActionDialogOpen(false);
+            setSelectedInventoryItem(null);
+          }}
+          item={selectedInventoryItem}
+        />
+      )}
     </div>
   );
 }
