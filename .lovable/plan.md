@@ -1,179 +1,391 @@
 
-
-# תוכנית לשיפורים במערכת השכרות
+# תוכנית שיפורים מקיפה למערכת
 
 ## סיכום הבקשות
 
-1. **דילוג על שבתות וחגי ישראל** - החיוב האוטומטי והשיחות האוטומטיות לא יופעלו בימי שבת וחגי ישראל
-2. **קטגוריות סינון בהשכרות** - הוספת כפתורי סטטוס מהירים כמו בעמוד התיקונים (פעיל, באיחור, הוחזר)
-3. **הצגת כמות פריטים ללקוח** - הוספת מספר הפריטים המושכרים בכל כרטיס השכרה
-4. **הורדת הוראות חיוג לכל סים** - כשיש כמה סימים אירופאיים בהשכרה, אפשרות להוריד הוראות לכל אחד בנפרד
+1. **התקשרות רק ללקוחות עם סימים** - להתקשר ללקוחות רק כאשר הם לקחו סים (לא רק מכשיר)
+2. **חובת מספר סים בהוספת מלאי** - לא לאפשר הוספת סים ללא מספר סים (ICCID), עם אפשרות לערוך
+3. **שיפור החיפוש הגלובלי** - הצגת סטטוס המוצר בתוצאות + ניווט ישיר לפעולות מהירות
+4. **הארכת השכרה בלחיצה** - כפתור מהיר להארכת השכרה
+5. **ברקוד אוטומטי למוצרים** - כל מוצר מקבל ברקוד וניתן לסרוק אותו לניווט מהיר
 
 ---
 
-## פתרון 1: דילוג על שבתות וחגי ישראל
+## פתרון 1: התקשרות רק ללקוחות עם סימים
 
-### גישה
-שימוש ב-**Hebcal REST API** (חינמי, ללא צורך ב-API key) לבדיקת האם היום הוא שבת או חג ישראלי.
+### קובץ: `supabase/functions/process-overdue-calls/index.ts`
 
-### שינויים ב-Edge Functions
+נוסיף בדיקה של פריטי ההשכרה לפני ביצוע שיחה:
 
-**קובץ: `supabase/functions/process-overdue-charges/index.ts`**
-- הוספת פונקציה `isShabbatOrHoliday()` שמבצעת קריאה ל-Hebcal API
-- בדיקה בתחילת הפונקציה ודילוג אם מדובר בשבת או חג
-
-**קובץ: `supabase/functions/process-overdue-calls/index.ts`**
-- אותו שינוי - בדיקת שבת/חג לפני ביצוע שיחות
-
-### לוגיקת הבדיקה
 ```typescript
-async function isShabbatOrHoliday(): Promise<boolean> {
-  // בדיקה אם היום שבת
-  const today = new Date();
-  const dayOfWeek = today.getDay();
-  if (dayOfWeek === 6) return true; // שבת
-  
-  // בדיקת חגים דרך Hebcal API
-  const dateStr = today.toISOString().split('T')[0];
-  const response = await fetch(
-    `https://www.hebcal.com/hebcal?v=1&cfg=json&maj=on&min=off&mod=off&start=${dateStr}&end=${dateStr}&geo=none`
-  );
-  const data = await response.json();
-  
-  // בדיקה אם יש יום טוב
-  return data.items?.some(item => 
-    item.yomtov === true || item.category === 'holiday'
-  ) ?? false;
+// Check if rental includes at least one SIM card
+const { data: rentalItems, error: itemsError } = await supabase
+  .from('rental_items')
+  .select('item_category')
+  .eq('rental_id', rental.id);
+
+if (itemsError) {
+  console.error(`Error fetching rental items for ${rental.id}:`, itemsError);
+  continue;
+}
+
+const hasSim = rentalItems?.some(item => 
+  item.item_category === 'sim_european' || item.item_category === 'sim_american'
+);
+
+if (!hasSim) {
+  console.log(`Rental ${rental.id} has no SIM cards, skipping call`);
+  results.push({ rentalId: rental.id, success: true, error: 'No SIM cards in rental' });
+  continue;
 }
 ```
 
-**חגים שייכללו:**
-- ראש השנה (2 ימים)
-- יום כיפור
-- סוכות (2 ימים ראשונים)
-- שמחת תורה
-- פסח (2 ימים ראשונים + 2 אחרונים)
-- שבועות (2 ימים)
-
 ---
 
-## פתרון 2: כפתורי סטטוס מהירים בהשכרות
+## פתרון 2: חובת מספר סים בהוספת מלאי
 
-### שינויים בקובץ: `src/pages/Rentals.tsx`
+### קובץ: `src/pages/Inventory.tsx`
 
-הוספת גריד כפתורי סטטוס לפני הפילטרים (כמו בעמוד התיקונים):
+**שינויים:**
+1. הוספת ולידציה ב-`handleSubmit` - בדיקה שמספר סים מוזן לקטגוריות סים
+2. הוספת אינדיקציה ויזואלית לשדה חובה
 
 ```tsx
-{/* Status Quick Access */}
-<div className="grid grid-cols-3 gap-3 mb-6">
-  <button
-    onClick={() => setFilterStatus('active')}
-    className={`stat-card p-4 text-center transition-all hover:border-primary/50 cursor-pointer ${filterStatus === 'active' ? 'border-primary bg-primary/10' : ''}`}
-  >
-    <div className="flex items-center justify-center gap-2 mb-1">
-      <ShoppingCart className="h-5 w-5 text-primary" />
-      <span className="text-2xl font-bold text-primary">
-        {rentals.filter(r => r.status === 'active').length}
-      </span>
-    </div>
-    <p className="text-sm text-muted-foreground">פעילות</p>
-  </button>
-  
-  <button
-    onClick={() => setFilterStatus('overdue')}
-    className={`stat-card p-4 text-center transition-all hover:border-destructive/50 cursor-pointer ${filterStatus === 'overdue' ? 'border-destructive bg-destructive/10' : ''}`}
-  >
-    <div className="flex items-center justify-center gap-2 mb-1">
-      <AlertTriangle className="h-5 w-5 text-destructive" />
-      <span className="text-2xl font-bold text-destructive">
-        {rentals.filter(r => {
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const endDate = parseISO(r.endDate);
-          return r.status === 'active' && isBefore(endDate, today);
-        }).length}
-      </span>
-    </div>
-    <p className="text-sm text-muted-foreground">באיחור</p>
-  </button>
-  
-  <button
-    onClick={() => setFilterStatus('returned')}
-    className={`stat-card p-4 text-center transition-all hover:border-success/50 cursor-pointer ${filterStatus === 'returned' ? 'border-success bg-success/10' : ''}`}
-  >
-    <div className="flex items-center justify-center gap-2 mb-1">
-      <CheckCircle className="h-5 w-5 text-success" />
-      <span className="text-2xl font-bold text-success">
-        {rentals.filter(r => r.status === 'returned').length}
-      </span>
-    </div>
-    <p className="text-sm text-muted-foreground">הוחזרו</p>
-  </button>
-</div>
+const handleSubmit = () => {
+  if (!formData.name) {
+    toast({
+      title: 'שגיאה',
+      description: 'יש להזין שם לפריט',
+      variant: 'destructive',
+    });
+    return;
+  }
+
+  // Validate SIM number for SIM categories
+  if (isSim(formData.category) && !formData.simNumber) {
+    toast({
+      title: 'שגיאה',
+      description: 'יש להזין מספר סים (ICCID) לפריט מסוג סים',
+      variant: 'destructive',
+    });
+    return;
+  }
+
+  // ... rest of submit logic
+};
 ```
 
----
-
-## פתרון 3: הצגת כמות פריטים בכרטיס השכרה
-
-### שינויים בקובץ: `src/pages/Rentals.tsx`
-
-הוספת תצוגת מספר פריטים ליד שם הלקוח בכרטיס ההשכרה:
-
+**עדכון ה-Label של שדה מספר סים:**
 ```tsx
-{/* Customer + Item Count */}
-<div className="flex items-center gap-3 mb-3">
-  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20 shrink-0">
-    <User className="h-5 w-5 text-primary" />
-  </div>
-  <div className="flex-1 min-w-0">
-    <p className="font-bold text-base text-foreground truncate">{rental.customerName}</p>
-    <p className="text-xs text-muted-foreground">
-      {rental.items.length} פריטים
-    </p>
-  </div>
-</div>
+<Label>
+  מספר סים (ICCID) <span className="text-destructive">*</span>
+</Label>
 ```
 
+**הערה:** עריכה כבר נתמכת דרך `handleEdit` שממלא את הטופס עם כל הנתונים הקיימים.
+
 ---
 
-## פתרון 4: הורדת הוראות חיוג לכל סים אירופאי
+## פתרון 3: שיפור החיפוש הגלובלי
 
-### שינויים בקובץ: `src/pages/Rentals.tsx`
+### קובץ: `src/components/GlobalSearch.tsx`
 
-עדכון לוגיקת הצגת הסימים כך שבמקום להציג רק סים אחד, יוצגו כל הסימים האירופאיים עם כפתור הורדה לכל אחד:
+**שינויים:**
 
+1. **הוספת סטטוס לממשק התוצאות:**
+```typescript
+interface SearchResult {
+  type: 'customer' | 'inventory' | 'rental' | 'repair';
+  id: string;
+  title: string;
+  subtitle: string;
+  status?: string;  // סטטוס הפריט
+  statusVariant?: 'success' | 'warning' | 'destructive' | 'info';
+  icon: React.ReactNode;
+  link: string;
+  // New: action data for quick actions
+  actionData?: {
+    itemId?: string;
+    inventoryItem?: InventoryItem;
+    rental?: Rental;
+  };
+}
+```
+
+2. **הצגת סטטוס בתוצאות חיפוש מלאי:**
 ```tsx
-{/* Multiple European SIMs support */}
-{rental.items
-  .filter(item => item.itemCategory === 'sim_european' && !item.isGeneric && item.inventoryItemId)
-  .map((simItem, idx) => {
-    const inventoryItem = inventory.find(i => i.id === simItem.inventoryItemId);
-    const itemId = `rental-${rental.id}-sim-${idx}`;
+// Search inventory with status
+inventory.forEach(item => {
+  if (matchesSearch) {
+    const statusLabels = { available: 'זמין', rented: 'מושכר', maintenance: 'בתחזוקה' };
+    const statusVariants = { available: 'success', rented: 'info', maintenance: 'warning' };
     
-    return (
-      <div key={idx} className="mb-3 space-y-2">
-        {/* Phone Numbers Display */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-lg p-3 border border-blue-200/50 dark:border-blue-800/50">
-          <div className="text-center space-y-1">
-            {/* Numbers display... */}
-          </div>
-        </div>
-        
-        {/* Download Button for this specific SIM */}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => handleDownloadInstructions(itemId, inventoryItem?.israeliNumber, inventoryItem?.localNumber)}
-          disabled={downloadingInstructions === itemId}
-          className="w-full"
-        >
-          {downloadingInstructions === itemId ? <Loader2 className="animate-spin" /> : <FileDown />}
-          הורד הוראות - {simItem.itemName}
-        </Button>
+    searchResults.push({
+      type: 'inventory',
+      id: item.id,
+      title: item.name,
+      subtitle: `${categoryIcons[item.category]} ${categoryLabels[item.category]}`,
+      status: statusLabels[item.status],
+      statusVariant: statusVariants[item.status],
+      icon: <Package className="h-4 w-4" />,
+      link: '/inventory',
+      actionData: { inventoryItem: item },
+    });
+  }
+});
+```
+
+3. **דיאלוג פעולות מהירות בלחיצה על תוצאה:**
+
+במקום ניווט ישיר לדף, נפתח דיאלוג פעולות מהירות:
+
+```tsx
+const [selectedItem, setSelectedItem] = useState<SearchResult | null>(null);
+const [quickActionDialogOpen, setQuickActionDialogOpen] = useState(false);
+
+const handleSelect = (result: SearchResult) => {
+  if (result.type === 'inventory' && result.actionData?.inventoryItem) {
+    setSelectedItem(result);
+    setQuickActionDialogOpen(true);
+  } else {
+    navigate(result.link);
+    onClose();
+  }
+};
+```
+
+**דיאלוג פעולות מהירות למוצר:**
+- צפייה בפרטים מלאים
+- עריכת המוצר
+- הוספה להשכרה חדשה (אם זמין)
+- ניווט לדף מלאי
+
+---
+
+## פתרון 4: הארכת השכרה בלחיצה
+
+### קובץ: `src/pages/Rentals.tsx`
+
+**הוספת דיאלוג הארכה:**
+
+```tsx
+const [extendDialogOpen, setExtendDialogOpen] = useState(false);
+const [extendingRental, setExtendingRental] = useState<Rental | null>(null);
+const [extendDays, setExtendDays] = useState(7); // ברירת מחדל: שבוע
+
+// Open extend dialog
+const openExtendDialog = (rental: Rental) => {
+  setExtendingRental(rental);
+  setExtendDays(7);
+  setExtendDialogOpen(true);
+};
+
+// Handle extend rental
+const handleExtendRental = async () => {
+  if (!extendingRental) return;
+
+  const currentEndDate = parseISO(extendingRental.endDate);
+  const newEndDate = addDays(currentEndDate, extendDays);
+
+  try {
+    const { error } = await supabase
+      .from('rentals')
+      .update({
+        end_date: format(newEndDate, 'yyyy-MM-dd'),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', extendingRental.id);
+
+    if (error) throw error;
+
+    toast({
+      title: 'ההשכרה הוארכה',
+      description: `תאריך ההחזרה החדש: ${format(newEndDate, 'dd/MM/yyyy', { locale: he })}`,
+    });
+    setExtendDialogOpen(false);
+    window.location.reload();
+  } catch (error) {
+    toast({
+      title: 'שגיאה',
+      description: 'לא ניתן להאריך את ההשכרה',
+      variant: 'destructive',
+    });
+  }
+};
+```
+
+**כפתור הארכה בכרטיס ההשכרה:**
+```tsx
+<Button
+  variant="outline"
+  size="sm"
+  onClick={() => openExtendDialog(rental)}
+>
+  <Calendar className="h-4 w-4" />
+  הארכה
+</Button>
+```
+
+**דיאלוג הארכה:**
+```tsx
+<Dialog open={extendDialogOpen} onOpenChange={setExtendDialogOpen}>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>הארכת השכרה</DialogTitle>
+    </DialogHeader>
+    <div className="space-y-4">
+      <p>תאריך החזרה נוכחי: {extendingRental?.endDate}</p>
+      <div className="grid grid-cols-4 gap-2">
+        {[3, 7, 14, 30].map(days => (
+          <Button
+            key={days}
+            variant={extendDays === days ? 'default' : 'outline'}
+            onClick={() => setExtendDays(days)}
+          >
+            {days} ימים
+          </Button>
+        ))}
       </div>
-    );
-  })}
+      <Button onClick={handleExtendRental} className="w-full">
+        הארך ל-{extendDays} ימים נוספים
+      </Button>
+    </div>
+  </DialogContent>
+</Dialog>
+```
+
+---
+
+## פתרון 5: ברקוד אוטומטי למוצרים
+
+### גישה טכנית
+
+נשתמש בספריית **JsBarcode** (קלה ופשוטה) ליצירת ברקודים מסוג Code 128. לסריקה נשתמש ב-**html5-qrcode**.
+
+### שינויים נדרשים:
+
+**1. הוספת dependencies:**
+```bash
+npm install jsbarcode html5-qrcode
+```
+
+**2. קובץ חדש: `src/components/BarcodeScanner.tsx`**
+
+```tsx
+import { useEffect, useRef, useState } from 'react';
+import { Html5Qrcode } from 'html5-qrcode';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Camera, X } from 'lucide-react';
+
+interface BarcodeScannerProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onScan: (barcodeId: string) => void;
+}
+
+export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps) {
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      scannerRef.current = new Html5Qrcode('scanner');
+      scannerRef.current.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: 250 },
+        (decodedText) => {
+          onScan(decodedText);
+          onClose();
+        },
+        () => {}
+      );
+    }
+
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.stop().catch(() => {});
+      }
+    };
+  }, [isOpen]);
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>סרוק ברקוד מוצר</DialogTitle>
+        </DialogHeader>
+        <div id="scanner" className="w-full aspect-square" />
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+**3. עדכון טבלת inventory:**
+
+```sql
+-- Add barcode column
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS barcode TEXT UNIQUE;
+```
+
+**4. יצירת ברקוד אוטומטית בהוספת מוצר:**
+
+הברקוד ייוצר אוטומטית מ-prefix + ID קצר:
+```typescript
+// Format: INV-{first 8 chars of UUID}
+const generateBarcode = (itemId: string): string => {
+  return `INV-${itemId.substring(0, 8).toUpperCase()}`;
+};
+```
+
+**5. קומפוננט הצגת ברקוד:**
+
+```tsx
+import JsBarcode from 'jsbarcode';
+
+function BarcodeDisplay({ code }: { code: string }) {
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  useEffect(() => {
+    if (svgRef.current) {
+      JsBarcode(svgRef.current, code, {
+        format: 'CODE128',
+        width: 2,
+        height: 60,
+        displayValue: true,
+      });
+    }
+  }, [code]);
+
+  return <svg ref={svgRef} />;
+}
+```
+
+**6. כפתור סריקה בדאשבורד:**
+
+```tsx
+<Button onClick={() => setScannerOpen(true)}>
+  <Camera className="h-4 w-4" />
+  סרוק ברקוד
+</Button>
+```
+
+**7. לוגיקת מציאת מוצר לפי ברקוד:**
+
+```typescript
+const handleBarcodeScan = (barcode: string) => {
+  const item = inventory.find(i => i.barcode === barcode);
+  if (item) {
+    // Open quick action dialog for this item
+    openQuickActionDialog(item);
+  } else {
+    toast({
+      title: 'לא נמצא',
+      description: 'לא נמצא מוצר עם ברקוד זה',
+      variant: 'destructive',
+    });
+  }
+};
 ```
 
 ---
@@ -182,13 +394,33 @@ async function isShabbatOrHoliday(): Promise<boolean> {
 
 | קובץ | שינוי |
 |------|-------|
-| `supabase/functions/process-overdue-charges/index.ts` | בדיקת שבת/חג לפני חיוב |
-| `supabase/functions/process-overdue-calls/index.ts` | בדיקת שבת/חג לפני שיחות |
-| `src/pages/Rentals.tsx` | כפתורי סטטוס, כמות פריטים, הורדת הוראות לכל סים |
+| `supabase/functions/process-overdue-calls/index.ts` | בדיקת סימים לפני התקשרות |
+| `src/pages/Inventory.tsx` | ולידציית מספר סים + הצגת ברקוד |
+| `src/components/GlobalSearch.tsx` | הצגת סטטוס + דיאלוג פעולות מהירות |
+| `src/pages/Rentals.tsx` | כפתור הארכת השכרה + דיאלוג |
+| `src/types/rental.ts` | הוספת שדה barcode לממשק InventoryItem |
+| `src/hooks/useRental.tsx` | טעינת barcode ממסד הנתונים |
+| `src/components/BarcodeScanner.tsx` | **קובץ חדש** - סורק ברקודים |
+| `src/components/BarcodeDisplay.tsx` | **קובץ חדש** - הצגת ברקוד |
+| Migration | הוספת עמודת barcode לטבלת inventory |
 
-## הערות
+## Dependencies חדשות
 
-- Hebcal API הוא שירות חינמי ואמין שמספק מידע על חגי ישראל
-- בדיקת יום שבת נעשית לפי יום בשבוע (שבת = 6 ב-JavaScript)
-- הפונקציות ישמרו לוג כשהן מדלגות על פעולה בגלל שבת/חג
+```json
+{
+  "jsbarcode": "^3.11.6",
+  "html5-qrcode": "^2.3.8"
+}
+```
 
+---
+
+## תזרים העבודה המתוכנן
+
+1. הוספת migration לעמודת barcode
+2. התקנת ספריות ברקוד
+3. עדכון Edge Function להתקשרות עם סימים בלבד
+4. עדכון דף המלאי עם ולידציה + ברקוד
+5. עדכון החיפוש הגלובלי
+6. הוספת כפתור הארכת השכרה
+7. יצירת קומפוננטות סריקה והצגת ברקוד
