@@ -45,6 +45,7 @@ export default function Customers() {
     notes: '',
     creditCard: '',
     creditCardExpiry: '',
+    cvv: '',
   });
 
   const filteredCustomers = customers.filter(customer => 
@@ -62,6 +63,7 @@ export default function Customers() {
       notes: '',
       creditCard: '',
       creditCardExpiry: '',
+      cvv: '',
     });
     setEditingCustomer(null);
   };
@@ -129,7 +131,7 @@ export default function Customers() {
                 description: 'שמירת כרטיס אשראי',
                 creditCard: formData.creditCard,
                 creditCardExpiry: formData.creditCardExpiry,
-                cvv: '000', // Placeholder - Pelecard may require this for tokenization
+                cvv: formData.cvv,
                 saveTokenOnly: true, // Custom flag to indicate token-only operation
                 transactionId: `token-${targetCustomerId}-${Date.now()}`,
               },
@@ -178,6 +180,7 @@ export default function Customers() {
       notes: customer.notes || '',
       creditCard: '',
       creditCardExpiry: customer.paymentTokenExpiry || '',
+      cvv: '',
     });
     setIsAddDialogOpen(true);
   };
@@ -267,14 +270,15 @@ export default function Customers() {
                   <CreditCard className="h-4 w-4" />
                   כרטיס אשראי (אופציונלי)
                 </Label>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-2 col-span-2">
                     <Label className="text-xs">מספר כרטיס</Label>
                     <Input
                       value={formData.creditCard}
                       onChange={(e) => setFormData({ ...formData, creditCard: e.target.value })}
                       placeholder="1234567890123456"
                       maxLength={16}
+                      inputMode="numeric"
                     />
                   </div>
                   <div className="space-y-2">
@@ -284,6 +288,18 @@ export default function Customers() {
                       onChange={(e) => setFormData({ ...formData, creditCardExpiry: e.target.value })}
                       placeholder="0126"
                       maxLength={4}
+                      inputMode="numeric"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">CVV</Label>
+                    <Input
+                      type="password"
+                      value={formData.cvv}
+                      onChange={(e) => setFormData({ ...formData, cvv: e.target.value })}
+                      placeholder="***"
+                      maxLength={4}
+                      inputMode="numeric"
                     />
                   </div>
                 </div>
