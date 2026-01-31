@@ -23,7 +23,8 @@ import {
   Plus, 
   Search, 
   Package,
-  Upload
+  Upload,
+  Printer
 } from 'lucide-react';
 import { 
   InventoryItem, 
@@ -34,6 +35,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { ImportDialog } from '@/components/inventory/ImportDialog';
 import { InventoryCategorySection } from '@/components/inventory/InventoryCategorySection';
+import { BarcodePrintDialog } from '@/components/inventory/BarcodePrintDialog';
 
 export default function Inventory() {
   const { inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem } = useRental();
@@ -44,6 +46,7 @@ export default function Inventory() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
 
   // Read URL params on mount
@@ -182,6 +185,10 @@ export default function Inventory() {
         description="הוספה, עריכה ומעקב אחר פריטים במלאי"
       >
         <div className="flex gap-2">
+          <Button variant="outline" size="lg" onClick={() => setIsPrintDialogOpen(true)}>
+            <Printer className="h-5 w-5" />
+            הדפס ברקודים
+          </Button>
           <Button variant="outline" size="lg" onClick={() => setIsImportDialogOpen(true)}>
             <Upload className="h-5 w-5" />
             ייבוא מקובץ
@@ -323,6 +330,12 @@ export default function Inventory() {
       <ImportDialog 
         isOpen={isImportDialogOpen} 
         onClose={() => setIsImportDialogOpen(false)} 
+      />
+
+      <BarcodePrintDialog
+        isOpen={isPrintDialogOpen}
+        onClose={() => setIsPrintDialogOpen(false)}
+        items={inventory}
       />
 
       {/* Filters */}
