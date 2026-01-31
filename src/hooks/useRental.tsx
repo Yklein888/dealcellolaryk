@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, useRef, createContext, useContext, ReactNode, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Customer, 
@@ -38,57 +38,78 @@ interface RentalContextType {
 
 const RentalContext = createContext<RentalContextType | undefined>(undefined);
 
+// Cache keys for all data types
+const CACHE_KEYS = {
+  customers: 'dealcell_cache_customers_v1',
+  inventory: 'dealcell_cache_inventory_v1',
+  rentals: 'dealcell_cache_rentals_v1',
+  repairs: 'dealcell_cache_repairs_v1',
+};
+
+// Generic cache functions
+const loadCachedData = <T,>(key: string): T[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as T[]) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveToCache = <T,>(key: string, data: T[]) => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(data));
+  } catch {
+    // Ignore storage quota / private mode errors
+  }
+};
+
 export function RentalProvider({ children }: { children: ReactNode }) {
-  const [customers, setCustomers] = useState<Customer[]>([]);
-
-  // Cache inventory locally so a transient network issue won't make inventory “disappear” on refresh.
-  const INVENTORY_CACHE_KEY = 'dealcell_cache_inventory_v1';
-  const loadCachedInventory = (): InventoryItem[] => {
-    if (typeof window === 'undefined') return [];
-    try {
-      const raw = window.localStorage.getItem(INVENTORY_CACHE_KEY);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? (parsed as InventoryItem[]) : [];
-    } catch {
-      return [];
-    }
-  };
-  const saveCachedInventory = (items: InventoryItem[]) => {
-    if (typeof window === 'undefined') return;
-    try {
-      window.localStorage.setItem(INVENTORY_CACHE_KEY, JSON.stringify(items));
-    } catch {
-      // Ignore storage quota / private mode errors
-    }
-  };
-
-  const [inventory, setInventory] = useState<InventoryItem[]>(() => loadCachedInventory());
-  const [rentals, setRentals] = useState<Rental[]>([]);
-  const [repairs, setRepairs] = useState<Repair[]>([]);
+  // Initialize all states from cache for instant display
+  const [customers, setCustomers] = useState<Customer[]>(() => loadCachedData<Customer>(CACHE_KEYS.customers));
+  const [inventory, setInventory] = useState<InventoryItem[]>(() => loadCachedData<InventoryItem>(CACHE_KEYS.inventory));
+  const [rentals, setRentals] = useState<Rental[]>(() => loadCachedData<Rental>(CACHE_KEYS.rentals));
+  const [repairs, setRepairs] = useState<Repair[]>(() => loadCachedData<Repair>(CACHE_KEYS.repairs));
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  
+  // Background retry state
+  const backgroundRetryRef = useRef(0);
+  const backgroundRetryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Save functions that also update cache
+  const saveCustomers = useCallback((data: Customer[]) => {
+    setCustomers(data);
+    saveToCache(CACHE_KEYS.customers, data);
+  }, []);
+
+  const saveInventory = useCallback((data: InventoryItem[]) => {
+    setInventory(data);
+    saveToCache(CACHE_KEYS.inventory, data);
+  }, []);
+
+  const saveRentals = useCallback((data: Rental[]) => {
+    setRentals(data);
+    saveToCache(CACHE_KEYS.rentals, data);
+  }, []);
+
+  const saveRepairs = useCallback((data: Repair[]) => {
+    setRepairs(data);
+    saveToCache(CACHE_KEYS.repairs, data);
+  }, []);
 
   // Fetch all data from database with retry logic.
   // IMPORTANT: one failed table fetch should NOT block the others (e.g. inventory failure shouldn't hide customers).
-  const fetchData = async (retryCount = 0) => {
+  const fetchData = async (retryCount = 0, isBackgroundRetry = false) => {
     const maxRetries = 3;
 
     const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
     type QueryResult<T> = { data: T[] | null; error: unknown | null };
-
-    const fetchWithTimeout = async <T,>(
-      queryBuilder: { then: (resolve: (value: T) => void) => PromiseLike<T> },
-      timeoutMs = 15000
-    ): Promise<T> => {
-      return Promise.race([
-        Promise.resolve().then(() => queryBuilder as unknown as Promise<T>),
-        new Promise<T>((_, reject) =>
-          setTimeout(() => reject(new Error('Request timeout')), timeoutMs)
-        ),
-      ]);
-    };
 
     const runFetchesOnce = async () => {
       const results = await Promise.allSettled([
@@ -110,7 +131,10 @@ export function RentalProvider({ children }: { children: ReactNode }) {
     };
 
     try {
-      setLoading(true);
+      // Only show loading on initial load, not background retries
+      if (!isBackgroundRetry) {
+        setLoading(true);
+      }
 
       const res = await runFetchesOnce();
 
@@ -120,14 +144,14 @@ export function RentalProvider({ children }: { children: ReactNode }) {
           (String((r as PromiseRejectedResult).reason).toLowerCase().includes('failed to fetch') ||
            String((r as PromiseRejectedResult).reason).toLowerCase().includes('timeout'))
       );
-      if (hasNetworkFailure && retryCount < maxRetries) {
+      if (hasNetworkFailure && retryCount < maxRetries && !isBackgroundRetry) {
         // Exponential backoff: 1.5s, 3s, 4.5s
         await sleep(1500 * (retryCount + 1));
-        return fetchData(retryCount + 1);
+        return fetchData(retryCount + 1, isBackgroundRetry);
       }
 
       const failedParts: string[] = [];
-      let inventoryFailed = false;
+      let anyDataFetched = false;
 
       // Customers
       if (res.customers.status === 'fulfilled') {
@@ -135,6 +159,7 @@ export function RentalProvider({ children }: { children: ReactNode }) {
         if (error) {
           failedParts.push('לקוחות');
         } else {
+          anyDataFetched = true;
           const customerData = (data || []).map((c) => ({
             id: c.id,
             name: c.name,
@@ -147,7 +172,7 @@ export function RentalProvider({ children }: { children: ReactNode }) {
             paymentTokenLast4: c.payment_token_last4 || undefined,
             paymentTokenExpiry: c.payment_token_expiry || undefined,
           }));
-          setCustomers(customerData);
+          saveCustomers(customerData);
         }
       } else {
         failedParts.push('לקוחות');
@@ -157,9 +182,9 @@ export function RentalProvider({ children }: { children: ReactNode }) {
       if (res.inventory.status === 'fulfilled') {
         const { data, error } = res.inventory.value as QueryResult<any>;
         if (error) {
-          inventoryFailed = true;
           failedParts.push('מלאי');
         } else {
+          anyDataFetched = true;
           const nextInventory = (data || []).map((i) => ({
             id: i.id,
             category: i.category as ItemCategory,
@@ -172,11 +197,9 @@ export function RentalProvider({ children }: { children: ReactNode }) {
             notes: i.notes || undefined,
             barcode: i.barcode || undefined,
           }));
-          setInventory(nextInventory);
-          saveCachedInventory(nextInventory);
+          saveInventory(nextInventory);
         }
       } else {
-        inventoryFailed = true;
         failedParts.push('מלאי');
       }
 
@@ -190,6 +213,7 @@ export function RentalProvider({ children }: { children: ReactNode }) {
         } else {
           rentalsData = data;
           rentalsOk = true;
+          anyDataFetched = true;
         }
       } else {
         failedParts.push('השכרות');
@@ -214,32 +238,31 @@ export function RentalProvider({ children }: { children: ReactNode }) {
           itemsByRental[item.rental_id].push(item);
         });
 
-        setRentals(
-          (rentalsData || []).map((r) => ({
-            id: r.id,
-            customerId: r.customer_id || '',
-            customerName: r.customer_name,
-            items: (itemsByRental[r.id] || []).map((item) => ({
-              inventoryItemId: item.inventory_item_id || '',
-              itemCategory: item.item_category as ItemCategory,
-              itemName: item.item_name,
-              pricePerDay: item.price_per_day ? Number(item.price_per_day) : undefined,
-              hasIsraeliNumber: item.has_israeli_number || false,
-              isGeneric: item.is_generic || false,
-            })),
-            startDate: r.start_date,
-            endDate: r.end_date,
-            totalPrice: Number(r.total_price),
-            currency: r.currency as 'ILS' | 'USD',
-            status: r.status as 'active' | 'overdue' | 'returned',
-            deposit: r.deposit ? Number(r.deposit) : undefined,
-            notes: r.notes || undefined,
-            createdAt: String(r.created_at).split('T')[0],
-            overdueDailyRate: r.overdue_daily_rate ? Number(r.overdue_daily_rate) : undefined,
-            overdueGraceDays: r.overdue_grace_days ?? 0,
-            autoChargeEnabled: r.auto_charge_enabled ?? false,
-          }))
-        );
+        const rentalsFormatted = (rentalsData || []).map((r) => ({
+          id: r.id,
+          customerId: r.customer_id || '',
+          customerName: r.customer_name,
+          items: (itemsByRental[r.id] || []).map((item) => ({
+            inventoryItemId: item.inventory_item_id || '',
+            itemCategory: item.item_category as ItemCategory,
+            itemName: item.item_name,
+            pricePerDay: item.price_per_day ? Number(item.price_per_day) : undefined,
+            hasIsraeliNumber: item.has_israeli_number || false,
+            isGeneric: item.is_generic || false,
+          })),
+          startDate: r.start_date,
+          endDate: r.end_date,
+          totalPrice: Number(r.total_price),
+          currency: r.currency as 'ILS' | 'USD',
+          status: r.status as 'active' | 'overdue' | 'returned',
+          deposit: r.deposit ? Number(r.deposit) : undefined,
+          notes: r.notes || undefined,
+          createdAt: String(r.created_at).split('T')[0],
+          overdueDailyRate: r.overdue_daily_rate ? Number(r.overdue_daily_rate) : undefined,
+          overdueGraceDays: r.overdue_grace_days ?? 0,
+          autoChargeEnabled: r.auto_charge_enabled ?? false,
+        }));
+        saveRentals(rentalsFormatted);
       }
 
       // Repairs
@@ -248,63 +271,143 @@ export function RentalProvider({ children }: { children: ReactNode }) {
         if (error) {
           failedParts.push('תיקונים');
         } else {
-          setRepairs(
-            (data || []).map((r) => ({
-              id: r.id,
-              repairNumber: r.repair_number,
-              deviceType: r.device_type,
-              deviceModel: r.device_model || undefined,
-              deviceCost: r.device_cost ? Number(r.device_cost) : undefined,
-              customerName: r.customer_name,
-              customerPhone: r.customer_phone || '',
-              problemDescription: r.problem_description,
-              status: r.status as 'in_lab' | 'ready' | 'collected',
-              isWarranty: r.is_warranty || false,
-              receivedDate: r.received_date,
-              completedDate: r.completed_date || undefined,
-              collectedDate: r.collected_date || undefined,
-              notes: r.notes || undefined,
-            }))
-          );
+          anyDataFetched = true;
+          const repairsFormatted = (data || []).map((r) => ({
+            id: r.id,
+            repairNumber: r.repair_number,
+            deviceType: r.device_type,
+            deviceModel: r.device_model || undefined,
+            deviceCost: r.device_cost ? Number(r.device_cost) : undefined,
+            customerName: r.customer_name,
+            customerPhone: r.customer_phone || '',
+            problemDescription: r.problem_description,
+            status: r.status as 'in_lab' | 'ready' | 'collected',
+            isWarranty: r.is_warranty || false,
+            receivedDate: r.received_date,
+            completedDate: r.completed_date || undefined,
+            collectedDate: r.collected_date || undefined,
+            notes: r.notes || undefined,
+          }));
+          saveRepairs(repairsFormatted);
         }
       } else {
         failedParts.push('תיקונים');
       }
 
-      // Show one toast (avoid spamming) only if something failed
+      // Handle notifications based on failure status
       if (failedParts.length > 0) {
         const uniqueFailed = Array.from(new Set(failedParts));
         const allFailed = uniqueFailed.length >= 4; // customers+inventory+rentals+repairs (rentalItems is auxiliary)
 
-        // If ONLY inventory failed but we have cached inventory displayed, don't scare the user with a destructive error.
-        const onlyInventoryFailed = uniqueFailed.length === 1 && uniqueFailed[0] === 'מלאי';
-        const hasCachedInventoryShown = inventoryFailed && inventory.length > 0;
-        if (onlyInventoryFailed && hasCachedInventoryShown) {
+        // Check if we have cached data to show
+        const hasCachedCustomers = customers.length > 0;
+        const hasCachedInventory = inventory.length > 0;
+        const hasCachedRentals = rentals.length > 0;
+        const hasCachedRepairs = repairs.length > 0;
+        const hasSomeCachedData = hasCachedCustomers || hasCachedInventory || hasCachedRentals || hasCachedRepairs;
+
+        if (isBackgroundRetry) {
+          // Silent background retry - only show toast on success or final failure
+          if (anyDataFetched) {
+            // Some data was refreshed successfully
+            toast({
+              title: 'הנתונים עודכנו',
+              description: 'חלק מהנתונים עודכנו בהצלחה מהשרת.',
+            });
+            backgroundRetryRef.current = 0;
+          }
+          // Don't show error on background retry, just schedule another attempt if needed
+        } else if (hasSomeCachedData && !allFailed) {
+          // Show gentle message when we have cached data to display
           toast({
-            title: 'המלאי מוצג זמנית מהמטמון',
-            description: 'ננסה לעדכן את המלאי אוטומטית ברקע. אם הבעיה חוזרת, נסה לרענן בעוד דקה.',
+            title: 'מוצג מהמטמון המקומי',
+            description: `הנתונים שלך בטוחים. ננסה לסנכרן ברקע עוד מעט...`,
+          });
+        } else if (allFailed) {
+          // All data failed and no cache - show error
+          toast({
+            title: 'שגיאה בטעינת נתונים',
+            description: 'לא ניתן לטעון את הנתונים מהשרת. נסה לרענן את הדף.',
+            variant: 'destructive',
           });
         } else {
+          // Partial failure without cache - still show warning but softer
           toast({
-            title: allFailed ? 'שגיאה בטעינת נתונים' : 'חלק מהנתונים לא נטענו',
-            description: allFailed
-              ? 'לא ניתן לטעון את הנתונים מהשרת. נסה לרענן את הדף.'
-              : `נכשל בטעינת: ${uniqueFailed.join(', ')}. שאר הנתונים נטענו.`,
+            title: 'חלק מהנתונים לא נטענו',
+            description: `נכשל בטעינת: ${uniqueFailed.join(', ')}. שאר הנתונים נטענו.`,
             variant: 'destructive',
+          });
+        }
+
+        // Schedule background retry if we have failures
+        if (!isBackgroundRetry && failedParts.length > 0 && backgroundRetryRef.current < 3) {
+          scheduleBackgroundRetry();
+        }
+      } else {
+        // All data loaded successfully
+        backgroundRetryRef.current = 0;
+        if (isBackgroundRetry) {
+          toast({
+            title: 'הסנכרון הושלם',
+            description: 'כל הנתונים עודכנו בהצלחה מהשרת.',
           });
         }
       }
     } catch (error) {
       console.error('Error fetching data:', error);
-      toast({
-        title: 'שגיאה בטעינת נתונים',
-        description: 'לא ניתן לטעון את הנתונים מהשרת. נסה לרענן את הדף.',
-        variant: 'destructive',
-      });
+      
+      // Check if we have cached data
+      const hasSomeCachedData = customers.length > 0 || inventory.length > 0 || rentals.length > 0 || repairs.length > 0;
+      
+      if (isBackgroundRetry) {
+        // Silent on background retry failure
+        console.log('Background retry failed, will try again...');
+      } else if (hasSomeCachedData) {
+        toast({
+          title: 'מוצג מהמטמון המקומי',
+          description: 'בעיית רשת זמנית. הנתונים שלך בטוחים. ננסה לסנכרן ברקע.',
+        });
+        scheduleBackgroundRetry();
+      } else {
+        toast({
+          title: 'שגיאה בטעינת נתונים',
+          description: 'לא ניתן לטעון את הנתונים מהשרת. נסה לרענן את הדף.',
+          variant: 'destructive',
+        });
+      }
     } finally {
-      setLoading(false);
+      if (!isBackgroundRetry) {
+        setLoading(false);
+      }
     }
   };
+
+  // Schedule a background retry after 30 seconds
+  const scheduleBackgroundRetry = useCallback(() => {
+    if (backgroundRetryTimeoutRef.current) {
+      clearTimeout(backgroundRetryTimeoutRef.current);
+    }
+    
+    if (backgroundRetryRef.current >= 3) {
+      console.log('Max background retries reached');
+      return;
+    }
+
+    backgroundRetryTimeoutRef.current = setTimeout(() => {
+      backgroundRetryRef.current += 1;
+      console.log(`Background retry attempt ${backgroundRetryRef.current}/3`);
+      fetchData(0, true);
+    }, 30000);
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (backgroundRetryTimeoutRef.current) {
+        clearTimeout(backgroundRetryTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -394,7 +497,7 @@ export function RentalProvider({ children }: { children: ReactNode }) {
       throw error;
     }
 
-    setCustomers(prev => [{
+    const newCustomer = {
       id: data.id,
       name: data.name,
       address: data.address || undefined,
@@ -402,10 +505,11 @@ export function RentalProvider({ children }: { children: ReactNode }) {
       email: data.email || undefined,
       notes: data.notes || undefined,
       createdAt: data.created_at.split('T')[0],
-      hasPaymentToken: false, // New customer has no payment token
+      hasPaymentToken: false,
       paymentTokenLast4: undefined,
       paymentTokenExpiry: undefined,
-    }, ...prev]);
+    };
+    saveCustomers([newCustomer, ...customers]);
   };
 
   const updateCustomer = async (id: string, customer: Partial<Customer>) => {
@@ -425,7 +529,7 @@ export function RentalProvider({ children }: { children: ReactNode }) {
       throw error;
     }
 
-    setCustomers(prev => prev.map(c => c.id === id ? { ...c, ...customer } : c));
+    saveCustomers(customers.map(c => c.id === id ? { ...c, ...customer } : c));
   };
 
   const deleteCustomer = async (id: string) => {
@@ -439,7 +543,7 @@ export function RentalProvider({ children }: { children: ReactNode }) {
       throw error;
     }
 
-    setCustomers(prev => prev.filter(c => c.id !== id));
+    saveCustomers(customers.filter(c => c.id !== id));
   };
 
   const addInventoryItem = async (item: Omit<InventoryItem, 'id'>) => {
@@ -463,22 +567,19 @@ export function RentalProvider({ children }: { children: ReactNode }) {
       throw error;
     }
 
-    setInventory((prev) => {
-      const next = [{
-        id: data.id,
-        category: data.category as ItemCategory,
-        name: data.name,
-        localNumber: data.local_number || undefined,
-        israeliNumber: data.israeli_number || undefined,
-        expiryDate: data.expiry_date || undefined,
-        simNumber: data.sim_number || undefined,
-        status: data.status as 'available' | 'rented' | 'maintenance',
-        notes: data.notes || undefined,
-        barcode: data.barcode || undefined,
-      }, ...prev];
-      saveCachedInventory(next);
-      return next;
-    });
+    const newItem = {
+      id: data.id,
+      category: data.category as ItemCategory,
+      name: data.name,
+      localNumber: data.local_number || undefined,
+      israeliNumber: data.israeli_number || undefined,
+      expiryDate: data.expiry_date || undefined,
+      simNumber: data.sim_number || undefined,
+      status: data.status as 'available' | 'rented' | 'maintenance',
+      notes: data.notes || undefined,
+      barcode: data.barcode || undefined,
+    };
+    saveInventory([newItem, ...inventory]);
   };
 
   const updateInventoryItem = async (id: string, item: Partial<InventoryItem>) => {
@@ -502,11 +603,7 @@ export function RentalProvider({ children }: { children: ReactNode }) {
       throw error;
     }
 
-    setInventory((prev) => {
-      const next = prev.map((i) => (i.id === id ? { ...i, ...item } : i));
-      saveCachedInventory(next);
-      return next;
-    });
+    saveInventory(inventory.map(i => i.id === id ? { ...i, ...item } : i));
   };
 
   const deleteInventoryItem = async (id: string) => {
@@ -520,11 +617,7 @@ export function RentalProvider({ children }: { children: ReactNode }) {
       throw error;
     }
 
-    setInventory((prev) => {
-      const next = prev.filter((i) => i.id !== id);
-      saveCachedInventory(next);
-      return next;
-    });
+    saveInventory(inventory.filter(i => i.id !== id));
   };
 
   const addRental = async (rental: Omit<Rental, 'id' | 'createdAt'>) => {
@@ -610,7 +703,7 @@ export function RentalProvider({ children }: { children: ReactNode }) {
       throw error;
     }
 
-    setRentals(prev => prev.map(r => r.id === id ? { ...r, ...rental } : r));
+    saveRentals(rentals.map(r => r.id === id ? { ...r, ...rental } : r));
   };
 
   const returnRental = async (id: string) => {
@@ -648,7 +741,7 @@ export function RentalProvider({ children }: { children: ReactNode }) {
       throw error;
     }
 
-    setRentals(prev => prev.filter(r => r.id !== id));
+    saveRentals(rentals.filter(r => r.id !== id));
   };
 
   const addRepair = async (repair: Omit<Repair, 'id'>) => {
@@ -677,7 +770,7 @@ export function RentalProvider({ children }: { children: ReactNode }) {
       throw error;
     }
 
-    setRepairs(prev => [{
+    const newRepair = {
       id: data.id,
       repairNumber: data.repair_number,
       deviceType: data.device_type,
@@ -692,7 +785,8 @@ export function RentalProvider({ children }: { children: ReactNode }) {
       completedDate: data.completed_date || undefined,
       collectedDate: data.collected_date || undefined,
       notes: data.notes || undefined,
-    }, ...prev]);
+    };
+    saveRepairs([newRepair, ...repairs]);
   };
 
   const updateRepair = async (id: string, repair: Partial<Repair>) => {
@@ -720,7 +814,7 @@ export function RentalProvider({ children }: { children: ReactNode }) {
       throw error;
     }
 
-    setRepairs(prev => prev.map(r => r.id === id ? { ...r, ...repair } : r));
+    saveRepairs(repairs.map(r => r.id === id ? { ...r, ...repair } : r));
   };
 
   const deleteRepair = async (id: string) => {
@@ -734,7 +828,7 @@ export function RentalProvider({ children }: { children: ReactNode }) {
       throw error;
     }
 
-    setRepairs(prev => prev.filter(r => r.id !== id));
+    saveRepairs(repairs.filter(r => r.id !== id));
   };
 
   const getAvailableItems = (category?: ItemCategory) => {
