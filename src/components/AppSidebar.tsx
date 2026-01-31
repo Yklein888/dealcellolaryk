@@ -1,9 +1,16 @@
 import { Link, useLocation } from 'react-router-dom';
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useRole } from '@/hooks/useRole';
 import { usePermissions, PermissionKey } from '@/hooks/usePermissions';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { 
   LayoutDashboard, 
   Users, 
@@ -16,8 +23,11 @@ import {
   Shield,
   CreditCard,
   FileText,
-  Store
+  Store,
+  Settings,
+  Fingerprint
 } from 'lucide-react';
+import { BiometricSettings } from '@/components/settings/BiometricSettings';
 
 const navItems = [
   { path: '/', label: 'דאשבורד', icon: LayoutDashboard, permission: 'view_dashboard' as PermissionKey },
@@ -43,6 +53,7 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
   const { user, signOut } = useAuth();
   const { isAdmin } = useRole();
   const { hasPermission } = usePermissions();
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Filter nav items by permission (admins see all)
   const visibleNavItems = navItems.filter(item => isAdmin || hasPermission(item.permission));
@@ -136,21 +147,46 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
         )}
       </nav>
 
-      {/* User & Logout */}
+      {/* User & Settings */}
       <div className="absolute bottom-0 right-0 left-0 p-4 border-t border-white/10">
         <div className="rounded-xl glass-subtle p-3 mb-3">
           <p className="text-xs text-muted-foreground">מחובר כ:</p>
           <p className="text-sm font-medium text-foreground truncate">{user?.email}</p>
         </div>
-        <Button
-          variant="outline"
-          className="w-full justify-start gap-2 text-muted-foreground hover:text-destructive hover:border-destructive/50 hover:bg-destructive/10 transition-all duration-300"
-          onClick={signOut}
-        >
-          <LogOut className="h-4 w-4" />
-          התנתק
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="flex-1 justify-start gap-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-300"
+            onClick={() => setIsSettingsOpen(true)}
+          >
+            <Settings className="h-4 w-4" />
+            הגדרות
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            className="text-muted-foreground hover:text-destructive hover:border-destructive/50 hover:bg-destructive/10 transition-all duration-300"
+            onClick={signOut}
+          >
+            <LogOut className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
+
+      {/* Settings Dialog */}
+      <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              הגדרות
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <BiometricSettings />
+          </div>
+        </DialogContent>
+      </Dialog>
     </aside>
   );
 }
