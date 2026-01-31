@@ -336,7 +336,7 @@ export function NewRentalDialog({
   };
 
   // Download calling instructions
-  const handleDownloadInstructions = async (itemId: string, israeliNumber?: string, localNumber?: string) => {
+  const handleDownloadInstructions = async (itemId: string, israeliNumber?: string, localNumber?: string, barcode?: string) => {
     if (!israeliNumber && !localNumber) {
       toast({
         title: 'אין מספרים',
@@ -349,7 +349,7 @@ export function NewRentalDialog({
     setDownloadingInstructions(itemId);
 
     try {
-      await generateCallingInstructions(israeliNumber, localNumber);
+      await generateCallingInstructions(israeliNumber, localNumber, barcode);
       toast({
         title: 'הקובץ הורד בהצלחה',
         description: 'פתח את הקובץ והדפס אותו',
@@ -647,7 +647,8 @@ export function NewRentalDialog({
                                 onClick={() => handleDownloadInstructions(
                                   item.inventoryItemId,
                                   inventoryItem.israeliNumber || undefined,
-                                  inventoryItem.localNumber || undefined
+                                  inventoryItem.localNumber || undefined,
+                                  inventoryItem.barcode || undefined
                                 )}
                                 className="h-7 w-7 p-0"
                               >

@@ -360,7 +360,7 @@ export default function Rentals() {
   const availableItems = getAvailableItems();
 
   // Handle downloading calling instructions for rental cards
-  const handleDownloadInstructions = async (itemId: string, israeliNumber?: string, localNumber?: string) => {
+  const handleDownloadInstructions = async (itemId: string, israeliNumber?: string, localNumber?: string, barcode?: string) => {
     if (!israeliNumber && !localNumber) {
       toast({
         title: 'אין מספרים',
@@ -373,7 +373,7 @@ export default function Rentals() {
     setDownloadingInstructions(itemId);
 
     try {
-      await generateCallingInstructions(israeliNumber, localNumber);
+      await generateCallingInstructions(israeliNumber, localNumber, barcode);
       toast({
         title: 'הקובץ הורד בהצלחה',
         description: 'פתח את הקובץ והדפס אותו',
@@ -790,25 +790,27 @@ export default function Rentals() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                disabled={downloadingInstructions === itemId}
-                                onClick={async () => {
-                                  let israeliNumber = inventoryItem?.israeliNumber;
-                                  let localNumber = inventoryItem?.localNumber;
-                                  
-                                  if (!inventoryItem && simItem.inventoryItemId) {
-                                    const { data } = await supabase
-                                      .from('inventory')
-                                      .select('israeli_number, local_number')
-                                      .eq('id', simItem.inventoryItemId)
-                                      .maybeSingle();
-                                    if (data) {
-                                      israeliNumber = data.israeli_number || undefined;
-                                      localNumber = data.local_number || undefined;
-                                    }
+                              disabled={downloadingInstructions === itemId}
+                              onClick={async () => {
+                                let israeliNumber = inventoryItem?.israeliNumber;
+                                let localNumber = inventoryItem?.localNumber;
+                                let barcode = inventoryItem?.barcode;
+                                
+                                if (!inventoryItem && simItem.inventoryItemId) {
+                                  const { data } = await supabase
+                                    .from('inventory')
+                                    .select('israeli_number, local_number, barcode')
+                                    .eq('id', simItem.inventoryItemId)
+                                    .maybeSingle();
+                                  if (data) {
+                                    israeliNumber = data.israeli_number || undefined;
+                                    localNumber = data.local_number || undefined;
+                                    barcode = data.barcode || undefined;
                                   }
-                                  
-                                  handleDownloadInstructions(itemId, israeliNumber || undefined, localNumber || undefined);
-                                }}
+                                }
+                                
+                                handleDownloadInstructions(itemId, israeliNumber || undefined, localNumber || undefined, barcode || undefined);
+                              }}
                                 className="gap-1 text-xs w-full"
                               >
                                 {downloadingInstructions === itemId ? (

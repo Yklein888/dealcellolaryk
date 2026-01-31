@@ -17,7 +17,8 @@ const formatPhoneNumber = (num: string | undefined): string => {
 
 export const generateCallingInstructions = async (
   israeliNumber: string | undefined,
-  localNumber: string | undefined
+  localNumber: string | undefined,
+  barcode?: string
 ): Promise<void> => {
   const formattedIsraeli = formatPhoneNumber(israeliNumber);
 
@@ -38,6 +39,7 @@ export const generateCallingInstructions = async (
           israeliNumber,
           localNumber,
           templateUrl,
+          barcode,
         }),
       }
     );

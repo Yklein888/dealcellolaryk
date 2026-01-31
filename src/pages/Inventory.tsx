@@ -24,8 +24,9 @@ import {
   Search, 
   Package,
   Upload,
-  Printer
+  Printer as PrinterIcon
 } from 'lucide-react';
+import { BarcodeDisplay } from '@/components/BarcodeDisplay';
 import { 
   InventoryItem, 
   ItemCategory, 
@@ -186,7 +187,7 @@ export default function Inventory() {
       >
         <div className="flex gap-2">
           <Button variant="outline" size="lg" onClick={() => setIsPrintDialogOpen(true)}>
-            <Printer className="h-5 w-5" />
+            <PrinterIcon className="h-5 w-5" />
             הדפס ברקודים
           </Button>
           <Button variant="outline" size="lg" onClick={() => setIsImportDialogOpen(true)}>
@@ -306,6 +307,81 @@ export default function Inventory() {
                   placeholder="הערות נוספות..."
                 />
               </div>
+
+              {/* Barcode preview and print - only for existing items with barcode */}
+              {editingItem && editingItem.barcode && (
+                <div className="space-y-3 pt-4 border-t">
+                  <Label className="flex items-center gap-2">
+                    <PrinterIcon className="h-4 w-4" />
+                    ברקוד
+                  </Label>
+                  <div className="flex flex-col items-center gap-3 p-4 bg-muted/50 rounded-lg">
+                    <BarcodeDisplay code={editingItem.barcode} height={50} width={1.5} />
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        const printWindow = window.open('', '_blank');
+                        if (!printWindow) return;
+                        
+                        printWindow.document.write(`
+                          <!DOCTYPE html>
+                          <html dir="rtl">
+                          <head>
+                            <title>הדפסת ברקוד</title>
+                            <style>
+                              * { margin: 0; padding: 0; box-sizing: border-box; }
+                              body { 
+                                font-family: Arial, sans-serif; 
+                                display: flex; 
+                                flex-direction: column; 
+                                align-items: center; 
+                                justify-content: center; 
+                                min-height: 100vh;
+                                padding: 20px;
+                              }
+                              .container { text-align: center; }
+                              h2 { font-size: 14pt; margin-bottom: 5px; }
+                              p { font-size: 10pt; color: #666; margin-bottom: 10px; }
+                              svg { max-width: 200px; }
+                            </style>
+                          </head>
+                          <body>
+                            <div class="container">
+                              <h2>${editingItem.name}</h2>
+                              <p>${categoryLabels[editingItem.category]}</p>
+                              <svg id="barcode"></svg>
+                            </div>
+                            <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.12.3/dist/JsBarcode.all.min.js"></script>
+                            <script>
+                              JsBarcode("#barcode", "${editingItem.barcode}", {
+                                format: "CODE128",
+                                width: 2,
+                                height: 60,
+                                displayValue: true,
+                                fontSize: 12,
+                                margin: 5
+                              });
+                              window.onload = function() {
+                                setTimeout(() => {
+                                  window.print();
+                                  window.close();
+                                }, 300);
+                              };
+                            </script>
+                          </body>
+                          </html>
+                        `);
+                        printWindow.document.close();
+                      }}
+                    >
+                      <PrinterIcon className="h-4 w-4 ml-2" />
+                      הדפס ברקוד
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               <div className="flex gap-3 pt-4">
                 <Button onClick={handleSubmit} className="flex-1">
