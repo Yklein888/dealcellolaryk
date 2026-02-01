@@ -289,7 +289,7 @@ const formatIsraeliDisplay = (num: string): string => {
   return num;
 };
 
-// Format international number
+// Format international number (UK/Europe)
 const formatInternationalDisplay = (num: string): string => {
   const digits = num.replace(/\D/g, '');
   
@@ -298,6 +298,21 @@ const formatInternationalDisplay = (num: string): string => {
   }
   if (digits.length >= 10) {
     return `44-${digits}`;
+  }
+  return num;
+};
+
+// Format American number (+1-XXX-XXX-XXXX)
+const formatAmericanDisplay = (num: string): string => {
+  const digits = num.replace(/\D/g, '');
+  
+  // Remove leading 1 if present
+  const cleanDigits = digits.startsWith('1') ? digits.slice(1) : digits;
+  
+  if (cleanDigits.length === 10) {
+    return `+1-${cleanDigits.slice(0, 3)}-${cleanDigits.slice(3, 6)}-${cleanDigits.slice(6)}`;
+  } else if (cleanDigits.length >= 10) {
+    return `+1-${cleanDigits.slice(0, 3)}-${cleanDigits.slice(3, 6)}-${cleanDigits.slice(6, 10)}`;
   }
   return num;
 };
@@ -361,23 +376,37 @@ serve(async (req) => {
   }
 
   try {
-    const { israeliNumber, localNumber, barcode } = await req.json();
+    const { israeliNumber, localNumber, barcode, isAmericanSim } = await req.json();
     
     const formattedIsraeli = formatPhoneNumber(israeliNumber);
     const formattedLocal = formatPhoneNumber(localNumber);
     
     const israeliDisplay = formattedIsraeli ? formatIsraeliDisplay(formattedIsraeli) : '---';
-    const localDisplay = formattedLocal ? formatInternationalDisplay(formattedLocal) : '---';
+    // For American SIM, format as US number (+1-XXX-XXX-XXXX)
+    const localDisplay = formattedLocal 
+      ? (isAmericanSim ? formatAmericanDisplay(formattedLocal) : formatInternationalDisplay(formattedLocal)) 
+      : '---';
 
     console.log("Input Israeli:", israeliNumber, "-> Formatted:", israeliDisplay);
     console.log("Input Local:", localNumber, "-> Formatted:", localDisplay);
     console.log("Barcode:", barcode);
+    console.log("Is American SIM:", isAmericanSim);
 
-    // Fetch PDF template from Storage
-    const templateUrl = `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/templates/calling-instructions-template.pdf`;
+    // Fetch PDF template from Storage (use different template for American SIM if available)
+    const templateName = isAmericanSim 
+      ? 'calling-instructions-template-american.pdf' 
+      : 'calling-instructions-template.pdf';
+    const templateUrl = `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/templates/${templateName}`;
     console.log("Fetching PDF template from:", templateUrl);
     
-    const templateResponse = await fetch(templateUrl);
+    // Try to fetch the template, fallback to European template if American not found
+    let templateResponse = await fetch(templateUrl);
+    if (!templateResponse.ok && isAmericanSim) {
+      console.log("American template not found, falling back to European template");
+      const fallbackUrl = `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/templates/calling-instructions-template.pdf`;
+      templateResponse = await fetch(fallbackUrl);
+    }
+    
     if (!templateResponse.ok) {
       throw new Error(`Template fetch failed: ${templateResponse.status} ${templateResponse.statusText}`);
     }

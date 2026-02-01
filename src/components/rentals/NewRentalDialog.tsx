@@ -935,6 +935,13 @@ export function NewRentalDialog({
                               <p className="font-medium text-xs sm:text-sm text-foreground line-clamp-1">{item.name}</p>
                               <p className="text-[10px] sm:text-xs text-muted-foreground">{categoryLabels[item.category]}</p>
                             </div>
+                            {/* SIM Number (ICCID) for all SIMs */}
+                            {isSim(item.category) && item.simNumber && (
+                              <p className="text-[10px] text-muted-foreground/70 font-mono truncate max-w-full">
+                                📱 {item.simNumber}
+                              </p>
+                            )}
+                            {/* Phone numbers display */}
                             {(item.israeliNumber || item.localNumber) && (
                               <div className="text-xs space-y-0.5">
                                 {item.israeliNumber && (
