@@ -36,32 +36,32 @@ function HebrewCalendar({
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
-      className={cn("p-2 pointer-events-auto select-none", className)}
+      className={cn("p-3 pointer-events-auto select-none", className)}
       locale={he}
       dir="rtl"
       classNames={{
-        months: "flex flex-col sm:flex-row gap-3",
-        month: "space-y-3",
-        caption: "flex justify-center relative items-center h-9 mb-1",
-        caption_label: "text-sm font-bold tracking-tight",
-        nav: "flex items-center",
+        months: "flex flex-col sm:flex-row gap-4",
+        month: "space-y-4",
+        caption: "flex justify-center relative items-center h-10",
+        caption_label: "text-base font-bold tracking-tight",
+        nav: "flex items-center gap-1",
         nav_button: cn(
           buttonVariants({ variant: "ghost" }),
           "h-8 w-8 bg-transparent p-0 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-200"
         ),
-        nav_button_previous: "absolute left-0",
-        nav_button_next: "absolute right-0",
+        nav_button_previous: "absolute left-1",
+        nav_button_next: "absolute right-1",
         table: "w-full border-collapse",
-        head_row: "flex mb-1",
-        head_cell: "text-muted-foreground/70 w-8 font-semibold text-[10px] uppercase tracking-wide",
-        row: "flex w-full",
+        head_row: "flex justify-around mb-2",
+        head_cell: "text-muted-foreground/70 w-10 font-semibold text-[11px] uppercase tracking-wide text-center",
+        row: "flex w-full justify-around",
         cell: cn(
           "relative p-0.5 text-center focus-within:relative focus-within:z-20",
           "[&:has([aria-selected])]:bg-primary/10 [&:has([aria-selected])]:rounded-lg",
           "[&:has([aria-selected].day-outside)]:bg-primary/5"
         ),
         day: cn(
-          "h-8 w-8 p-0 font-normal rounded-lg transition-all duration-150",
+          "h-10 w-10 p-0 font-normal rounded-lg transition-all duration-150",
           "hover:bg-muted/80 hover:scale-105",
           "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
           "aria-selected:opacity-100"
