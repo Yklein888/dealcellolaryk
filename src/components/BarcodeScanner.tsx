@@ -41,6 +41,18 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
   const containerRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(true);
   const pendingStartRef = useRef(false);
+  // Serialize start/stop operations to avoid html5-qrcode "already under transition" race
+  const opQueueRef = useRef<Promise<void>>(Promise.resolve());
+
+  const runExclusive = useCallback(async (fn: () => Promise<void>) => {
+    const run = opQueueRef.current.then(fn, fn);
+    // Keep queue always-resolving so one failure doesn't block subsequent operations
+    opQueueRef.current = run.then(
+      () => undefined,
+      () => undefined
+    );
+    return run;
+  }, []);
 
   // Explicitly stop all video tracks from a stream
   const stopAllTracks = useCallback((stream: MediaStream | null) => {
@@ -73,55 +85,69 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
 
   // Full cleanup of scanner and all resources
   const cleanupScanner = useCallback(async () => {
-    console.log('cleanupScanner called, current state:', scannerStateRef.current);
-    
-    // If already idle or stopping, don't double-stop
-    if (scannerStateRef.current === 'idle' || scannerStateRef.current === 'stopping') {
-      console.log('Scanner already idle/stopping, skipping cleanup');
-      return;
-    }
-    
-    scannerStateRef.current = 'stopping';
-    
-    try {
-      // First, stop the Html5Qrcode scanner
-      if (scannerRef.current) {
-        try {
-          const state = scannerRef.current.getState();
-          console.log('Scanner getState:', state);
-          // Only call stop if scanner is actually running (state 2 = SCANNING)
-          if (state === 2) {
-            await scannerRef.current.stop();
-            console.log('Html5Qrcode stopped successfully');
-          }
-        } catch (stopErr) {
-          console.warn('Error stopping Html5Qrcode:', stopErr);
-        }
-        scannerRef.current = null;
+    return runExclusive(async () => {
+      console.log('cleanupScanner called, current state:', scannerStateRef.current);
+
+      // If already stopping, don't double-stop (but still allow cleanup calls while idle)
+      if (scannerStateRef.current === 'stopping') {
+        console.log('Scanner already stopping, skipping cleanup');
+        return;
       }
-      
-      // Explicitly stop all active video tracks
-      stopAllTracks(activeStreamRef.current);
-      activeStreamRef.current = null;
-      
-      // Also try to stop any lingering video elements
-      const videoElements = document.querySelectorAll('#barcode-scanner-reader video');
-      videoElements.forEach((video) => {
-        const videoEl = video as HTMLVideoElement;
-        if (videoEl.srcObject) {
-          const stream = videoEl.srcObject as MediaStream;
-          stopAllTracks(stream);
-          videoEl.srcObject = null;
+
+      scannerStateRef.current = 'stopping';
+
+      try {
+        // Stop Html5Qrcode if exists
+        if (scannerRef.current) {
+          const instance = scannerRef.current;
+          try {
+            const state = instance.getState?.();
+            console.log('Scanner getState:', state);
+            // state 2 = SCANNING in html5-qrcode
+            if (state === 2) {
+              await instance.stop();
+            } else {
+              // Some implementations throw if stop() called when not running
+              await (instance as any).stop?.();
+            }
+          } catch (stopErr) {
+            console.warn('Error stopping Html5Qrcode:', stopErr);
+          }
+          try {
+            await (instance as any).clear?.();
+          } catch (clearErr) {
+            // clear() is not typed in all versions
+            console.warn('Error clearing Html5Qrcode:', clearErr);
+          }
+          scannerRef.current = null;
         }
-      });
-      
-    } catch (err) {
-      console.warn('Cleanup error:', err);
-    } finally {
-      scannerStateRef.current = 'idle';
-      console.log('Scanner cleanup complete, state now idle');
-    }
-  }, [stopAllTracks]);
+
+        // Explicitly stop all active video tracks
+        stopAllTracks(activeStreamRef.current);
+        activeStreamRef.current = null;
+
+        // Also try to stop any lingering video elements
+        const videoElements = document.querySelectorAll('#barcode-scanner-reader video');
+        videoElements.forEach((video) => {
+          const videoEl = video as HTMLVideoElement;
+          if (videoEl.srcObject) {
+            const stream = videoEl.srcObject as MediaStream;
+            stopAllTracks(stream);
+            videoEl.srcObject = null;
+          }
+        });
+
+        // Clear the reader container to remove stale DOM/video nodes
+        const reader = document.getElementById('barcode-scanner-reader');
+        if (reader) reader.innerHTML = '';
+      } catch (err) {
+        console.warn('Cleanup error:', err);
+      } finally {
+        scannerStateRef.current = 'idle';
+        console.log('Scanner cleanup complete, state now idle');
+      }
+    });
+  }, [runExclusive, stopAllTracks]);
 
   const handleClose = useCallback(async () => {
     await cleanupScanner();
@@ -173,51 +199,49 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
 
   const startScanner = useCallback(
     async (cameraIdOverride?: string) => {
-      console.log('startScanner called, current state:', scannerStateRef.current);
-      
-      // CRITICAL: Prevent starting if already initializing or running
-      if (scannerStateRef.current !== 'idle') {
-        console.log('Scanner not idle, aborting start. State:', scannerStateRef.current);
-        return;
-      }
-      
-      scannerStateRef.current = 'initializing';
-      setIsStarting(true);
-      setError(null);
+      return runExclusive(async () => {
+        console.log('startScanner called, current state:', scannerStateRef.current);
 
-      // Add delay to ensure DOM and previous instances are fully cleared
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      
-      // Double-check we're still mounted and should proceed
-      if (!mountedRef.current) {
-        scannerStateRef.current = 'idle';
-        return;
-      }
+        // 1) Lifecycle Management: Prevent start() during initializing/running/stopping
+        if (scannerStateRef.current !== 'idle') {
+          console.log('Scanner not idle, aborting start. State:', scannerStateRef.current);
+          return;
+        }
 
-      const scannerId = 'barcode-scanner-reader';
-      const scannerElement = document.getElementById(scannerId);
+        scannerStateRef.current = 'initializing';
+        setIsStarting(true);
+        setError(null);
 
-      if (!scannerElement) {
-        setError('לא ניתן לאתחל את הסורק');
-        setIsStarting(false);
-        scannerStateRef.current = 'idle';
-        return;
-      }
+        // 3) Delay: ensure DOM / previous instances fully cleared
+        await new Promise((resolve) => setTimeout(resolve, 300));
 
-      try {
-        // Create fresh scanner instance
-        scannerRef.current = new Html5Qrcode(scannerId, {
-          formatsToSupport: [
-            Html5QrcodeSupportedFormats.CODE_128,
-            Html5QrcodeSupportedFormats.CODE_39,
-            Html5QrcodeSupportedFormats.EAN_13,
-            Html5QrcodeSupportedFormats.EAN_8,
-            Html5QrcodeSupportedFormats.UPC_A,
-            Html5QrcodeSupportedFormats.UPC_E,
-            Html5QrcodeSupportedFormats.QR_CODE,
-          ],
-          verbose: false,
-        });
+        if (!mountedRef.current) {
+          scannerStateRef.current = 'idle';
+          return;
+        }
+
+        const scannerId = 'barcode-scanner-reader';
+        const scannerElement = document.getElementById(scannerId);
+        if (!scannerElement) {
+          setError('לא ניתן לאתחל את הסורק');
+          setIsStarting(false);
+          scannerStateRef.current = 'idle';
+          return;
+        }
+
+        const makeInstance = () =>
+          new Html5Qrcode(scannerId, {
+            formatsToSupport: [
+              Html5QrcodeSupportedFormats.CODE_128,
+              Html5QrcodeSupportedFormats.CODE_39,
+              Html5QrcodeSupportedFormats.EAN_13,
+              Html5QrcodeSupportedFormats.EAN_8,
+              Html5QrcodeSupportedFormats.UPC_A,
+              Html5QrcodeSupportedFormats.UPC_E,
+              Html5QrcodeSupportedFormats.QR_CODE,
+            ],
+            verbose: false,
+          });
 
         // Calculate qrbox dimensions
         const containerWidth = containerRef.current?.clientWidth || window.innerWidth;
@@ -229,160 +253,175 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
           onScan(decodedText);
           handleClose();
         };
-
         const onDecodeError = () => {};
 
         // Get available cameras
         let cameraList: CameraDevice[] = [];
         let preferredCameraId: string | undefined;
-        
         try {
           cameraList = await Html5Qrcode.getCameras();
           setCameras(cameraList);
-          
+
           const storedId = getStoredCameraId();
           preferredCameraId = cameraIdOverride || pickPreferredCameraId(cameraList, storedId);
-          
-          if (preferredCameraId) {
-            setSelectedCameraId(preferredCameraId);
-          }
+          if (preferredCameraId) setSelectedCameraId(preferredCameraId);
         } catch (camErr) {
           console.warn('Could not enumerate cameras:', camErr);
         }
 
         const scanConfig = buildBarcodeScannerConfig({ qrboxWidth, qrboxHeight });
 
-        // Try starting with different constraint levels
-        const attemptStart = async (
-          constraints: MediaTrackConstraints,
-          label: string
-        ): Promise<boolean> => {
+        // Ensure we never re-use a potentially half-transitioned instance.
+        const disposeInstance = async (instance: Html5Qrcode | null) => {
+          if (!instance) return;
           try {
+            const state = instance.getState?.();
+            if (state === 2) {
+              await instance.stop();
+            } else {
+              await (instance as any).stop?.();
+            }
+          } catch {}
+          try {
+            await (instance as any).clear?.();
+          } catch {}
+        };
+
+        let lastErr: any = null;
+        const attemptStartFresh = async (constraints: MediaTrackConstraints, label: string) => {
+          try {
+            // Hard reset between attempts
+            await disposeInstance(scannerRef.current);
+            scannerRef.current = null;
+            stopAllTracks(activeStreamRef.current);
+            activeStreamRef.current = null;
+
+            const reader = document.getElementById(scannerId);
+            if (reader) reader.innerHTML = '';
+            document.querySelectorAll('#barcode-scanner-reader video').forEach((v) => {
+              const ve = v as HTMLVideoElement;
+              if (ve.srcObject) {
+                stopAllTracks(ve.srcObject as MediaStream);
+                ve.srcObject = null;
+              }
+            });
+
+            await new Promise((r) => setTimeout(r, 250));
+
             console.log(`Attempting start with ${label}:`, constraints);
-            await scannerRef.current!.start(
+            scannerRef.current = makeInstance();
+            await scannerRef.current.start(
               constraints as any,
               scanConfig as any,
               onDecoded,
               onDecodeError
             );
-            
-            // After successful start, try to get the active stream and apply optimizations
+
+            // After successful start, grab active stream and apply optimizations
             try {
-              const videoElement = document.querySelector('#barcode-scanner-reader video') as HTMLVideoElement;
+              const videoElement = document.querySelector(
+                '#barcode-scanner-reader video'
+              ) as HTMLVideoElement;
               if (videoElement?.srcObject) {
                 const stream = videoElement.srcObject as MediaStream;
                 activeStreamRef.current = stream;
-                
                 const videoTrack = stream.getVideoTracks()[0];
-                if (videoTrack) {
-                  await applyTrackOptimizations(videoTrack);
-                }
+                if (videoTrack) await applyTrackOptimizations(videoTrack);
               }
             } catch (optErr) {
               console.warn('Could not apply optimizations:', optErr);
             }
-            
+
             return true;
           } catch (err) {
+            lastErr = err;
             console.warn(`${label} failed:`, err);
             return false;
           }
         };
 
-        // Attempt 1: Primary constraints with deviceId
-        let started = await attemptStart(
-          buildBarcodeVideoConstraints(preferredCameraId, 'primary'),
-          'Primary with deviceId'
-        );
-
-        // Attempt 2: Fallback constraints with deviceId
-        if (!started && preferredCameraId) {
-          started = await attemptStart(
-            buildBarcodeVideoConstraints(preferredCameraId, 'fallback'),
-            'Fallback with deviceId'
+        try {
+          // Attempts: strict -> relaxed
+          let started = await attemptStartFresh(
+            buildBarcodeVideoConstraints(preferredCameraId, 'primary'),
+            'Primary with deviceId'
           );
-        }
 
-        // Attempt 3: Primary constraints without deviceId (facingMode only)
-        if (!started) {
-          started = await attemptStart(
-            buildBarcodeVideoConstraints(undefined, 'primary'),
-            'Primary without deviceId'
-          );
-        }
+          if (!started && preferredCameraId) {
+            started = await attemptStartFresh(
+              buildBarcodeVideoConstraints(preferredCameraId, 'fallback'),
+              'Fallback with deviceId'
+            );
+          }
 
-        // Attempt 4: Fallback constraints without deviceId
-        if (!started) {
-          started = await attemptStart(
-            buildBarcodeVideoConstraints(undefined, 'fallback'),
-            'Fallback without deviceId'
-          );
-        }
+          if (!started) {
+            started = await attemptStartFresh(
+              buildBarcodeVideoConstraints(undefined, 'primary'),
+              'Primary without deviceId'
+            );
+          }
 
-        // Attempt 5: Minimal constraints as last resort
-        if (!started) {
-          started = await attemptStart(
-            { facingMode: 'environment' },
-            'Minimal constraints'
-          );
-        }
+          if (!started) {
+            started = await attemptStartFresh(
+              buildBarcodeVideoConstraints(undefined, 'fallback'),
+              'Fallback without deviceId'
+            );
+          }
 
-        if (!started) {
-          throw new Error('All camera start attempts failed');
-        }
+          if (!started) {
+            started = await attemptStartFresh({ facingMode: { ideal: 'environment' } }, 'Minimal constraints');
+          }
 
-        if (mountedRef.current) {
-          setIsStarting(false);
-          setIsScanning(true);
-          scannerStateRef.current = 'running';
-        }
-        
-      } catch (err: any) {
-        console.error('Failed to start scanner:', err);
-        console.error('Error details:', {
-          name: err?.name,
-          message: err?.message,
-          constraint: err?.constraint,
-          stack: err?.stack?.slice?.(0, 500),
-        });
+          if (!started) {
+            // Surface the real underlying error instead of the generic wrapper
+            throw lastErr ?? new Error('All camera start attempts failed');
+          }
 
-        const fullErrorCode = formatCameraErrorCode(err);
+          if (mountedRef.current) {
+            setIsStarting(false);
+            setIsScanning(true);
+            scannerStateRef.current = 'running';
+          }
+        } catch (err: any) {
+          console.error('Failed to start scanner:', err);
 
-        if (err.name === 'NotAllowedError') {
-          setError(
-            'נדרשת הרשאת גישה למצלמה. אם כבר אישרת ועדיין יש שגיאה, בדוק גם בהרשאות המערכת: הגדרות אנדרואיד → אפליקציות → Chrome → הרשאות → מצלמה → אפשר.\n' +
-              `קוד שגיאה: ${fullErrorCode}`
-          );
-        } else if (err.name === 'NotFoundError') {
-          setError(`לא נמצאה מצלמה במכשיר זה.\nקוד שגיאה: ${fullErrorCode}`);
-        } else if (err.name === 'OverconstrainedError') {
-          setError(
-            'הגדרות המצלמה לא נתמכות במצלמה שנבחרה. נסה לבחור מצלמה אחרת (⚙️) או נסה שוב.\n' +
-              `קוד שגיאה: ${fullErrorCode}`
-          );
-        } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
-          setError(
-            'המצלמה תפוסה/לא זמינה כרגע. סגור אפליקציות שמשתמשות במצלמה (WhatsApp/Instagram/מצלמה) ונסה שוב.\n' +
-              `קוד שגיאה: ${fullErrorCode}`
-          );
-        } else if (err.name === 'NotSupportedError') {
-          setError(
-            `הדפדפן לא תומך בהפעלת מצלמה בצורה הזו. נסה דפדפן אחר או עדכן גרסה.\nקוד שגיאה: ${fullErrorCode}`
-          );
-        } else {
-          setError(`לא ניתן להפעיל את המצלמה. וודא שנתת הרשאות גישה.\nקוד שגיאה: ${fullErrorCode}`);
+          const fullErrorCode = formatCameraErrorCode(err);
+
+          if (err?.name === 'NotAllowedError') {
+            setError(
+              'נדרשת הרשאת גישה למצלמה. אם כבר אישרת ועדיין יש שגיאה, בדוק גם בהרשאות המערכת: הגדרות אנדרואיד → אפליקציות → Chrome → הרשאות → מצלמה → אפשר.\n' +
+                `קוד שגיאה: ${fullErrorCode}`
+            );
+          } else if (err?.name === 'NotFoundError') {
+            setError(`לא נמצאה מצלמה במכשיר זה.\nקוד שגיאה: ${fullErrorCode}`);
+          } else if (err?.name === 'OverconstrainedError') {
+            setError(
+              'הגדרות המצלמה לא נתמכות במצלמה שנבחרה. נסה לבחור מצלמה אחרת (⚙️) או נסה שוב.\n' +
+                `קוד שגיאה: ${fullErrorCode}`
+            );
+          } else if (err?.name === 'NotReadableError' || err?.name === 'TrackStartError') {
+            setError(
+              'המצלמה תפוסה/לא זמינה כרגע. סגור אפליקציות שמשתמשות במצלמה (WhatsApp/Instagram/מצלמה) ונסה שוב.\n' +
+                `קוד שגיאה: ${fullErrorCode}`
+            );
+          } else if (err?.name === 'NotSupportedError') {
+            setError(
+              `הדפדפן לא תומך בהפעלת מצלמה בצורה הזו. נסה דפדפן אחר או עדכן גרסה.\nקוד שגיאה: ${fullErrorCode}`
+            );
+          } else {
+            setError(`לא ניתן להפעיל את המצלמה. וודא שנתת הרשאות גישה.\nקוד שגיאה: ${fullErrorCode}`);
+          }
+
+          await cleanupScanner();
+
+          if (mountedRef.current) {
+            setIsStarting(false);
+            setNeedsUserGesture(true);
+          }
         }
-        
-        // Clean up on failure
-        await cleanupScanner();
-        
-        if (mountedRef.current) {
-          setIsStarting(false);
-          setNeedsUserGesture(true);
-        }
-      }
+      });
     },
-    [formatCameraErrorCode, handleClose, onScan, cleanupScanner]
+    [cleanupScanner, formatCameraErrorCode, handleClose, onScan, runExclusive, stopAllTracks]
   );
 
   // Handle camera selection change
