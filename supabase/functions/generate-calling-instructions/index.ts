@@ -75,35 +75,74 @@ function generateCode128Pattern(text: string): string {
   return values.map(v => CODE128_PATTERNS[v]).join('');
 }
 
-// Generate SVG barcode
-function generateBarcodeSvg(text: string, width: number = 200, height: number = 60): string {
+// Generate barcode as BMP image (simpler format that works everywhere)
+function generateBarcodeBmp(text: string): Uint8Array {
   const pattern = generateCode128Pattern(text);
-  const barWidth = width / pattern.length;
-  const barsHeight = height - 15; // Leave space for text
+  const barWidth = 2; // pixels per bar
+  const height = 50;
+  const textHeight = 15;
+  const totalHeight = height + textHeight;
+  const width = pattern.length * barWidth + 20; // padding
   
-  let bars = '';
-  let x = 0;
+  // BMP header (54 bytes for 24-bit BMP)
+  const rowSize = Math.ceil((width * 3) / 4) * 4; // rows must be multiple of 4 bytes
+  const imageSize = rowSize * totalHeight;
+  const fileSize = 54 + imageSize;
   
-  for (const bit of pattern) {
-    if (bit === '1') {
-      bars += `<rect x="${x}" y="0" width="${barWidth}" height="${barsHeight}" fill="black"/>`;
+  const bmp = new Uint8Array(fileSize);
+  
+  // BMP file header (14 bytes)
+  bmp[0] = 0x42; bmp[1] = 0x4D; // 'BM'
+  bmp[2] = fileSize & 0xFF;
+  bmp[3] = (fileSize >> 8) & 0xFF;
+  bmp[4] = (fileSize >> 16) & 0xFF;
+  bmp[5] = (fileSize >> 24) & 0xFF;
+  bmp[10] = 54; // pixel data offset
+  
+  // DIB header (40 bytes)
+  bmp[14] = 40; // header size
+  bmp[18] = width & 0xFF;
+  bmp[19] = (width >> 8) & 0xFF;
+  bmp[22] = totalHeight & 0xFF;
+  bmp[23] = (totalHeight >> 8) & 0xFF;
+  bmp[26] = 1; // color planes
+  bmp[28] = 24; // bits per pixel
+  
+  // Pixel data (bottom-up)
+  const padding = 10;
+  for (let y = 0; y < totalHeight; y++) {
+    const rowOffset = 54 + y * rowSize;
+    for (let x = 0; x < width; x++) {
+      const pixelOffset = rowOffset + x * 3;
+      
+      // Default to white
+      let isBlack = false;
+      
+      // Barcode area (from bottom, BMP is bottom-up, so y=0 is bottom)
+      if (y >= textHeight && y < totalHeight) {
+        const barcodeX = x - padding;
+        if (barcodeX >= 0) {
+          const patternIndex = Math.floor(barcodeX / barWidth);
+          if (patternIndex < pattern.length) {
+            isBlack = pattern[patternIndex] === '1';
+          }
+        }
+      }
+      
+      // Set pixel color (BGR format)
+      if (isBlack) {
+        bmp[pixelOffset] = 0;     // B
+        bmp[pixelOffset + 1] = 0; // G
+        bmp[pixelOffset + 2] = 0; // R
+      } else {
+        bmp[pixelOffset] = 255;     // B
+        bmp[pixelOffset + 1] = 255; // G
+        bmp[pixelOffset + 2] = 255; // R
+      }
     }
-    x += barWidth;
   }
   
-  const svg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-  <rect width="100%" height="100%" fill="white"/>
-  ${bars}
-  <text x="${width / 2}" y="${height - 2}" text-anchor="middle" font-family="Arial, sans-serif" font-size="10">${text}</text>
-</svg>`;
-  
-  return svg;
-}
-
-// Convert SVG to PNG using canvas-like approach (base64 SVG for Word)
-function svgToBase64(svg: string): string {
-  return btoa(svg);
+  return bmp;
 }
 
 // Format phone number from scientific notation to string
@@ -156,16 +195,18 @@ const formatInternationalDisplay = (num: string): string => {
 };
 
 // Create XML for logo image at top of document
+// Original logo dimensions from image: approximately 540x142 pixels (ratio ~3.8:1)
 const createLogoXml = (imageRelId: string): string => {
-  // Size: approximately 60mm x 24mm = 2286000 x 914400 EMUs (1 mm = 38100 EMUs)
-  const width = 2286000;
-  const height = 914400;
+  // Size: approximately 50mm x 13mm to match original aspect ratio
+  // 1 mm = 38100 EMUs
+  const width = 1905000;  // ~50mm
+  const height = 495300;  // ~13mm (maintains 3.8:1 ratio)
   
   return `
     <w:p>
       <w:pPr>
         <w:jc w:val="center"/>
-        <w:spacing w:before="0" w:after="200"/>
+        <w:spacing w:before="0" w:after="120"/>
       </w:pPr>
       <w:r>
         <w:drawing>
@@ -204,17 +245,17 @@ const createLogoXml = (imageRelId: string): string => {
   `;
 };
 
-// Create XML for barcode image at bottom left of document (SVG version)
+// Create XML for barcode image at bottom left of document
 const createBarcodeXml = (imageRelId: string): string => {
-  // Size: approximately 25mm x 12mm = 950000 x 457200 EMUs (1 mm = 38100 EMUs)
-  const width = 950000;
-  const height = 457200;
+  // Size: approximately 30mm x 10mm
+  const width = 1143000;  // ~30mm
+  const height = 381000;  // ~10mm
   
   return `
     <w:p>
       <w:pPr>
         <w:jc w:val="left"/>
-        <w:spacing w:before="200" w:after="0"/>
+        <w:spacing w:before="240" w:after="0"/>
       </w:pPr>
       <w:r>
         <w:drawing>
@@ -225,7 +266,7 @@ const createBarcodeXml = (imageRelId: string): string => {
               <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
                 <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
                   <pic:nvPicPr>
-                    <pic:cNvPr id="0" name="barcode.svg"/>
+                    <pic:cNvPr id="0" name="barcode.bmp"/>
                     <pic:cNvPicPr/>
                   </pic:nvPicPr>
                   <pic:blipFill>
@@ -254,7 +295,6 @@ const createBarcodeXml = (imageRelId: string): string => {
 };
 
 // Create XML for the phone numbers header section
-// Font size 13 = 26 in Word half-points, aligned left, bold, no spacing before/after
 const createPhoneNumbersXml = (israeliDisplay: string, localDisplay: string): string => {
   return `
     <w:p>
@@ -370,10 +410,10 @@ serve(async (req) => {
           '<Default Extension="png" ContentType="image/png"/></Types>'
         );
       }
-      if (!contentTypesXml.includes('Extension="svg"')) {
+      if (!contentTypesXml.includes('Extension="bmp"')) {
         contentTypesXml = contentTypesXml.replace(
           '</Types>',
-          '<Default Extension="svg" ContentType="image/svg+xml"/></Types>'
+          '<Default Extension="bmp" ContentType="image/bmp"/></Types>'
         );
       }
       if (!contentTypesXml.includes('Extension="jpeg"') && !contentTypesXml.includes('Extension="jpg"')) {
@@ -432,23 +472,24 @@ serve(async (req) => {
 
     // Handle barcode if provided
     if (barcode) {
-      console.log("Generating barcode SVG for:", barcode);
+      console.log("Generating barcode BMP for:", barcode);
       
       try {
-        const barcodeSvg = generateBarcodeSvg(barcode, 200, 60);
+        const barcodeBmp = generateBarcodeBmp(barcode);
         const barcodeId = `rIdBarcode${imageIdCounter++}`;
         
-        // Save SVG as file
-        zip.file("word/media/barcode.svg", barcodeSvg);
+        // Save BMP as file
+        zip.file("word/media/barcode.bmp", barcodeBmp);
+        console.log("Barcode BMP size:", barcodeBmp.length);
         
         // Add relationship
-        const barcodeRel = `<Relationship Id="${barcodeId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/barcode.svg"/>`;
+        const barcodeRel = `<Relationship Id="${barcodeId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/barcode.bmp"/>`;
         relsXml = relsXml.replace('</Relationships>', barcodeRel + '</Relationships>');
         
         // Insert barcode XML before </w:body>
         const barcodeXml = createBarcodeXml(barcodeId);
         modifiedXml = modifiedXml.replace('</w:body>', barcodeXml + '</w:body>');
-        console.log("Inserted barcode SVG before </w:body>");
+        console.log("Inserted barcode BMP before </w:body>");
       } catch (error) {
         console.error('Error generating barcode:', error);
       }
@@ -462,7 +503,7 @@ serve(async (req) => {
     // Update the document.xml in the zip
     zip.file("word/document.xml", modifiedXml);
 
-    // Generate the output docx as arraybuffer (works better for Response)
+    // Generate the output docx as arraybuffer
     const output = await zip.generateAsync({
       type: "arraybuffer",
       mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
