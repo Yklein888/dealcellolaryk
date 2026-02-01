@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
 import { CallHistoryBadge } from '@/components/CallHistoryBadge';
 import { NewRentalDialog } from '@/components/rentals/NewRentalDialog';
+import { PaymentConfirmationDialog } from '@/components/rentals/PaymentConfirmationDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -58,6 +59,7 @@ import { format, parseISO, isBefore, addDays } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { DualCurrencyPrice } from '@/components/DualCurrencyPrice';
 
+
 export default function Rentals() {
   const { 
     rentals, 
@@ -104,6 +106,10 @@ export default function Rentals() {
   const [useStoredCard, setUseStoredCard] = useState(false);
   const [isTerminalMode, setIsTerminalMode] = useState(false);
   const [terminalStatus, setTerminalStatus] = useState<'idle' | 'waiting' | 'success' | 'error'>('idle');
+  
+  // Payment confirmation dialog state (for saved card payments)
+  const [isPaymentConfirmOpen, setIsPaymentConfirmOpen] = useState(false);
+  const [confirmedPaymentAmount, setConfirmedPaymentAmount] = useState<number | null>(null);
 
   // Extension dialog state
   const [extendDialogOpen, setExtendDialogOpen] = useState(false);
@@ -226,13 +232,37 @@ export default function Rentals() {
     return `${rentalId}-${timestamp}-${random}`;
   };
 
-  const handlePayment = async () => {
+  // Handle initiating payment - opens confirmation for saved cards
+  const handlePaymentClick = () => {
     if (!paymentRental) return;
     
     const customer = getPaymentCustomer();
     const hasStoredToken = customer?.hasPaymentToken;
     
-    // If using stored card, we don't need card details
+    // If using stored card, show confirmation dialog first
+    if (useStoredCard && hasStoredToken) {
+      setConfirmedPaymentAmount(null);
+      setIsPaymentConfirmOpen(true);
+      return;
+    }
+    
+    // Otherwise, process payment directly
+    handlePayment(paymentRental.totalPrice);
+  };
+
+  // Handle confirmed payment with amount (from confirmation dialog or direct)
+  const handlePayment = async (amount: number) => {
+    if (!paymentRental) return;
+    
+    const customer = getPaymentCustomer();
+    const hasStoredToken = customer?.hasPaymentToken;
+    
+    // If using stored card, close confirmation dialog
+    if (useStoredCard && hasStoredToken) {
+      setIsPaymentConfirmOpen(false);
+    }
+    
+    // Validate card details for non-token payments
     if (!useStoredCard) {
       if (!paymentFormData.creditCard || !paymentFormData.creditCardExpiry || !paymentFormData.cvv) {
         toast({
@@ -258,7 +288,7 @@ export default function Rentals() {
 
     try {
       const paymentBody: Record<string, unknown> = { 
-        amount: paymentRental.totalPrice,
+        amount: amount, // Use the confirmed/edited amount
         customerName: paymentRental.customerName,
         customerId: paymentRental.customerId,
         description: `השכרה - ${paymentRental.items.map(i => i.itemName).join(', ')}`,
@@ -1192,7 +1222,7 @@ export default function Rentals() {
               {!isTerminalMode && (
                 <div className="flex gap-3 pt-4">
                   <Button 
-                    onClick={handlePayment} 
+                    onClick={handlePaymentClick} 
                     className="flex-1"
                     disabled={payingRentalId === paymentRental.id}
                   >
@@ -1222,6 +1252,24 @@ export default function Rentals() {
           })()}
         </DialogContent>
       </Dialog>
+
+      {/* Payment Confirmation Dialog (for saved card payments) */}
+      {paymentRental && (() => {
+        const customer = getPaymentCustomer();
+        return (
+          <PaymentConfirmationDialog
+            isOpen={isPaymentConfirmOpen}
+            onOpenChange={setIsPaymentConfirmOpen}
+            originalAmount={paymentRental.totalPrice}
+            currency={paymentRental.currency}
+            customerName={paymentRental.customerName}
+            cardLast4={customer?.paymentTokenLast4}
+            cardExpiry={customer?.paymentTokenExpiry}
+            onConfirm={handlePayment}
+            isProcessing={payingRentalId === paymentRental.id}
+          />
+        );
+      })()}
 
       {/* Extend Rental Dialog */}
       <Dialog open={extendDialogOpen} onOpenChange={setExtendDialogOpen}>

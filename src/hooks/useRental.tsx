@@ -550,7 +550,7 @@ export function RentalProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase
       .from('inventory')
       .insert({
-        category: item.category,
+        category: item.category as any, // Type assertion for new enum values
         name: item.name,
         local_number: item.localNumber || null,
         israeli_number: item.israeliNumber || null,
@@ -654,7 +654,7 @@ export function RentalProvider({ children }: { children: ReactNode }) {
           rental.items.map(item => ({
             rental_id: rentalData.id,
             inventory_item_id: item.isGeneric ? null : item.inventoryItemId,
-            item_category: item.itemCategory,
+            item_category: item.itemCategory as any, // Type assertion for new enum values
             item_name: item.itemName,
             price_per_day: item.pricePerDay || null,
             has_israeli_number: item.hasIsraeliNumber || false,

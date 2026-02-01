@@ -973,6 +973,7 @@ export type Database = {
         | "device_smartphone"
         | "modem"
         | "netstick"
+        | "device_simple_europe"
       item_status: "available" | "rented" | "maintenance"
       payment_status: "pending" | "success" | "failed" | "declined"
       pos_sale_status:
@@ -1119,6 +1120,7 @@ export const Constants = {
         "device_smartphone",
         "modem",
         "netstick",
+        "device_simple_europe",
       ],
       item_status: ["available", "rented", "maintenance"],
       payment_status: ["pending", "success", "failed", "declined"],
