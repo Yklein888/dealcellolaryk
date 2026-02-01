@@ -404,7 +404,7 @@ export default function Rentals() {
   const availableItems = getAvailableItems();
 
   // Handle printing calling instructions for rental cards
-  const handlePrintInstructions = async (itemId: string, israeliNumber?: string, localNumber?: string, barcode?: string) => {
+  const handlePrintInstructions = async (itemId: string, israeliNumber?: string, localNumber?: string, barcode?: string, isAmericanSim?: boolean) => {
     if (!israeliNumber && !localNumber) {
       toast({
         title: 'אין מספרים',
@@ -417,7 +417,7 @@ export default function Rentals() {
     setDownloadingInstructions(itemId);
 
     try {
-      await printCallingInstructions(israeliNumber, localNumber, barcode);
+      await printCallingInstructions(israeliNumber, localNumber, barcode, isAmericanSim);
       toast({
         title: 'פותח חלון הדפסה',
         description: 'בחר מדפסת והדפס את ההוראות',
@@ -431,7 +431,7 @@ export default function Rentals() {
       });
       // Fallback to download
       try {
-        await downloadCallingInstructions(israeliNumber, localNumber, barcode);
+        await downloadCallingInstructions(israeliNumber, localNumber, barcode, isAmericanSim);
         toast({
           title: 'הקובץ הורד',
           description: 'פתח את הקובץ והדפס אותו ידנית',
@@ -846,8 +846,8 @@ export default function Rentals() {
                             </div>
                           </div>
                           
-                          {/* Download Button - Only for European SIMs */}
-                          {isEuropeanSim && (
+                          {/* Download Button - For European and American SIMs */}
+                          {(isEuropeanSim || isAmericanSim) && (
                             <div className="flex justify-center">
                               <Button
                                 variant="outline"
@@ -871,7 +871,7 @@ export default function Rentals() {
                                   }
                                 }
                                 
-                                handlePrintInstructions(itemId, israeliNumber || undefined, localNumber || undefined, barcode || undefined);
+                                handlePrintInstructions(itemId, israeliNumber || undefined, localNumber || undefined, barcode || undefined, isAmericanSim);
                               }}
                                 className="gap-1 text-xs w-full"
                               >
