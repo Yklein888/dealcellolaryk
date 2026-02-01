@@ -194,67 +194,68 @@ const formatInternationalDisplay = (num: string): string => {
   return num;
 };
 
-// Create XML for logo image at top of document
-// Logo dimensions: approximately square with slight width bias
-const createLogoXml = (imageRelId: string): string => {
-  // Size: approximately 55mm x 45mm to show logo prominently
-  // 1 mm = 38100 EMUs
-  const width = 2095500;  // ~55mm
-  const height = 1714500; // ~45mm
-  
+// Create XML for the phone numbers section (inserted after logo paragraph)
+const createPhoneNumbersXml = (israeliDisplay: string, localDisplay: string): string => {
   return `
     <w:p>
       <w:pPr>
-        <w:jc w:val="center"/>
-        <w:spacing w:before="0" w:after="120"/>
+        <w:jc w:val="left"/>
+        <w:spacing w:before="120" w:after="0" w:line="240" w:lineRule="auto"/>
+        <w:rPr>
+          <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
+          <w:b/>
+          <w:bCs/>
+          <w:sz w:val="26"/>
+          <w:szCs w:val="26"/>
+        </w:rPr>
       </w:pPr>
       <w:r>
-        <w:drawing>
-          <wp:inline distT="0" distB="0" distL="0" distR="0">
-            <wp:extent cx="${width}" cy="${height}"/>
-            <wp:docPr id="2" name="Logo"/>
-            <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
-              <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
-                <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
-                  <pic:nvPicPr>
-                    <pic:cNvPr id="0" name="logo.png"/>
-                    <pic:cNvPicPr/>
-                  </pic:nvPicPr>
-                  <pic:blipFill>
-                    <a:blip r:embed="${imageRelId}"/>
-                    <a:stretch>
-                      <a:fillRect/>
-                    </a:stretch>
-                  </pic:blipFill>
-                  <pic:spPr>
-                    <a:xfrm>
-                      <a:off x="0" y="0"/>
-                      <a:ext cx="${width}" cy="${height}"/>
-                    </a:xfrm>
-                    <a:prstGeom prst="rect">
-                      <a:avLst/>
-                    </a:prstGeom>
-                  </pic:spPr>
-                </pic:pic>
-              </a:graphicData>
-            </a:graphic>
-          </wp:inline>
-        </w:drawing>
+        <w:rPr>
+          <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
+          <w:b/>
+          <w:bCs/>
+          <w:sz w:val="26"/>
+          <w:szCs w:val="26"/>
+        </w:rPr>
+        <w:t>מספר ישראלי: ${israeliDisplay}</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:jc w:val="left"/>
+        <w:spacing w:before="0" w:after="120" w:line="240" w:lineRule="auto"/>
+        <w:rPr>
+          <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
+          <w:b/>
+          <w:bCs/>
+          <w:sz w:val="26"/>
+          <w:szCs w:val="26"/>
+        </w:rPr>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
+          <w:b/>
+          <w:bCs/>
+          <w:sz w:val="26"/>
+          <w:szCs w:val="26"/>
+        </w:rPr>
+        <w:t>מספר מקומי: ${localDisplay}</w:t>
       </w:r>
     </w:p>
   `;
 };
 
-// Create XML for barcode image at bottom left of document
+// Create XML for barcode image at bottom of document (centered)
 const createBarcodeXml = (imageRelId: string): string => {
-  // Size: approximately 30mm x 10mm
-  const width = 1143000;  // ~30mm
-  const height = 381000;  // ~10mm
+  // Size: approximately 60mm x 20mm (doubled for better visibility)
+  const width = 2286000;  // ~60mm
+  const height = 762000;  // ~20mm
   
   return `
     <w:p>
       <w:pPr>
-        <w:jc w:val="left"/>
+        <w:jc w:val="center"/>
         <w:spacing w:before="240" w:after="0"/>
       </w:pPr>
       <w:r>
@@ -294,60 +295,6 @@ const createBarcodeXml = (imageRelId: string): string => {
   `;
 };
 
-// Create XML for the phone numbers header section
-const createPhoneNumbersXml = (israeliDisplay: string, localDisplay: string): string => {
-  return `
-    <w:p>
-      <w:pPr>
-        <w:jc w:val="left"/>
-        <w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/>
-        <w:rPr>
-          <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
-          <w:b/>
-          <w:bCs/>
-          <w:sz w:val="26"/>
-          <w:szCs w:val="26"/>
-        </w:rPr>
-      </w:pPr>
-      <w:r>
-        <w:rPr>
-          <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
-          <w:b/>
-          <w:bCs/>
-          <w:sz w:val="26"/>
-          <w:szCs w:val="26"/>
-        </w:rPr>
-        <w:t>מספר ישראלי: ${israeliDisplay}</w:t>
-      </w:r>
-    </w:p>
-    <w:p>
-      <w:pPr>
-        <w:jc w:val="left"/>
-        <w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/>
-        <w:rPr>
-          <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
-          <w:b/>
-          <w:bCs/>
-          <w:sz w:val="26"/>
-          <w:szCs w:val="26"/>
-        </w:rPr>
-      </w:pPr>
-      <w:r>
-        <w:rPr>
-          <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
-          <w:b/>
-          <w:bCs/>
-          <w:sz w:val="26"/>
-          <w:szCs w:val="26"/>
-        </w:rPr>
-        <w:t>מספר מקומי: ${localDisplay}</w:t>
-      </w:r>
-    </w:p>
-  `;
-};
-
-const LOGO_URL = "https://qifcynwnxmtoxzpskmmt.supabase.co/storage/v1/object/public/templates/logo.png";
-
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -368,24 +315,13 @@ serve(async (req) => {
     console.log("Barcode:", barcode);
     console.log("Fetching template from:", templateUrl);
 
-    // Fetch the template
+    // Fetch the template (contains original logo and content)
     const templateResponse = await fetch(templateUrl);
     if (!templateResponse.ok) {
       throw new Error(`Template fetch failed: ${templateResponse.status} ${templateResponse.statusText}`);
     }
     const templateBuffer = await templateResponse.arrayBuffer();
     console.log("Template fetched, size:", templateBuffer.byteLength);
-
-    // Fetch the logo
-    console.log("Fetching logo from:", LOGO_URL);
-    const logoResponse = await fetch(LOGO_URL);
-    let logoBuffer: ArrayBuffer | null = null;
-    if (logoResponse.ok) {
-      logoBuffer = await logoResponse.arrayBuffer();
-      console.log("Logo fetched, size:", logoBuffer.byteLength);
-    } else {
-      console.log("Warning: Could not fetch logo:", logoResponse.status);
-    }
 
     // Load the DOCX as a zip
     const zip = await JSZip.loadAsync(templateBuffer);
@@ -404,22 +340,10 @@ serve(async (req) => {
     // Update [Content_Types].xml to include image types
     let contentTypesXml = await zip.file("[Content_Types].xml")?.async("string");
     if (contentTypesXml) {
-      if (!contentTypesXml.includes('Extension="png"')) {
-        contentTypesXml = contentTypesXml.replace(
-          '</Types>',
-          '<Default Extension="png" ContentType="image/png"/></Types>'
-        );
-      }
       if (!contentTypesXml.includes('Extension="bmp"')) {
         contentTypesXml = contentTypesXml.replace(
           '</Types>',
           '<Default Extension="bmp" ContentType="image/bmp"/></Types>'
-        );
-      }
-      if (!contentTypesXml.includes('Extension="jpeg"') && !contentTypesXml.includes('Extension="jpg"')) {
-        contentTypesXml = contentTypesXml.replace(
-          '</Types>',
-          '<Default Extension="jpeg" ContentType="image/jpeg"/></Types>'
         );
       }
       zip.file("[Content_Types].xml", contentTypesXml);
@@ -439,35 +363,20 @@ serve(async (req) => {
       );
     }
 
-    // Build content to insert after <w:body>
-    let insertContent = '';
-    
-    // Add logo if available
-    if (logoBuffer) {
-      const logoId = `rIdLogo${imageIdCounter++}`;
-      zip.file("word/media/logo.png", logoBuffer);
-      
-      const logoRel = `<Relationship Id="${logoId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/logo.png"/>`;
-      relsXml = relsXml.replace('</Relationships>', logoRel + '</Relationships>');
-      
-      insertContent += createLogoXml(logoId);
-      console.log("Added logo to document body");
-    }
+    // Create phone numbers XML to insert after the first paragraph (the logo)
+    const phoneNumbersXml = createPhoneNumbersXml(israeliDisplay, localDisplay);
 
-    // Add phone numbers
-    insertContent += createPhoneNumbersXml(israeliDisplay, localDisplay);
-
-    // Insert content after <w:body> tag
-    const bodyTagMatch = modifiedXml.match(/<w:body[^>]*>/);
-    if (bodyTagMatch) {
-      const bodyTagEnd = modifiedXml.indexOf(bodyTagMatch[0]) + bodyTagMatch[0].length;
+    // Find the first </w:p> tag (end of logo paragraph) and insert phone numbers after it
+    const firstParagraphEnd = modifiedXml.indexOf('</w:p>');
+    if (firstParagraphEnd !== -1) {
+      const insertPosition = firstParagraphEnd + '</w:p>'.length;
       modifiedXml = 
-        modifiedXml.slice(0, bodyTagEnd) + 
-        insertContent + 
-        modifiedXml.slice(bodyTagEnd);
-      console.log("Inserted logo and phone numbers after <w:body> tag");
+        modifiedXml.slice(0, insertPosition) + 
+        phoneNumbersXml + 
+        modifiedXml.slice(insertPosition);
+      console.log("Inserted phone numbers after first paragraph (logo)");
     } else {
-      console.log("Warning: Could not find <w:body> tag");
+      console.log("Warning: Could not find first paragraph end");
     }
 
     // Handle barcode if provided
