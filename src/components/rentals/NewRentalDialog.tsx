@@ -71,6 +71,11 @@ const categoryColors: Record<ItemCategory, { bg: string; border: string; hover: 
     border: 'border-green-200 dark:border-green-800', 
     hover: 'hover:border-green-400 dark:hover:border-green-600' 
   },
+  device_simple_europe: { 
+    bg: 'bg-emerald-50 dark:bg-emerald-950/30', 
+    border: 'border-emerald-200 dark:border-emerald-800', 
+    hover: 'hover:border-emerald-400 dark:hover:border-emerald-600' 
+  },
   device_smartphone: { 
     bg: 'bg-purple-50 dark:bg-purple-950/30', 
     border: 'border-purple-200 dark:border-purple-800', 

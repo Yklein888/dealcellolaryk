@@ -132,24 +132,51 @@ export function calculateDevicePriceWithHolidays(
   };
 }
 
-// Calculate price for devices (excluding Saturdays only - legacy)
+// Calculate price for devices (excluding Saturdays AND holidays for business days)
 export function calculateDevicePrice(
   category: ItemCategory,
   startDate: Date,
   endDate: Date
 ): number {
-  const weekdays = countWeekdays(startDate, endDate);
+  // Use business days (excluding Saturdays AND holidays) for device pricing
+  const businessDays = countBusinessDays(startDate, endDate);
   
-  // Updated daily rates
+  // Updated daily rates with new products
   const dailyRates: Record<string, number> = {
-    device_simple: 10, // מכשיר פשוט - 10 ש"ח ליום (updated)
+    device_simple: 10,         // מכשיר פשוט - 10 ש"ח ליום
+    device_simple_europe: 5,   // מכשיר פשוט לאירופה - 5 ש"ח ליום
     device_smartphone: 25,
     modem: 20,
     netstick: 15,
   };
   
   const rate = dailyRates[category] || 0;
-  return weekdays * rate;
+  return businessDays * rate;
+}
+
+// Get detailed pricing info for transparency
+export function calculateDevicePriceDetailed(
+  category: ItemCategory,
+  startDate: Date,
+  endDate: Date
+): { price: number; businessDays: number; dailyRate: number; breakdown: ReturnType<typeof getExcludedDaysBreakdown> } {
+  const breakdown = getExcludedDaysBreakdown(startDate, endDate);
+  
+  const dailyRates: Record<string, number> = {
+    device_simple: 10,
+    device_simple_europe: 5,
+    device_smartphone: 25,
+    modem: 20,
+    netstick: 15,
+  };
+  
+  const rate = dailyRates[category] || 0;
+  return {
+    price: breakdown.businessDays * rate,
+    businessDays: breakdown.businessDays,
+    dailyRate: rate,
+    breakdown,
+  };
 }
 
 // Calculate total rental price
@@ -157,14 +184,22 @@ export function calculateRentalPrice(
   items: Array<{ category: ItemCategory; hasIsraeliNumber?: boolean }>,
   startDate: string,
   endDate: string
-): { total: number; currency: 'ILS' | 'USD'; breakdown: Array<{ item: string; price: number; currency: string }>; usdTotal?: number; ilsTotal?: number } {
+): { 
+  total: number; 
+  currency: 'ILS' | 'USD'; 
+  breakdown: Array<{ item: string; price: number; currency: string; details?: string }>; 
+  usdTotal?: number; 
+  ilsTotal?: number;
+  businessDaysInfo?: ReturnType<typeof getExcludedDaysBreakdown>;
+} {
   const start = parseISO(startDate);
   const end = parseISO(endDate);
   const totalDays = differenceInDays(end, start) + 1;
+  const businessDaysInfo = getExcludedDaysBreakdown(start, end);
   
   let ilsTotal = 0;
   let usdTotal = 0;
-  const breakdown: Array<{ item: string; price: number; currency: string }> = [];
+  const breakdown: Array<{ item: string; price: number; currency: string; details?: string }> = [];
   
   items.forEach(item => {
     switch (item.category) {
@@ -181,39 +216,70 @@ export function calculateRentalPrice(
         break;
         
       case 'device_simple':
-        const simpleDevicePrice = calculateDevicePrice(item.category, start, end);
-        ilsTotal += simpleDevicePrice;
-        breakdown.push({ item: 'מכשיר פשוט', price: simpleDevicePrice, currency: '₪' });
+        const simpleDeviceInfo = calculateDevicePriceDetailed(item.category, start, end);
+        ilsTotal += simpleDeviceInfo.price;
+        breakdown.push({ 
+          item: 'מכשיר פשוט', 
+          price: simpleDeviceInfo.price, 
+          currency: '₪',
+          details: `${simpleDeviceInfo.businessDays} ימי עסקים × ₪${simpleDeviceInfo.dailyRate}`
+        });
+        break;
+        
+      case 'device_simple_europe':
+        const euroDeviceInfo = calculateDevicePriceDetailed(item.category, start, end);
+        ilsTotal += euroDeviceInfo.price;
+        breakdown.push({ 
+          item: 'מכשיר פשוט לאירופה', 
+          price: euroDeviceInfo.price, 
+          currency: '₪',
+          details: `${euroDeviceInfo.businessDays} ימי עסקים × ₪${euroDeviceInfo.dailyRate}`
+        });
         break;
         
       case 'device_smartphone':
-        const smartphonePrice = calculateDevicePrice(item.category, start, end);
-        ilsTotal += smartphonePrice;
-        breakdown.push({ item: 'סמארטפון', price: smartphonePrice, currency: '₪' });
+        const smartphoneInfo = calculateDevicePriceDetailed(item.category, start, end);
+        ilsTotal += smartphoneInfo.price;
+        breakdown.push({ 
+          item: 'סמארטפון', 
+          price: smartphoneInfo.price, 
+          currency: '₪',
+          details: `${smartphoneInfo.businessDays} ימי עסקים × ₪${smartphoneInfo.dailyRate}`
+        });
         break;
         
       case 'modem':
-        const modemPrice = calculateDevicePrice(item.category, start, end);
-        ilsTotal += modemPrice;
-        breakdown.push({ item: 'מודם', price: modemPrice, currency: '₪' });
+        const modemInfo = calculateDevicePriceDetailed(item.category, start, end);
+        ilsTotal += modemInfo.price;
+        breakdown.push({ 
+          item: 'מודם', 
+          price: modemInfo.price, 
+          currency: '₪',
+          details: `${modemInfo.businessDays} ימי עסקים × ₪${modemInfo.dailyRate}`
+        });
         break;
         
       case 'netstick':
-        const netstickPrice = calculateDevicePrice(item.category, start, end);
-        ilsTotal += netstickPrice;
-        breakdown.push({ item: 'נטסטיק', price: netstickPrice, currency: '₪' });
+        const netstickInfo = calculateDevicePriceDetailed(item.category, start, end);
+        ilsTotal += netstickInfo.price;
+        breakdown.push({ 
+          item: 'נטסטיק', 
+          price: netstickInfo.price, 
+          currency: '₪',
+          details: `${netstickInfo.businessDays} ימי עסקים × ₪${netstickInfo.dailyRate}`
+        });
         break;
     }
   });
   
   // If there are USD items, return USD total; otherwise ILS
   if (usdTotal > 0 && ilsTotal === 0) {
-    return { total: usdTotal, currency: 'USD', breakdown, usdTotal, ilsTotal: 0 };
+    return { total: usdTotal, currency: 'USD', breakdown, usdTotal, ilsTotal: 0, businessDaysInfo };
   }
   
   // Mixed currencies - keep them separate, don't convert here
   // Frontend will handle conversion display with live exchange rate
-  return { total: ilsTotal, currency: 'ILS', breakdown, usdTotal, ilsTotal };
+  return { total: ilsTotal, currency: 'ILS', breakdown, usdTotal, ilsTotal, businessDaysInfo };
 }
 
 // Format price with currency symbol
