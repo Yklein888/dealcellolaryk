@@ -108,6 +108,9 @@ export function calculateAmericanSimPrice(
 }
 
 // Calculate price for devices based on business days (excluding Saturdays AND holidays)
+// European bundle device rate - 5 ILS per business day when bundled with European SIM
+export const EUROPEAN_BUNDLE_DEVICE_RATE = 5;
+
 export function calculateDevicePriceWithHolidays(
   category: ItemCategory,
   startDate: Date,
@@ -116,7 +119,7 @@ export function calculateDevicePriceWithHolidays(
   const breakdown = getExcludedDaysBreakdown(startDate, endDate);
   const businessDays = breakdown.businessDays;
   
-  // Updated daily rates with new products
+  // Daily rates for devices
   const dailyRates: Record<string, number> = {
     device_simple: 10, // מכשיר פשוט - 10 ש"ח ליום
     device_smartphone: 25,
@@ -141,10 +144,9 @@ export function calculateDevicePrice(
   // Use business days (excluding Saturdays AND holidays) for device pricing
   const businessDays = countBusinessDays(startDate, endDate);
   
-  // Updated daily rates with new products
+  // Daily rates for devices
   const dailyRates: Record<string, number> = {
     device_simple: 10,         // מכשיר פשוט - 10 ש"ח ליום
-    device_simple_europe: 5,   // מכשיר פשוט לאירופה - 5 ש"ח ליום
     device_smartphone: 25,
     modem: 20,
     netstick: 15,
@@ -164,7 +166,6 @@ export function calculateDevicePriceDetailed(
   
   const dailyRates: Record<string, number> = {
     device_simple: 10,
-    device_simple_europe: 5,
     device_smartphone: 25,
     modem: 20,
     netstick: 15,
@@ -181,7 +182,7 @@ export function calculateDevicePriceDetailed(
 
 // Calculate total rental price
 export function calculateRentalPrice(
-  items: Array<{ category: ItemCategory; hasIsraeliNumber?: boolean }>,
+  items: Array<{ category: ItemCategory; hasIsraeliNumber?: boolean; includeEuropeanDevice?: boolean }>,
   startDate: string,
   endDate: string
 ): { 
@@ -207,6 +208,18 @@ export function calculateRentalPrice(
         const euroSimPrice = calculateEuropeanSimPrice(totalDays);
         ilsTotal += euroSimPrice;
         breakdown.push({ item: 'סים אירופאי', price: euroSimPrice, currency: '₪' });
+        
+        // Check if european bundle device should be added
+        if (item.includeEuropeanDevice) {
+          const devicePrice = businessDaysInfo.businessDays * EUROPEAN_BUNDLE_DEVICE_RATE;
+          ilsTotal += devicePrice;
+          breakdown.push({ 
+            item: 'מכשיר פשוט (באנדל אירופאי)', 
+            price: devicePrice, 
+            currency: '₪',
+            details: `${businessDaysInfo.businessDays} ימי עסקים × ₪${EUROPEAN_BUNDLE_DEVICE_RATE}`
+          });
+        }
         break;
         
       case 'sim_american':
@@ -223,17 +236,6 @@ export function calculateRentalPrice(
           price: simpleDeviceInfo.price, 
           currency: '₪',
           details: `${simpleDeviceInfo.businessDays} ימי עסקים × ₪${simpleDeviceInfo.dailyRate}`
-        });
-        break;
-        
-      case 'device_simple_europe':
-        const euroDeviceInfo = calculateDevicePriceDetailed(item.category, start, end);
-        ilsTotal += euroDeviceInfo.price;
-        breakdown.push({ 
-          item: 'מכשיר פשוט לאירופה', 
-          price: euroDeviceInfo.price, 
-          currency: '₪',
-          details: `${euroDeviceInfo.businessDays} ימי עסקים × ₪${euroDeviceInfo.dailyRate}`
         });
         break;
         
