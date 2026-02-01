@@ -35,6 +35,21 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
   const pendingStartRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const formatCameraErrorCode = useCallback((err: any) => {
+    const errName = err?.name ? String(err.name) : 'UnknownError';
+    const errMsg = err?.message ? String(err.message) : '';
+    const errConstraint = err?.constraint ? ` (constraint: ${err.constraint})` : '';
+    const errAsString =
+      typeof err === 'string'
+        ? err
+        : typeof err?.toString === 'function'
+          ? String(err.toString())
+          : '';
+
+    const detail = errMsg || (errAsString && errAsString !== '[object Object]' ? errAsString : '');
+    return `${errName}${errConstraint}${detail ? ` - ${detail.slice(0, 120)}` : ''}`;
+  }, []);
+
   const handleClose = useCallback(() => {
     if (scannerRef.current) {
       scannerRef.current
@@ -81,6 +96,8 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
 
   // CRITICAL: Ask for camera permission directly from a user gesture.
   // Some browsers will block permission prompts if media capture is initiated from useEffect/setTimeout.
+  // NOTE: We avoid a “preflight getUserMedia → stop” cycle on the main flow because some Android devices
+  // fail to start the second stream immediately after stopping the first.
   const preflightCameraPermission = useCallback(async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
       const err = new Error('NotSupportedError') as any;
@@ -89,11 +106,9 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
     }
 
     const stream = await navigator.mediaDevices.getUserMedia({
-      // Prefer back camera on mobile; some devices behave better when facingMode is provided.
       video: { facingMode: { ideal: 'environment' } },
       audio: false,
     });
-    // Stop immediately; we only needed the permission prompt in a gesture context.
     stream.getTracks().forEach((t) => t.stop());
   }, []);
 
@@ -211,13 +226,11 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
         name: err?.name,
         message: err?.message,
         constraint: err?.constraint,
+        asString: typeof err === 'string' ? err : err?.toString?.(),
         stack: err?.stack?.slice?.(0, 500),
       });
 
-      const errName = err?.name ? String(err.name) : 'UnknownError';
-      const errMsg = err?.message ? String(err.message) : '';
-      const errConstraint = err?.constraint ? ` (constraint: ${err.constraint})` : '';
-      const fullErrorCode = `${errName}${errConstraint}${errMsg ? ` - ${errMsg.slice(0, 80)}` : ''}`;
+      const fullErrorCode = formatCameraErrorCode(err);
 
       if (err.name === 'NotAllowedError') {
         setError(
@@ -245,7 +258,7 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
       hasStartedRef.current = false;
       setNeedsUserGesture(true);
     }
-  }, [handleClose, onScan]);
+  }, [formatCameraErrorCode, handleClose, onScan]);
 
   // Handle camera selection change
   const handleCameraChange = useCallback(async (newCameraId: string) => {
@@ -261,7 +274,10 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
     setError(null);
 
     try {
-      await preflightCameraPermission();
+      // Only do preflight when we need to switch UI (manual → camera). Otherwise, start directly.
+      if (manualMode) {
+        await preflightCameraPermission();
+      }
       setNeedsUserGesture(false);
     } catch (err: any) {
       console.error('Camera permission preflight failed:', err);
@@ -284,6 +300,7 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
     }
 
     // Camera UI is already mounted → start immediately.
+    // Avoid preflight here (some Android devices fail after a preflight stream is stopped).
     startScanner(selectedCameraId ?? undefined);
   }, [manualMode, preflightCameraPermission, selectedCameraId, startScanner]);
 
