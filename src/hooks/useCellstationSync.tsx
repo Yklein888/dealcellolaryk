@@ -5,17 +5,19 @@ import { useToast } from '@/hooks/use-toast';
 
 export interface SimCard {
   id: string;
+  short_number: string | null;
   local_number: string | null;
   israeli_number: string | null;
   sim_number: string | null;
   expiry_date: string | null;
-  is_rented: boolean;
-  status: string;
+  is_rented: boolean | null;
+  is_active: boolean | null;
+  status: string | null;
   package_name: string | null;
   notes: string | null;
   last_synced: string;
-  created_at: string;
-  updated_at: string;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 export function useCellstationSync() {

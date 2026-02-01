@@ -743,12 +743,14 @@ export type Database = {
           created_at: string | null
           expiry_date: string | null
           id: string
+          is_active: boolean | null
           is_rented: boolean | null
           israeli_number: string | null
           last_synced: string | null
           local_number: string | null
           notes: string | null
           package_name: string | null
+          short_number: string | null
           sim_number: string | null
           status: string | null
           updated_at: string | null
@@ -757,12 +759,14 @@ export type Database = {
           created_at?: string | null
           expiry_date?: string | null
           id?: string
+          is_active?: boolean | null
           is_rented?: boolean | null
           israeli_number?: string | null
           last_synced?: string | null
           local_number?: string | null
           notes?: string | null
           package_name?: string | null
+          short_number?: string | null
           sim_number?: string | null
           status?: string | null
           updated_at?: string | null
@@ -771,12 +775,14 @@ export type Database = {
           created_at?: string | null
           expiry_date?: string | null
           id?: string
+          is_active?: boolean | null
           is_rented?: boolean | null
           israeli_number?: string | null
           last_synced?: string | null
           local_number?: string | null
           notes?: string | null
           package_name?: string | null
+          short_number?: string | null
           sim_number?: string | null
           status?: string | null
           updated_at?: string | null
