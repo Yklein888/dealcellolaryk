@@ -9,6 +9,7 @@ import {
   buildBarcodeVideoConstraints,
   pickPreferredCameraId,
   CameraDevice,
+  applyTrackOptimizations,
 } from '@/lib/barcodeScanner';
 import {
   BarcodeScannerSettings,
@@ -21,6 +22,9 @@ interface BarcodeScannerProps {
   onScan: (barcodeId: string) => void;
 }
 
+// Scanner states for lifecycle management
+type ScannerState = 'idle' | 'initializing' | 'running' | 'stopping';
+
 export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps) {
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,21 +34,26 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
   const [cameras, setCameras] = useState<CameraDevice[]>([]);
   const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null);
   const [needsUserGesture, setNeedsUserGesture] = useState(true);
+  
   const scannerRef = useRef<Html5Qrcode | null>(null);
-  const hasStartedRef = useRef(false);
-  const pendingStartRef = useRef(false);
-  const opQueueRef = useRef<Promise<void>>(Promise.resolve());
-  const isStartingRef = useRef(false);
+  const scannerStateRef = useRef<ScannerState>('idle');
+  const activeStreamRef = useRef<MediaStream | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const mountedRef = useRef(true);
+  const pendingStartRef = useRef(false);
 
-  const runExclusive = useCallback(<T,>(fn: () => Promise<T>): Promise<T> => {
-    const next = opQueueRef.current.then(fn, fn);
-    // Keep queue alive even if fn throws
-    opQueueRef.current = next.then(
-      () => undefined,
-      () => undefined
-    );
-    return next;
+  // Explicitly stop all video tracks from a stream
+  const stopAllTracks = useCallback((stream: MediaStream | null) => {
+    if (stream) {
+      stream.getTracks().forEach((track) => {
+        try {
+          track.stop();
+          console.log('Stopped track:', track.kind, track.label);
+        } catch (e) {
+          console.warn('Failed to stop track:', e);
+        }
+      });
+    }
   }, []);
 
   const formatCameraErrorCode = useCallback((err: any) => {
@@ -62,27 +71,71 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
     return `${errName}${errConstraint}${detail ? ` - ${detail.slice(0, 120)}` : ''}`;
   }, []);
 
-  const handleClose = useCallback(() => {
-    runExclusive(async () => {
+  // Full cleanup of scanner and all resources
+  const cleanupScanner = useCallback(async () => {
+    console.log('cleanupScanner called, current state:', scannerStateRef.current);
+    
+    // If already idle or stopping, don't double-stop
+    if (scannerStateRef.current === 'idle' || scannerStateRef.current === 'stopping') {
+      console.log('Scanner already idle/stopping, skipping cleanup');
+      return;
+    }
+    
+    scannerStateRef.current = 'stopping';
+    
+    try {
+      // First, stop the Html5Qrcode scanner
       if (scannerRef.current) {
         try {
-          await scannerRef.current.stop();
-        } catch {
-          // ignore
+          const state = scannerRef.current.getState();
+          console.log('Scanner getState:', state);
+          // Only call stop if scanner is actually running (state 2 = SCANNING)
+          if (state === 2) {
+            await scannerRef.current.stop();
+            console.log('Html5Qrcode stopped successfully');
+          }
+        } catch (stopErr) {
+          console.warn('Error stopping Html5Qrcode:', stopErr);
         }
         scannerRef.current = null;
       }
-      hasStartedRef.current = false;
-      isStartingRef.current = false;
-    }).finally(() => {
+      
+      // Explicitly stop all active video tracks
+      stopAllTracks(activeStreamRef.current);
+      activeStreamRef.current = null;
+      
+      // Also try to stop any lingering video elements
+      const videoElements = document.querySelectorAll('#barcode-scanner-reader video');
+      videoElements.forEach((video) => {
+        const videoEl = video as HTMLVideoElement;
+        if (videoEl.srcObject) {
+          const stream = videoEl.srcObject as MediaStream;
+          stopAllTracks(stream);
+          videoEl.srcObject = null;
+        }
+      });
+      
+    } catch (err) {
+      console.warn('Cleanup error:', err);
+    } finally {
+      scannerStateRef.current = 'idle';
+      console.log('Scanner cleanup complete, state now idle');
+    }
+  }, [stopAllTracks]);
+
+  const handleClose = useCallback(async () => {
+    await cleanupScanner();
+    
+    if (mountedRef.current) {
       setIsScanning(false);
       setIsStarting(false);
       setManualMode(false);
       setManualInput('');
       setNeedsUserGesture(true);
-      onClose();
-    });
-  }, [onClose, runExclusive]);
+    }
+    
+    onClose();
+  }, [onClose, cleanupScanner]);
 
   const handleManualSubmit = useCallback(() => {
     const trimmed = manualInput.trim();
@@ -93,27 +146,16 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
     }
   }, [manualInput, onScan, handleClose]);
 
-  const stopScanner = useCallback(() => {
-    return runExclusive(async () => {
-      if (scannerRef.current) {
-        try {
-          await scannerRef.current.stop();
-        } catch {
-          // ignore
-        }
-        scannerRef.current = null;
-      }
-      hasStartedRef.current = false;
-      isStartingRef.current = false;
+  const stopScanner = useCallback(async () => {
+    await cleanupScanner();
+    
+    if (mountedRef.current) {
       setIsScanning(false);
       setIsStarting(false);
-    });
-  }, [runExclusive]);
+    }
+  }, [cleanupScanner]);
 
-  // CRITICAL: Ask for camera permission directly from a user gesture.
-  // Some browsers will block permission prompts if media capture is initiated from useEffect/setTimeout.
-  // NOTE: We avoid a “preflight getUserMedia → stop” cycle on the main flow because some Android devices
-  // fail to start the second stream immediately after stopping the first.
+  // Request camera permission from user gesture
   const preflightCameraPermission = useCallback(async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
       const err = new Error('NotSupportedError') as any;
@@ -125,175 +167,233 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
       video: { facingMode: { ideal: 'environment' } },
       audio: false,
     });
-    stream.getTracks().forEach((t) => t.stop());
-  }, []);
+    // Store reference and stop tracks
+    stopAllTracks(stream);
+  }, [stopAllTracks]);
 
   const startScanner = useCallback(
-    (cameraIdOverride?: string) => {
-      return runExclusive(async () => {
-        // Prevent overlapping start/stop transitions (html5-qrcode throws "already under transition")
-        if (hasStartedRef.current || isStartingRef.current) return;
-        hasStartedRef.current = true;
-        isStartingRef.current = true;
-        setIsStarting(true);
-        setError(null);
+    async (cameraIdOverride?: string) => {
+      console.log('startScanner called, current state:', scannerStateRef.current);
+      
+      // CRITICAL: Prevent starting if already initializing or running
+      if (scannerStateRef.current !== 'idle') {
+        console.log('Scanner not idle, aborting start. State:', scannerStateRef.current);
+        return;
+      }
+      
+      scannerStateRef.current = 'initializing';
+      setIsStarting(true);
+      setError(null);
 
-        const scannerId = 'barcode-scanner-reader';
-        const scannerElement = document.getElementById(scannerId);
+      // Add delay to ensure DOM and previous instances are fully cleared
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      
+      // Double-check we're still mounted and should proceed
+      if (!mountedRef.current) {
+        scannerStateRef.current = 'idle';
+        return;
+      }
 
-        if (!scannerElement) {
-          setError('לא ניתן לאתחל את הסורק');
-          setIsStarting(false);
-          hasStartedRef.current = false;
-          isStartingRef.current = false;
-          return;
+      const scannerId = 'barcode-scanner-reader';
+      const scannerElement = document.getElementById(scannerId);
+
+      if (!scannerElement) {
+        setError('לא ניתן לאתחל את הסורק');
+        setIsStarting(false);
+        scannerStateRef.current = 'idle';
+        return;
+      }
+
+      try {
+        // Create fresh scanner instance
+        scannerRef.current = new Html5Qrcode(scannerId, {
+          formatsToSupport: [
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,
+            Html5QrcodeSupportedFormats.QR_CODE,
+          ],
+          verbose: false,
+        });
+
+        // Calculate qrbox dimensions
+        const containerWidth = containerRef.current?.clientWidth || window.innerWidth;
+        const qrboxWidth = Math.min(containerWidth - 48, 400);
+        const qrboxHeight = Math.floor(qrboxWidth * 0.35);
+
+        const onDecoded = (decodedText: string) => {
+          if (navigator.vibrate) navigator.vibrate(100);
+          onScan(decodedText);
+          handleClose();
+        };
+
+        const onDecodeError = () => {};
+
+        // Get available cameras
+        let cameraList: CameraDevice[] = [];
+        let preferredCameraId: string | undefined;
+        
+        try {
+          cameraList = await Html5Qrcode.getCameras();
+          setCameras(cameraList);
+          
+          const storedId = getStoredCameraId();
+          preferredCameraId = cameraIdOverride || pickPreferredCameraId(cameraList, storedId);
+          
+          if (preferredCameraId) {
+            setSelectedCameraId(preferredCameraId);
+          }
+        } catch (camErr) {
+          console.warn('Could not enumerate cameras:', camErr);
         }
 
-        try {
-          scannerRef.current = new Html5Qrcode(scannerId, {
-            formatsToSupport: [
-              Html5QrcodeSupportedFormats.CODE_128,
-              Html5QrcodeSupportedFormats.CODE_39,
-              Html5QrcodeSupportedFormats.EAN_13,
-              Html5QrcodeSupportedFormats.EAN_8,
-              Html5QrcodeSupportedFormats.UPC_A,
-              Html5QrcodeSupportedFormats.UPC_E,
-              Html5QrcodeSupportedFormats.QR_CODE,
-            ],
-            verbose: false,
-          });
+        const scanConfig = buildBarcodeScannerConfig({ qrboxWidth, qrboxHeight });
 
-          // Use full container width for qrbox (larger = easier barcode capture)
-          const containerWidth = containerRef.current?.clientWidth || window.innerWidth;
-          const qrboxWidth = Math.min(containerWidth - 48, 400);
-          const qrboxHeight = Math.floor(qrboxWidth * 0.35);
-
-          const onDecoded = (decodedText: string) => {
-            if (navigator.vibrate) navigator.vibrate(100);
-            onScan(decodedText);
-            handleClose();
-          };
-
-          const onDecodeError = () => {};
-
-          // Get available cameras and determine which to use
-          let cameraList: CameraDevice[] = [];
-          let preferredCameraId: string | undefined;
-          
+        // Try starting with different constraint levels
+        const attemptStart = async (
+          constraints: MediaTrackConstraints,
+          label: string
+        ): Promise<boolean> => {
           try {
-            cameraList = await Html5Qrcode.getCameras();
-            setCameras(cameraList);
+            console.log(`Attempting start with ${label}:`, constraints);
+            await scannerRef.current!.start(
+              constraints as any,
+              scanConfig as any,
+              onDecoded,
+              onDecodeError
+            );
             
-            // Use override, or stored preference, or auto-detect
-            const storedId = getStoredCameraId();
-            preferredCameraId = cameraIdOverride || pickPreferredCameraId(cameraList, storedId);
-            
-            if (preferredCameraId) {
-              setSelectedCameraId(preferredCameraId);
-            }
-          } catch {}
-
-          try {
-            const scanConfig = buildBarcodeScannerConfig({ qrboxWidth, qrboxHeight });
-
-            // Attempt 1: primary constraints (may include deviceId exact)
+            // After successful start, try to get the active stream and apply optimizations
             try {
-              const constraints = buildBarcodeVideoConstraints(preferredCameraId, 'primary');
-              await scannerRef.current.start(
-                constraints as any,
-                scanConfig as any,
-                onDecoded,
-                onDecodeError
-              );
-            } catch (err1: any) {
-              console.warn('Primary camera constraints failed, retrying with fallback:', err1);
-
-              // Attempt 2: fallback constraints (still may include deviceId exact)
-              try {
-                const fallbackConstraints = buildBarcodeVideoConstraints(preferredCameraId, 'fallback');
-                await scannerRef.current.start(
-                  fallbackConstraints as any,
-                  scanConfig as any,
-                  onDecoded,
-                  onDecodeError
-                );
-              } catch (err2: any) {
-                // Some Android devices reject deviceId constraints even when permission is granted.
-                // Attempt 3: try again WITHOUT deviceId (use facingMode instead).
-                if (preferredCameraId) {
-                  console.warn('Fallback with deviceId failed, retrying without deviceId:', err2);
-                  const noDeviceIdConstraints = buildBarcodeVideoConstraints(undefined, 'fallback');
-                  await scannerRef.current.start(
-                    noDeviceIdConstraints as any,
-                    scanConfig as any,
-                    onDecoded,
-                    onDecodeError
-                  );
-                } else {
-                  throw err2;
+              const videoElement = document.querySelector('#barcode-scanner-reader video') as HTMLVideoElement;
+              if (videoElement?.srcObject) {
+                const stream = videoElement.srcObject as MediaStream;
+                activeStreamRef.current = stream;
+                
+                const videoTrack = stream.getVideoTracks()[0];
+                if (videoTrack) {
+                  await applyTrackOptimizations(videoTrack);
                 }
               }
+            } catch (optErr) {
+              console.warn('Could not apply optimizations:', optErr);
             }
-          } catch (err: any) {
-            throw err;
+            
+            return true;
+          } catch (err) {
+            console.warn(`${label} failed:`, err);
+            return false;
           }
+        };
 
+        // Attempt 1: Primary constraints with deviceId
+        let started = await attemptStart(
+          buildBarcodeVideoConstraints(preferredCameraId, 'primary'),
+          'Primary with deviceId'
+        );
+
+        // Attempt 2: Fallback constraints with deviceId
+        if (!started && preferredCameraId) {
+          started = await attemptStart(
+            buildBarcodeVideoConstraints(preferredCameraId, 'fallback'),
+            'Fallback with deviceId'
+          );
+        }
+
+        // Attempt 3: Primary constraints without deviceId (facingMode only)
+        if (!started) {
+          started = await attemptStart(
+            buildBarcodeVideoConstraints(undefined, 'primary'),
+            'Primary without deviceId'
+          );
+        }
+
+        // Attempt 4: Fallback constraints without deviceId
+        if (!started) {
+          started = await attemptStart(
+            buildBarcodeVideoConstraints(undefined, 'fallback'),
+            'Fallback without deviceId'
+          );
+        }
+
+        // Attempt 5: Minimal constraints as last resort
+        if (!started) {
+          started = await attemptStart(
+            { facingMode: 'environment' },
+            'Minimal constraints'
+          );
+        }
+
+        if (!started) {
+          throw new Error('All camera start attempts failed');
+        }
+
+        if (mountedRef.current) {
           setIsStarting(false);
-          isStartingRef.current = false;
           setIsScanning(true);
-        } catch (err: any) {
-          // Log full error details for debugging
-          console.error('Failed to start scanner:', err);
-          console.error('Error details:', {
-            name: err?.name,
-            message: err?.message,
-            constraint: err?.constraint,
-            asString: typeof err === 'string' ? err : err?.toString?.(),
-            stack: err?.stack?.slice?.(0, 500),
-          });
+          scannerStateRef.current = 'running';
+        }
+        
+      } catch (err: any) {
+        console.error('Failed to start scanner:', err);
+        console.error('Error details:', {
+          name: err?.name,
+          message: err?.message,
+          constraint: err?.constraint,
+          stack: err?.stack?.slice?.(0, 500),
+        });
 
-          const fullErrorCode = formatCameraErrorCode(err);
+        const fullErrorCode = formatCameraErrorCode(err);
 
-          if (err.name === 'NotAllowedError') {
-            setError(
-              'נדרשת הרשאת גישה למצלמה. אם כבר אישרת ועדיין יש שגיאה, בדוק גם בהרשאות המערכת: הגדרות אנדרואיד → אפליקציות → Chrome → הרשאות → מצלמה → אפשר.\n' +
-                `קוד שגיאה: ${fullErrorCode}`
-            );
-          } else if (err.name === 'NotFoundError') {
-            setError(`לא נמצאה מצלמה במכשיר זה.\nקוד שגיאה: ${fullErrorCode}`);
-          } else if (err.name === 'OverconstrainedError') {
-            setError(
-              'הגדרות המצלמה לא נתמכות במצלמה שנבחרה. נסה לבחור מצלמה אחרת (⚙️) או נסה שוב.\n' +
-                `קוד שגיאה: ${fullErrorCode}`
-            );
-          } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
-            setError(
-              'המצלמה תפוסה/לא זמינה כרגע. סגור אפליקציות שמשתמשות במצלמה (WhatsApp/Instagram/מצלמה) ונסה שוב.\n' +
-                `קוד שגיאה: ${fullErrorCode}`
-            );
-          } else if (err.name === 'NotSupportedError') {
-            setError(
-              `הדפדפן לא תומך בהפעלת מצלמה בצורה הזו. נסה דפדפן אחר או עדכן גרסה.\nקוד שגיאה: ${fullErrorCode}`
-            );
-          } else {
-            setError(`לא ניתן להפעיל את המצלמה. וודא שנתת הרשאות גישה.\nקוד שגיאה: ${fullErrorCode}`);
-          }
+        if (err.name === 'NotAllowedError') {
+          setError(
+            'נדרשת הרשאת גישה למצלמה. אם כבר אישרת ועדיין יש שגיאה, בדוק גם בהרשאות המערכת: הגדרות אנדרואיד → אפליקציות → Chrome → הרשאות → מצלמה → אפשר.\n' +
+              `קוד שגיאה: ${fullErrorCode}`
+          );
+        } else if (err.name === 'NotFoundError') {
+          setError(`לא נמצאה מצלמה במכשיר זה.\nקוד שגיאה: ${fullErrorCode}`);
+        } else if (err.name === 'OverconstrainedError') {
+          setError(
+            'הגדרות המצלמה לא נתמכות במצלמה שנבחרה. נסה לבחור מצלמה אחרת (⚙️) או נסה שוב.\n' +
+              `קוד שגיאה: ${fullErrorCode}`
+          );
+        } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+          setError(
+            'המצלמה תפוסה/לא זמינה כרגע. סגור אפליקציות שמשתמשות במצלמה (WhatsApp/Instagram/מצלמה) ונסה שוב.\n' +
+              `קוד שגיאה: ${fullErrorCode}`
+          );
+        } else if (err.name === 'NotSupportedError') {
+          setError(
+            `הדפדפן לא תומך בהפעלת מצלמה בצורה הזו. נסה דפדפן אחר או עדכן גרסה.\nקוד שגיאה: ${fullErrorCode}`
+          );
+        } else {
+          setError(`לא ניתן להפעיל את המצלמה. וודא שנתת הרשאות גישה.\nקוד שגיאה: ${fullErrorCode}`);
+        }
+        
+        // Clean up on failure
+        await cleanupScanner();
+        
+        if (mountedRef.current) {
           setIsStarting(false);
-          hasStartedRef.current = false;
-          isStartingRef.current = false;
           setNeedsUserGesture(true);
         }
-      });
+      }
     },
-    [formatCameraErrorCode, handleClose, onScan, runExclusive]
+    [formatCameraErrorCode, handleClose, onScan, cleanupScanner]
   );
 
   // Handle camera selection change
   const handleCameraChange = useCallback(async (newCameraId: string) => {
     setSelectedCameraId(newCameraId);
     await stopScanner();
-    // If permission was already granted and user is scanning, restart immediately.
+    
+    // If permission was already granted, restart with new camera
     if (!needsUserGesture && isOpen && !manualMode) {
+      // Wait for cleanup to complete
+      await new Promise((resolve) => setTimeout(resolve, 300));
       pendingStartRef.current = true;
     }
   }, [stopScanner, needsUserGesture, isOpen, manualMode]);
@@ -302,7 +402,7 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
     setError(null);
 
     try {
-      // Only do preflight when we need to switch UI (manual → camera). Otherwise, start directly.
+      // Only do preflight when switching from manual mode
       if (manualMode) {
         await preflightCameraPermission();
       }
@@ -320,24 +420,23 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
       return;
     }
 
-    // If we're in manual mode, render the camera UI first, then start.
+    // If in manual mode, switch to camera UI first
     if (manualMode) {
       pendingStartRef.current = true;
       setManualMode(false);
       return;
     }
 
-    // Camera UI is already mounted → start immediately.
-    // Avoid preflight here (some Android devices fail after a preflight stream is stopped).
+    // Camera UI is mounted, start scanner
     await startScanner(selectedCameraId ?? undefined);
   }, [manualMode, preflightCameraPermission, selectedCameraId, startScanner]);
 
-  // When opening, if permission already granted, we can autostart safely.
+  // Check permission on open
   useEffect(() => {
     if (!isOpen) return;
 
     setError(null);
-    // Keep manualMode as-is; don't force switching user flow.
+    
     (async () => {
       try {
         const permissionsApi = (navigator as any).permissions;
@@ -345,39 +444,42 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
         const res = await permissionsApi.query({ name: 'camera' as any });
         if (res?.state === 'granted') {
           setNeedsUserGesture(false);
-          // Only autostart if camera UI is visible.
-          if (!manualMode && !hasStartedRef.current) {
-            startScanner(selectedCameraId ?? undefined);
+          // Only autostart if camera UI is visible and we're idle
+          if (!manualMode && scannerStateRef.current === 'idle') {
+            await startScanner(selectedCameraId ?? undefined);
           }
         } else {
           setNeedsUserGesture(true);
         }
       } catch {
-        // If we can't detect, fall back to requiring a user gesture.
         setNeedsUserGesture(true);
       }
     })();
   }, [isOpen, manualMode, selectedCameraId, startScanner]);
 
-  // Start after manual mode switch when the UI is mounted.
+  // Handle pending start after mode switch
   useEffect(() => {
     if (!isOpen) return;
     if (manualMode) return;
     if (!pendingStartRef.current) return;
+    
     pendingStartRef.current = false;
 
-    if (!needsUserGesture && !hasStartedRef.current) {
+    if (!needsUserGesture && scannerStateRef.current === 'idle') {
       startScanner(selectedCameraId ?? undefined);
     }
   }, [isOpen, manualMode, needsUserGesture, selectedCameraId, startScanner]);
 
-  // Cleanup on unmount / close
+  // Cleanup on unmount
   useEffect(() => {
+    mountedRef.current = true;
+    
     return () => {
-      // Ensure we don't call stop/start concurrently during unmount
-      void stopScanner();
+      mountedRef.current = false;
+      // Async cleanup on unmount
+      cleanupScanner();
     };
-  }, [stopScanner]);
+  }, [cleanupScanner]);
 
   if (!isOpen) return null;
 
@@ -441,7 +543,7 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
                 className="w-full h-full [&_video]:w-full [&_video]:h-full [&_video]:object-cover"
               />
 
-              {/* User gesture gate (permission prompt) */}
+              {/* User gesture gate */}
               {needsUserGesture && !isStarting && !isScanning && (
                 <div className="absolute inset-0 bg-black/70 flex items-center justify-center px-6">
                   <div className="w-full max-w-sm text-center text-white space-y-3">
@@ -498,7 +600,7 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
                 </div>
               ) : needsUserGesture ? (
                 <div className="text-center text-white/70 text-sm">
-                  לחץ על “הפעל מצלמה” כדי לאשר הרשאה
+                  לחץ על "הפעל מצלמה" כדי לאשר הרשאה
                 </div>
               ) : null}
 
@@ -512,10 +614,9 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
                 <Button
                   variant="secondary"
                   className="flex-1"
-                  onClick={() => {
-                    void stopScanner().finally(() => {
-                      setManualMode(true);
-                    });
+                  onClick={async () => {
+                    await stopScanner();
+                    setManualMode(true);
                   }}
                 >
                   <Keyboard className="h-4 w-4 ml-2" />
