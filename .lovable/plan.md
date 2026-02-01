@@ -1,330 +1,128 @@
 
-# תוכנית: הדפסה לסימים אמריקאיים + ניווט ישיר לפעולות
+מטרה
+- להפוך את “הוראות החיוג” של סים אירופאי ל”הדפסה ישירה” בלי להוריד קבצי Word למחשב, ובמקביל לשמור על העיצוב המקורי של תבנית ה‑DOCX (בלי “עיצוב מחדש”).
+- לפי הבדיקה בקוד: היום ההוראות נוצרות בשרת כ‑DOCX מתוך התבנית המקורית (Edge Function: `generate-calling-instructions`) ואז נשמרות מקומית דרך `file-saver` (הורדה).
 
-## סיכום הבקשות
+מה יש היום (מצב קיים בקוד)
+- `src/lib/callingInstructions.ts`:
+  - `generateCallingInstructions(...)` קורא לפונקציית backend `generate-calling-instructions` ומקבל DOCX כ‑Blob.
+  - אחר כך עושה `saveAs(blob, "...docx")` → זה יוצר קובץ במחשב (העמסה/בלגן).
+- שימושים:
+  - `src/pages/Rentals.tsx` מציג כפתור “הורד הוראות חיוג” לסים אירופאי.
+  - `src/components/rentals/NewRentalDialog.tsx` מציג אייקון הורדה (FileDown) לסים אירופאי בתוך “פריטים נבחרים”.
+- אין כרגע הדפסה ישירה, ואין שום ספריות jsPDF/html2canvas/docx-preview בפרויקט.
 
-1. **הדפסת סים אמריקאי**: הוספת אפשרות הדפסה לסימים אמריקאיים בגודל קטן (להדבקה על מכשירים), שכולל:
-   - מספר אמריקאי (תמיד)
-   - מספר ישראלי (אם קיים)
-   - מספר סים (ICCID)
-   - ברקוד
+הבעיה והאילוץ המרכזי
+- דפדפנים לא “מדפיסים Word” בצורה נאטיבית.
+- כל ניסיון להמיר DOCX ל‑HTML ולהדפיס – בדרך כלל הורס את הפריסה של התבנית.
+- כדי לשמור את הפריסה המקורית של התבנית, נשתמש בגישה שמדפיסה PDF שנוצר בתהליך שמנסה לשמר את העיצוב המקורי ככל האפשר.
 
-2. **ניווט ישיר לפעולות**: כשבוחרים מוצר בחיפוש ולוחצים "הוסף להשכרה", הדיאלוג של השכרה חדשה ייפתח ישירות עם הפריט מסומן (במקום לעבור לדף ההשכרות ולפתוח השכרה ידנית)
+הפתרון המוצע (לפי ההנחיות שלך)
+ניישם הדפסה ישירה כך:
+1) נמשיך לייצר DOCX מהתבנית המקורית (כמו היום) – זה שומר את “האמת” של המסמך המקורי.
+2) במקום להוריד את ה‑DOCX למחשב, נרנדר אותו בתוך הדפדפן בצורה נאמנה לתבנית באמצעות `docx-preview`.
+3) נצלם את הדפים כרינדור (Canvas) באמצעות `html2canvas` (זה נותן “תמונה” של הדף כפי שמופיע – הכי קרוב לשמירה על פריסה).
+4) נרכיב PDF מתוך התמונות בעזרת `jsPDF`.
+5) ניצור Blob של ה‑PDF בזיכרון (ללא הורדה).
+6) ניצור URL זמני עם `URL.createObjectURL`.
+7) נטעין את ה‑PDF בתוך iframe נסתר ונפעיל `print()` אוטומטית.
+8) ניקוי משאבים: הסרת iframe, הסרת קונטיינרים זמניים, `URL.revokeObjectURL`.
 
----
+הערת איכות חשובה (כדי להימנע מ”עיצוב מחדש”)
+- ה‑PDF שיודפס יהיה “תמונתי” (כל דף תמונה), כי זה מה שמאפשר לשמור פריסה ב‑100% הרבה יותר טוב.
+- החיסרון: טקסט לא יהיה “Selectable” כמו PDF טקסטואלי, אבל הדפסה תיראה כמו המקור.
 
-## חלק 1: הדפסת סים אמריקאי
+שינויים בקוד (קבצים ותכולה)
 
-### מה נוסיף
-כפתור הדפסה חדש שמייצר מדבקה קטנה (כ-4x6 ס"מ) עם:
+A) הוספת תלויות (dependencies)
+- נוסיף חבילות:
+  - `docx-preview`
+  - `html2canvas`
+  - `jspdf`
+- עדכון `package.json` בהתאם.
 
-```text
-┌─────────────────────────────┐
-│    מספר אמריקאי/מקומי:     │
-│     +1-555-123-4567         │
-│ ────────────────────────── │
-│    מספר ישראלי:             │
-│     0722-587-081            │
-│ ────────────────────────── │
-│     SIM: 8972...            │
-│                             │
-│     [||||||||||||||||]      │
-│       INV-XXXXXX            │
-└─────────────────────────────┘
-```
+B) ריפקטור ב‑`src/lib/callingInstructions.ts`
+נפצל את האחריות ל־2 פעולות:
+1) פונקציה פנימית/חדשה שמחזירה Blob של ה‑DOCX בלי להוריד:
+   - `fetchCallingInstructionsDocx(israeliNumber, localNumber, barcode): Promise<Blob>`
+2) “הדפסה ישירה”:
+   - `printCallingInstructions(israeliNumber, localNumber, barcode): Promise<void>`
+   - שלבים:
+     - `const docxBlob = await fetchCallingInstructionsDocx(...)`
+     - יצירת `bodyContainer` + `styleContainer` נסתרים (offscreen)
+     - `await renderAsync(docxBlob, bodyContainer, styleContainer, options)`
+     - איתור דפים:
+       - אם `docx-preview` יוצר `.docx-page` → נצלם כל דף בנפרד לדיוק ומולטי‑עמודים
+       - אחרת נצלם את הקונטיינר כולו
+     - `html2canvas(pageEl, { scale: 2, useCORS: true, backgroundColor: "#fff" })`
+     - `jsPDF("p","mm","a4")` + `addImage` לכל דף
+     - `const pdfBlob = pdf.output("blob")`
+     - `const url = URL.createObjectURL(pdfBlob)`
+     - iframe נסתר:
+       - `iframe.src = url`
+       - `iframe.onload = () => iframe.contentWindow?.print()`
+     - ניקוי אחרי ~1–2 שניות:
+       - `document.body.removeChild(iframe)`
+       - `URL.revokeObjectURL(url)`
+       - הסרת הקונטיינרים של ה‑docx-preview
+3) נשאיר אופציה להורדה (למקרי גיבוי) – אבל לא כפעולה הראשית:
+   - `downloadCallingInstructions(...)` שישתמש שוב ב‑`saveAs(docxBlob, ...)`.
+   - או נשאיר את הפונקציה הקיימת כ”הורדה” ונוסיף חדשה להדפסה; אבל נעדכן את ה‑UI להשתמש בהדפסה.
 
-### קבצים לעריכה
+C) עדכון ה‑UI לאירופאי (שלא יוריד קבצים)
+1) `src/pages/Rentals.tsx`
+- לשנות את הכפתור “הורד הוראות חיוג” ל:
+  - טקסט: “הדפס הוראות חיוג”
+  - אייקון: `Printer` במקום `FileDown`
+- לשנות את handler:
+  - במקום `generateCallingInstructions(...)` → `printCallingInstructions(...)`
+- Toast:
+  - במקום “הקובץ הורד בהצלחה” → הודעה בסגנון:
+    - “פותח חלון הדפסה…”
+    - ואם יש כשל: “לא ניתן לפתוח הדפסה. אפשר לנסות הורדה כגיבוי.”
 
-#### 1. `src/components/inventory/QuickActionDialog.tsx`
-- הוספת כפתור "הדפס מדבקה" לפריטים מסוג סים
-- פונקציית הדפסה חדשה שמייצרת מסמך בגודל קטן
+2) `src/components/rentals/NewRentalDialog.tsx`
+- להחליף את כפתור האייקון (FileDown) לאייקון Printer ולהדפיס ישירות באותו אופן.
+- לשמור על אותה לוגיקה של “כפתור לכל סים” כאשר יש כמה סימים.
 
-#### 2. `src/pages/Inventory.tsx`
-- הוספת אותה פונקציית הדפסת מדבקה בדיאלוג העריכה
-- עובד גם לסים אירופאי וגם לסים אמריקאי
+D) טיפול בקצוות (כדי למנוע “שוב זה לא עובד לי”)
+- חסימת “לחיצה כפולה” בזמן יצירה/רינדור/הדפסה:
+  - שימוש ב‑`downloadingInstructions` (אולי נרצה לשנות שם ל‑`printingInstructions`, אבל לא חובה)
+- תאימות דפדפנים:
+  - Chrome/Edge: אמור לעבוד טוב
+  - Safari/iOS: לעיתים `print()` בתוך iframe יכול להיות רגיש; נשאיר fallback “הורד כקובץ” בתוך תפריט קטן או כפתור משני (מומלץ מאוד כדי שלא תיתקע).
+- ניקוי זיכרון:
+  - חובה לוודא `revokeObjectURL` והסרת DOM זמני אחרי כל הדפסה, אחרת זה יכול לצבור זיכרון.
 
-### לוגיקת ההדפסה
+בדיקות/QA שנבצע אחרי מימוש
+1) הדפסה ישירה מסים אירופאי מתוך:
+   - כרטיס השכרה ב‑`/rentals`
+   - דיאלוג “השכרה חדשה” (`NewRentalDialog`)
+2) בדיקה עם:
+   - סים עם מספר ישראלי + מקומי
+   - סים עם מקומי בלבד
+   - ברקוד קיים
+3) בדיקת איכות:
+   - שהפריסה זהה לתבנית המקורית (כותרות/יישור/מרווחים/ברקוד בתחתית שמאל)
+4) בדיקה שאין הורדה למחשב:
+   - לא נוצר קובץ בתיקיית Downloads
+5) בדיקת ביצועים:
+   - לוודא שלא נשארים iframes/containers אחרי ההדפסה (Memory leak)
 
-```javascript
-const printSimLabel = (item: InventoryItem) => {
-  const printWindow = window.open('', '_blank');
-  
-  // גודל מדבקה: 4x6 ס"מ
-  // כולל:
-  // - מספר מקומי (אמריקאי/אירופאי)
-  // - מספר ישראלי (אם קיים)
-  // - מספר ICCID
-  // - ברקוד (JsBarcode)
-};
-```
+מה ייצא למשתמש בסוף (תוצאה)
+- לחיצה על “הדפס הוראות חיוג” תפתח מיד את דיאלוג ההדפסה של הדפדפן עם מסמך שנראה כמו התבנית המקורית.
+- לא יווצרו עשרות קבצי Word במחשב.
+- אם הדפסה נחסמת/נכשלת בדפדפן מסוים: יהיה fallback להורדה (רצוי), כדי שתמיד תהיה דרך להדפיס.
 
----
+קבצים שניגע בהם
+- `package.json` (הוספת תלויות)
+- `src/lib/callingInstructions.ts` (ריפקטור + פונקציית print)
+- `src/pages/Rentals.tsx` (להחליף “הורדה” ל”הדפסה” ולשנות אייקון/טקסט/טוסטים)
+- `src/components/rentals/NewRentalDialog.tsx` (אותו שינוי בדיאלוג)
 
-## חלק 2: ניווט ישיר לפעולות
+סיכונים ידועים והפחתה
+- “הדפסה חייבת להיות מתוך פעולה של המשתמש”: תהליך רינדור+צילום הוא אסינכרוני, ובחלק מהדפדפנים זה עלול להיחשב לא “user gesture”.
+  - הפחתה: נשמור את ההדפסה כתגובה ישירה ללחיצה, ונפתח את ה‑iframe מיד עם “מסך טוען” ואז נחליף ל‑pdf כשהוא מוכן, או נשאיר fallback הורדה במצב שהדפסה נחסמה.
+- התאמת פונטים: אם התבנית משתמשת בפונט שלא קיים במערכת, התצוגה עשויה להשתנות.
+  - הפחתה: `docx-preview` מנסה לכבד fonts; בנוסף צילום כקנבס יקפיא את מה שנראה בפועל.
 
-### הבעיה הנוכחית
-כשלוחצים "הוסף להשכרה" בחיפוש הגלובלי:
-1. המשתמש מועבר לדף `/rentals`
-2. צריך ללחוץ ידנית על "השכרה חדשה"
-3. צריך לחפש ולבחור את הפריט מחדש
-
-### הפתרון
-הדיאלוג של השכרה חדשה ייפתח ישירות עם הפריט כבר מסומן.
-
-### קבצים לעריכה
-
-#### 1. `src/pages/Rentals.tsx`
-- הוספת `useLocation` מ-react-router
-- קריאת `location.state.addItemToRental` בטעינה
-- פתיחה אוטומטית של `isAddDialogOpen` עם הפריט
-- העברת `preSelectedItem` ל-NewRentalDialog
-
-#### 2. `src/components/rentals/NewRentalDialog.tsx`
-- הוספת prop חדש: `preSelectedItem?: InventoryItem`
-- ב-`useEffect`: אם `preSelectedItem` קיים, הוסף אותו ל-`selectedItems` אוטומטית
-
-#### 3. `src/pages/Inventory.tsx`
-- הוספת `useLocation` מ-react-router
-- קריאת `location.state.editItem` בטעינה
-- פתיחה אוטומטית של דיאלוג העריכה עם הפריט
-
----
-
-## שינויים טכניים מפורטים
-
-### קובץ: `src/components/inventory/QuickActionDialog.tsx`
-
-**שינוי 1**: הוספת פונקציית הדפסת מדבקה
-
-```typescript
-const printSimLabel = () => {
-  if (!item) return;
-  
-  const printWindow = window.open('', '_blank');
-  if (!printWindow) return;
-  
-  const localDisplay = item.localNumber || '---';
-  const israeliDisplay = item.israeliNumber || null;
-  const simDisplay = item.simNumber || '---';
-  
-  printWindow.document.write(`
-    <!DOCTYPE html>
-    <html dir="rtl">
-    <head>
-      <title>מדבקת סים</title>
-      <style>
-        @page { size: 4cm 6cm; margin: 2mm; }
-        body { 
-          font-family: Arial, sans-serif; 
-          font-size: 8pt;
-          width: 4cm;
-          height: 6cm;
-          padding: 2mm;
-          direction: rtl;
-        }
-        .field { 
-          margin-bottom: 2mm; 
-          text-align: center;
-        }
-        .label { font-size: 6pt; color: #666; }
-        .value { font-size: 9pt; font-weight: bold; }
-        .barcode { margin-top: 3mm; text-align: center; }
-        .barcode svg { max-width: 100%; height: 25px; }
-      </style>
-    </head>
-    <body>
-      <div class="field">
-        <div class="label">מספר מקומי:</div>
-        <div class="value">${localDisplay}</div>
-      </div>
-      ${israeliDisplay ? `
-      <div class="field">
-        <div class="label">מספר ישראלי:</div>
-        <div class="value">${israeliDisplay}</div>
-      </div>
-      ` : ''}
-      <div class="field">
-        <div class="label">מספר סים:</div>
-        <div class="value" style="font-size: 7pt;">${simDisplay}</div>
-      </div>
-      <div class="barcode">
-        <svg id="barcode"></svg>
-      </div>
-      <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.12.3/dist/JsBarcode.all.min.js"></script>
-      <script>
-        JsBarcode("#barcode", "${item.barcode || ''}", {
-          format: "CODE128",
-          width: 1,
-          height: 25,
-          displayValue: true,
-          fontSize: 8,
-          margin: 2
-        });
-        window.onload = function() {
-          setTimeout(() => {
-            window.print();
-            window.close();
-          }, 300);
-        };
-      </script>
-    </body>
-    </html>
-  `);
-  printWindow.document.close();
-};
-```
-
-**שינוי 2**: הוספת כפתור הדפסה לסימים
-
-```tsx
-{isSim && item.barcode && (
-  <Button onClick={printSimLabel} variant="outline" className="w-full">
-    <Printer className="h-4 w-4 ml-2" />
-    הדפס מדבקה
-  </Button>
-)}
-```
-
----
-
-### קובץ: `src/pages/Rentals.tsx`
-
-**שינוי 1**: הוספת import ו-useLocation
-
-```typescript
-import { useSearchParams, useLocation } from 'react-router-dom';
-
-// בתוך הקומפוננטה:
-const location = useLocation();
-const [preSelectedItem, setPreSelectedItem] = useState<InventoryItem | null>(null);
-```
-
-**שינוי 2**: האזנה ל-state בטעינה
-
-```typescript
-useEffect(() => {
-  // בדיקה אם הגענו עם פריט לבחירה מהחיפוש הגלובלי
-  if (location.state?.addItemToRental) {
-    const item = location.state.addItemToRental as InventoryItem;
-    setPreSelectedItem(item);
-    setIsAddDialogOpen(true);
-    // ניקוי ה-state כדי שלא יישמר בהיסטוריה
-    window.history.replaceState({}, document.title);
-  }
-}, [location.state]);
-```
-
-**שינוי 3**: העברת הפריט לדיאלוג
-
-```tsx
-<NewRentalDialog
-  isOpen={isAddDialogOpen}
-  onOpenChange={setIsAddDialogOpen}
-  customers={customers}
-  inventory={inventory}
-  availableItems={availableItems}
-  preSelectedItem={preSelectedItem}  // prop חדש
-  onAddRental={addRental}
-  onAddCustomer={addCustomer}
-  onAddInventoryItem={addInventoryItem}
-/>
-```
-
----
-
-### קובץ: `src/components/rentals/NewRentalDialog.tsx`
-
-**שינוי 1**: הוספת prop חדש
-
-```typescript
-interface NewRentalDialogProps {
-  // ... existing props
-  preSelectedItem?: InventoryItem | null;
-}
-```
-
-**שינוי 2**: הוספה אוטומטית של הפריט
-
-```typescript
-useEffect(() => {
-  if (isOpen && preSelectedItem && preSelectedItem.status === 'available') {
-    // בדיקה שהפריט לא כבר נבחר
-    if (!selectedItems.some(i => i.inventoryItemId === preSelectedItem.id)) {
-      setSelectedItems([{
-        inventoryItemId: preSelectedItem.id,
-        category: preSelectedItem.category,
-        name: preSelectedItem.name,
-        hasIsraeliNumber: false,
-      }]);
-    }
-  }
-}, [isOpen, preSelectedItem]);
-```
-
----
-
-### קובץ: `src/pages/Inventory.tsx`
-
-**שינוי 1**: הוספת import ו-useLocation
-
-```typescript
-import { useSearchParams, useLocation } from 'react-router-dom';
-
-// בתוך הקומפוננטה:
-const location = useLocation();
-```
-
-**שינוי 2**: האזנה ל-state בטעינה
-
-```typescript
-useEffect(() => {
-  // בדיקה אם הגענו עם פריט לעריכה מהחיפוש הגלובלי
-  if (location.state?.editItem) {
-    const item = location.state.editItem as InventoryItem;
-    handleEdit(item);
-    // ניקוי ה-state
-    window.history.replaceState({}, document.title);
-  }
-}, [location.state]);
-```
-
----
-
-## תרשים זרימה חדש
-
-```text
-משתמש מחפש מוצר בחיפוש הגלובלי
-    │
-    ├── בוחר פריט מלאי
-    │       │
-    │       └── נפתח QuickActionDialog
-    │                │
-    │                ├── "הוסף להשכרה" ──> נפתח ישירות דיאלוג השכרה
-    │                │                     עם הפריט כבר מסומן
-    │                │
-    │                ├── "ערוך פריט" ──> נפתח ישירות דיאלוג עריכה
-    │                │                   עם הפריט טעון
-    │                │
-    │                └── "הדפס מדבקה" ──> מדבקה קטנה עם כל הפרטים
-    │                                     (חדש!)
-```
-
----
-
-## סיכום השינויים
-
-| קובץ | שינוי |
-|------|-------|
-| `QuickActionDialog.tsx` | הוספת כפתור "הדפס מדבקה" + פונקציית הדפסה |
-| `Inventory.tsx` | הוספת כפתור הדפסת מדבקה + טיפול ב-state לעריכה |
-| `Rentals.tsx` | טיפול ב-state לפתיחת דיאלוג השכרה עם פריט |
-| `NewRentalDialog.tsx` | הוספת prop `preSelectedItem` + הוספה אוטומטית |
-
----
-
-## יתרונות
-
-1. **חסכון בזמן**: פריט נבחר אוטומטית - לא צריך לחפש פעמיים
-2. **מדבקות מקצועיות**: גודל קטן ומתאים להדבקה על מכשירים
-3. **תמיכה בכל הסימים**: גם אמריקאי וגם אירופאי
-4. **מידע מלא**: כל המספרים הרלוונטיים + ברקוד
