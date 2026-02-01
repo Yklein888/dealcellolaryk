@@ -738,6 +738,51 @@ export type Database = {
         }
         Relationships: []
       }
+      sim_cards: {
+        Row: {
+          created_at: string | null
+          expiry_date: string | null
+          id: string
+          is_rented: boolean | null
+          israeli_number: string | null
+          last_synced: string | null
+          local_number: string | null
+          notes: string | null
+          package_name: string | null
+          sim_number: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          expiry_date?: string | null
+          id?: string
+          is_rented?: boolean | null
+          israeli_number?: string | null
+          last_synced?: string | null
+          local_number?: string | null
+          notes?: string | null
+          package_name?: string | null
+          sim_number?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          expiry_date?: string | null
+          id?: string
+          is_rented?: boolean | null
+          israeli_number?: string | null
+          last_synced?: string | null
+          local_number?: string | null
+          notes?: string | null
+          package_name?: string | null
+          sim_number?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       user_devices: {
         Row: {
           browser: string | null
