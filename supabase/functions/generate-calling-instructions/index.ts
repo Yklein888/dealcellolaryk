@@ -195,12 +195,12 @@ const formatInternationalDisplay = (num: string): string => {
 };
 
 // Create XML for logo image at top of document
-// Original logo dimensions from image: approximately 540x142 pixels (ratio ~3.8:1)
+// Logo dimensions: approximately square with slight width bias
 const createLogoXml = (imageRelId: string): string => {
-  // Size: approximately 50mm x 13mm to match original aspect ratio
+  // Size: approximately 55mm x 45mm to show logo prominently
   // 1 mm = 38100 EMUs
-  const width = 1905000;  // ~50mm
-  const height = 495300;  // ~13mm (maintains 3.8:1 ratio)
+  const width = 2095500;  // ~55mm
+  const height = 1714500; // ~45mm
   
   return `
     <w:p>
