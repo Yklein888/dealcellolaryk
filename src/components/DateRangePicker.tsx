@@ -9,9 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { format, differenceInDays } from 'date-fns';
 import { he } from 'date-fns/locale';
-import { CalendarCheck, Calendar as CalendarIcon, ChevronRight, ChevronLeft } from 'lucide-react';
+import { CalendarCheck, Calendar as CalendarIcon, ChevronLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useIsMobile } from '@/hooks/use-mobile';
 
 interface DateRangePickerProps {
   isOpen: boolean;
@@ -31,7 +30,6 @@ export function DateRangePicker({
   const [tempStartDate, setTempStartDate] = useState<Date | undefined>(startDate);
   const [tempEndDate, setTempEndDate] = useState<Date | undefined>(endDate);
   const [activeTab, setActiveTab] = useState<'start' | 'end'>('start');
-  const isMobile = useIsMobile();
 
   // Reset temp dates when dialog opens
   useEffect(() => {
@@ -59,8 +57,8 @@ export function DateRangePicker({
     if (date && tempEndDate && tempEndDate < date) {
       setTempEndDate(undefined);
     }
-    // On mobile, auto-switch to end date selection
-    if (isMobile && date) {
+    // Auto-switch to end date selection
+    if (date) {
       setTimeout(() => setActiveTab('end'), 300);
     }
   };
@@ -73,8 +71,8 @@ export function DateRangePicker({
     ? differenceInDays(tempEndDate, tempStartDate) + 1 
     : 0;
 
-  // Desktop calendar: strict fixed grid layout with large cells
-  const desktopCalendarClassNames = {
+  // Single calendar classNames - spacious and readable
+  const calendarClassNames = {
     months: "flex flex-col",
     month: "space-y-4",
     caption: "flex justify-center pt-1 relative items-center h-14",
@@ -91,7 +89,7 @@ export function DateRangePicker({
     row: "grid grid-cols-7 gap-0",
     cell: "p-1 text-center relative",
     day: cn(
-      "h-12 w-12 p-0 font-medium rounded-lg transition-all text-base leading-none",
+      "h-11 w-11 sm:h-12 sm:w-12 p-0 font-medium rounded-lg transition-all text-base leading-none",
       "inline-flex items-center justify-center",
       "hover:bg-muted hover:scale-105",
       "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
@@ -109,48 +107,9 @@ export function DateRangePicker({
     day_hidden: "invisible",
   };
 
-  // Mobile calendar: slightly smaller but still spacious
-  const mobileCalendarClassNames = {
-    months: "flex flex-col",
-    month: "space-y-4",
-    caption: "flex justify-center pt-1 relative items-center h-12",
-    caption_label: "text-base font-semibold tracking-tight",
-    nav: "space-x-1 flex items-center",
-    nav_button: cn(
-      "h-9 w-9 bg-transparent p-0 opacity-60 hover:opacity-100 hover:bg-muted rounded-full transition-all inline-flex items-center justify-center"
-    ),
-    nav_button_previous: "absolute left-1",
-    nav_button_next: "absolute right-1",
-    table: "w-full border-collapse",
-    head_row: "grid grid-cols-7 gap-0 mb-1",
-    head_cell: "text-muted-foreground font-medium text-xs text-center py-1",
-    row: "grid grid-cols-7 gap-0",
-    cell: "p-0.5 text-center relative",
-    day: cn(
-      "h-10 w-10 p-0 font-normal rounded-lg transition-all text-sm leading-none",
-      "inline-flex items-center justify-center",
-      "hover:bg-muted",
-      "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-      "aria-selected:opacity-100"
-    ),
-    day_range_end: "day-range-end",
-    day_selected: cn(
-      "bg-primary text-primary-foreground shadow-md",
-      "hover:bg-primary/90"
-    ),
-    day_today: "bg-accent text-accent-foreground font-bold ring-1 ring-accent",
-    day_outside: "text-muted-foreground/40",
-    day_disabled: "text-muted-foreground/30 cursor-not-allowed",
-    day_range_middle: "aria-selected:bg-accent/40 aria-selected:text-accent-foreground",
-    day_hidden: "invisible",
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className={cn(
-        "p-0 gap-0 overflow-hidden",
-        isMobile ? "max-w-[95vw] w-full" : "max-w-[900px] w-[95vw]"
-      )}>
+      <DialogContent className="p-0 gap-0 overflow-hidden max-w-[450px] w-[95vw]">
         {/* Header */}
         <DialogHeader className="px-6 pt-6 pb-4 border-b bg-muted/30">
           <DialogTitle className="flex items-center gap-3 text-xl font-semibold">
@@ -161,165 +120,84 @@ export function DateRangePicker({
           </DialogTitle>
         </DialogHeader>
 
-        {/* Mobile Tab Switcher */}
-        {isMobile && (
-          <div className="flex border-b bg-background">
-            <button
-              onClick={() => setActiveTab('start')}
-              className={cn(
-                "flex-1 py-4 px-4 text-center transition-all relative",
-                activeTab === 'start' 
-                  ? "text-primary font-semibold" 
-                  : "text-muted-foreground"
-              )}
-            >
-              <div className="text-sm mb-1">תאריך התחלה</div>
-              <div className={cn(
-                "text-base font-medium",
-                tempStartDate ? "text-foreground" : "text-muted-foreground"
-              )}>
-                {tempStartDate 
-                  ? format(tempStartDate, "dd/MM/yyyy", { locale: he })
-                  : "בחר תאריך"
-                }
-              </div>
-              {activeTab === 'start' && (
-                <div className="absolute bottom-0 left-4 right-4 h-0.5 bg-primary rounded-full" />
-              )}
-            </button>
-            
-            <div className="flex items-center px-2">
-              <ChevronLeft className="h-4 w-4 text-muted-foreground" />
+        {/* Tab Switcher */}
+        <div className="flex border-b bg-background">
+          <button
+            onClick={() => setActiveTab('start')}
+            className={cn(
+              "flex-1 py-4 px-4 text-center transition-all relative",
+              activeTab === 'start' 
+                ? "text-primary font-semibold" 
+                : "text-muted-foreground"
+            )}
+          >
+            <div className="text-sm mb-1">תאריך התחלה</div>
+            <div className={cn(
+              "text-base font-medium",
+              tempStartDate ? "text-foreground" : "text-muted-foreground"
+            )}>
+              {tempStartDate 
+                ? format(tempStartDate, "dd/MM/yyyy", { locale: he })
+                : "בחר תאריך"
+              }
             </div>
-            
-            <button
-              onClick={() => setActiveTab('end')}
-              className={cn(
-                "flex-1 py-4 px-4 text-center transition-all relative",
-                activeTab === 'end' 
-                  ? "text-primary font-semibold" 
-                  : "text-muted-foreground"
-              )}
-            >
-              <div className="text-sm mb-1">תאריך סיום</div>
-              <div className={cn(
-                "text-base font-medium",
-                tempEndDate ? "text-foreground" : "text-muted-foreground"
-              )}>
-                {tempEndDate 
-                  ? format(tempEndDate, "dd/MM/yyyy", { locale: he })
-                  : "בחר תאריך"
-                }
-              </div>
-              {activeTab === 'end' && (
-                <div className="absolute bottom-0 left-4 right-4 h-0.5 bg-primary rounded-full" />
-              )}
-            </button>
+            {activeTab === 'start' && (
+              <div className="absolute bottom-0 left-4 right-4 h-0.5 bg-primary rounded-full" />
+            )}
+          </button>
+          
+          <div className="flex items-center px-2">
+            <ChevronLeft className="h-4 w-4 text-muted-foreground" />
           </div>
-        )}
-
-        {/* Calendars Container */}
-        <div className={cn(
-          "p-6 bg-background",
-          isMobile ? "pb-4" : "pb-6"
-        )}>
-          {isMobile ? (
-            // Mobile: Single calendar with tabs
-            <div className="flex justify-center">
-              {activeTab === 'start' ? (
-              <Calendar
-                  mode="single"
-                  selected={tempStartDate}
-                  onSelect={handleStartDateSelect}
-                  locale={he}
-                  dir="rtl"
-                  classNames={mobileCalendarClassNames}
-                  className="pointer-events-auto"
-                />
-              ) : (
-              <Calendar
-                  mode="single"
-                  selected={tempEndDate}
-                  onSelect={handleEndDateSelect}
-                  disabled={(date) => !!(tempStartDate && date < tempStartDate)}
-                  locale={he}
-                  dir="rtl"
-                  classNames={mobileCalendarClassNames}
-                  className="pointer-events-auto"
-                />
-              )}
+          
+          <button
+            onClick={() => setActiveTab('end')}
+            className={cn(
+              "flex-1 py-4 px-4 text-center transition-all relative",
+              activeTab === 'end' 
+                ? "text-primary font-semibold" 
+                : "text-muted-foreground"
+            )}
+          >
+            <div className="text-sm mb-1">תאריך סיום</div>
+            <div className={cn(
+              "text-base font-medium",
+              tempEndDate ? "text-foreground" : "text-muted-foreground"
+            )}>
+              {tempEndDate 
+                ? format(tempEndDate, "dd/MM/yyyy", { locale: he })
+                : "בחר תאריך"
+              }
             </div>
+            {activeTab === 'end' && (
+              <div className="absolute bottom-0 left-4 right-4 h-0.5 bg-primary rounded-full" />
+            )}
+          </button>
+        </div>
+
+        {/* Single Calendar */}
+        <div className="p-6 bg-background flex justify-center">
+          {activeTab === 'start' ? (
+            <Calendar
+              mode="single"
+              selected={tempStartDate}
+              onSelect={handleStartDateSelect}
+              locale={he}
+              dir="rtl"
+              classNames={calendarClassNames}
+              className="pointer-events-auto"
+            />
           ) : (
-            // Desktop: Two wide calendars side by side with proper grid
-            <div className="grid grid-cols-2 gap-10">
-              {/* Start Date Calendar */}
-              <div className="space-y-3">
-                <div className="text-center pb-2 border-b">
-                  <h3 className="text-lg font-bold text-foreground mb-1">
-                    תאריך התחלה
-                  </h3>
-                  <p className={cn(
-                    "text-sm transition-all h-5",
-                    tempStartDate 
-                      ? "text-primary font-medium" 
-                      : "text-muted-foreground"
-                  )}>
-                    {tempStartDate 
-                      ? format(tempStartDate, "EEEE, d בMMMM yyyy", { locale: he })
-                      : "לחץ לבחירת תאריך"
-                    }
-                  </p>
-                </div>
-                <div className="border rounded-xl p-5 bg-card shadow-sm min-w-[340px]">
-                  <Calendar
-                    mode="single"
-                    selected={tempStartDate}
-                    onSelect={handleStartDateSelect}
-                    locale={he}
-                    dir="rtl"
-                    classNames={desktopCalendarClassNames}
-                    className="pointer-events-auto w-full"
-                  />
-                </div>
-              </div>
-
-              {/* Visual Separator */}
-              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 hidden">
-                <div className="w-px h-48 bg-border" />
-              </div>
-
-              {/* End Date Calendar */}
-              <div className="space-y-3">
-                <div className="text-center pb-2 border-b">
-                  <h3 className="text-lg font-bold text-foreground mb-1">
-                    תאריך סיום
-                  </h3>
-                  <p className={cn(
-                    "text-sm transition-all h-5",
-                    tempEndDate 
-                      ? "text-primary font-medium" 
-                      : "text-muted-foreground"
-                  )}>
-                    {tempEndDate 
-                      ? format(tempEndDate, "EEEE, d בMMMM yyyy", { locale: he })
-                      : "לחץ לבחירת תאריך"
-                    }
-                  </p>
-                </div>
-                <div className="border rounded-xl p-5 bg-card shadow-sm min-w-[340px]">
-                  <Calendar
-                    mode="single"
-                    selected={tempEndDate}
-                    onSelect={handleEndDateSelect}
-                    disabled={(date) => !!(tempStartDate && date < tempStartDate)}
-                    locale={he}
-                    dir="rtl"
-                    classNames={desktopCalendarClassNames}
-                    className="pointer-events-auto w-full"
-                  />
-                </div>
-              </div>
-            </div>
+            <Calendar
+              mode="single"
+              selected={tempEndDate}
+              onSelect={handleEndDateSelect}
+              disabled={(date) => !!(tempStartDate && date < tempStartDate)}
+              locale={he}
+              dir="rtl"
+              classNames={calendarClassNames}
+              className="pointer-events-auto"
+            />
           )}
         </div>
 

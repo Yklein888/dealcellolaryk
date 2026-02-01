@@ -71,11 +71,6 @@ const categoryColors: Record<ItemCategory, { bg: string; border: string; hover: 
     border: 'border-green-200 dark:border-green-800', 
     hover: 'hover:border-green-400 dark:hover:border-green-600' 
   },
-  device_simple_europe: { 
-    bg: 'bg-emerald-50 dark:bg-emerald-950/30', 
-    border: 'border-emerald-200 dark:border-emerald-800', 
-    hover: 'hover:border-emerald-400 dark:hover:border-emerald-600' 
-  },
   device_smartphone: { 
     bg: 'bg-purple-50 dark:bg-purple-950/30', 
     border: 'border-purple-200 dark:border-purple-800', 
@@ -99,6 +94,7 @@ interface SelectedItem {
   name: string;
   hasIsraeliNumber: boolean;
   isGeneric?: boolean;
+  includeEuropeanDevice?: boolean; // For European SIM bundle
 }
 
 interface NewRentalDialogProps {
@@ -267,6 +263,15 @@ export function NewRentalDialog({
     ));
   };
 
+  // Toggle European device bundle option
+  const handleToggleEuropeanDevice = (inventoryItemId: string) => {
+    setSelectedItems(selectedItems.map(i => 
+      i.inventoryItemId === inventoryItemId 
+        ? { ...i, includeEuropeanDevice: !i.includeEuropeanDevice }
+        : i
+    ));
+  };
+
   // Add bundle - only for device_simple which doesn't require inventory
   // Note: Bundles with SIMs are no longer supported since SIMs must be from inventory
   const handleAddBundle = (bundleType: BundleType) => {
@@ -425,7 +430,8 @@ export function NewRentalDialog({
     return calculateRentalPrice(
       selectedItems.map(i => ({ 
         category: i.category, 
-        hasIsraeliNumber: i.hasIsraeliNumber 
+        hasIsraeliNumber: i.hasIsraeliNumber,
+        includeEuropeanDevice: i.includeEuropeanDevice,
       })),
       format(startDate, 'yyyy-MM-dd'),
       format(endDate, 'yyyy-MM-dd')
@@ -701,6 +707,15 @@ export function NewRentalDialog({
                                   onCheckedChange={() => handleToggleIsraeliNumber(item.inventoryItemId)}
                                 />
                                 <Label className="text-xs">ישראלי (+$10)</Label>
+                              </div>
+                            )}
+                            {item.category === 'sim_european' && (
+                              <div className="flex items-center gap-1 mr-2">
+                                <Checkbox
+                                  checked={item.includeEuropeanDevice}
+                                  onCheckedChange={() => handleToggleEuropeanDevice(item.inventoryItemId)}
+                                />
+                                <Label className="text-xs">+ מכשיר (₪5/יום)</Label>
                               </div>
                             )}
                             {isEuropeanSimFromInventory && inventoryItem && (
