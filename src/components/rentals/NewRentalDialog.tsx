@@ -30,12 +30,12 @@ import {
   Phone,
   Loader2,
   UserPlus,
-  FileDown,
+  Printer,
   Check,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
-import { generateCallingInstructions } from '@/lib/callingInstructions';
+import { printCallingInstructions, downloadCallingInstructions } from '@/lib/callingInstructions';
 import { 
   RentalItem, 
   ItemCategory,
@@ -352,8 +352,8 @@ export function NewRentalDialog({
     setIsQuickAddInventoryOpen(false);
   };
 
-  // Download calling instructions
-  const handleDownloadInstructions = async (itemId: string, israeliNumber?: string, localNumber?: string, barcode?: string) => {
+  // Print calling instructions
+  const handlePrintInstructions = async (itemId: string, israeliNumber?: string, localNumber?: string, barcode?: string) => {
     if (!israeliNumber && !localNumber) {
       toast({
         title: 'אין מספרים',
@@ -366,18 +366,32 @@ export function NewRentalDialog({
     setDownloadingInstructions(itemId);
 
     try {
-      await generateCallingInstructions(israeliNumber, localNumber, barcode);
+      await printCallingInstructions(israeliNumber, localNumber, barcode);
       toast({
-        title: 'הקובץ הורד בהצלחה',
-        description: 'פתח את הקובץ והדפס אותו',
+        title: 'פותח חלון הדפסה',
+        description: 'בחר מדפסת והדפס את ההוראות',
       });
     } catch (error) {
-      console.error('Error generating instructions:', error);
+      console.error('Error printing instructions:', error);
       toast({
-        title: 'שגיאה',
-        description: 'לא ניתן ליצור את קובץ ההוראות',
+        title: 'שגיאה בהדפסה',
+        description: 'מנסה להוריד כקובץ במקום...',
         variant: 'destructive',
       });
+      // Fallback to download
+      try {
+        await downloadCallingInstructions(israeliNumber, localNumber, barcode);
+        toast({
+          title: 'הקובץ הורד',
+          description: 'פתח את הקובץ והדפס אותו ידנית',
+        });
+      } catch (downloadError) {
+        toast({
+          title: 'שגיאה',
+          description: 'לא ניתן ליצור את קובץ ההוראות',
+          variant: 'destructive',
+        });
+      }
     } finally {
       setDownloadingInstructions(null);
     }
@@ -661,7 +675,7 @@ export function NewRentalDialog({
                                 variant="ghost"
                                 size="sm"
                                 disabled={downloadingInstructions === item.inventoryItemId}
-                                onClick={() => handleDownloadInstructions(
+                                onClick={() => handlePrintInstructions(
                                   item.inventoryItemId,
                                   inventoryItem.israeliNumber || undefined,
                                   inventoryItem.localNumber || undefined,
@@ -672,7 +686,7 @@ export function NewRentalDialog({
                                 {downloadingInstructions === item.inventoryItemId ? (
                                   <Loader2 className="h-4 w-4 animate-spin" />
                                 ) : (
-                                  <FileDown className="h-4 w-4" />
+                                  <Printer className="h-4 w-4" />
                                 )}
                               </Button>
                             )}

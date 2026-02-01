@@ -36,14 +36,14 @@ import {
   Loader2,
   Trash2,
   Pencil,
-  FileDown,
+  Printer,
   Wifi,
   AlertTriangle,
   CheckCircle,
   Package,
   CalendarPlus,
 } from 'lucide-react';
-import { generateCallingInstructions } from '@/lib/callingInstructions';
+import { printCallingInstructions, downloadCallingInstructions } from '@/lib/callingInstructions';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Rental, 
@@ -373,8 +373,8 @@ export default function Rentals() {
 
   const availableItems = getAvailableItems();
 
-  // Handle downloading calling instructions for rental cards
-  const handleDownloadInstructions = async (itemId: string, israeliNumber?: string, localNumber?: string, barcode?: string) => {
+  // Handle printing calling instructions for rental cards
+  const handlePrintInstructions = async (itemId: string, israeliNumber?: string, localNumber?: string, barcode?: string) => {
     if (!israeliNumber && !localNumber) {
       toast({
         title: 'אין מספרים',
@@ -387,18 +387,32 @@ export default function Rentals() {
     setDownloadingInstructions(itemId);
 
     try {
-      await generateCallingInstructions(israeliNumber, localNumber, barcode);
+      await printCallingInstructions(israeliNumber, localNumber, barcode);
       toast({
-        title: 'הקובץ הורד בהצלחה',
-        description: 'פתח את הקובץ והדפס אותו',
+        title: 'פותח חלון הדפסה',
+        description: 'בחר מדפסת והדפס את ההוראות',
       });
     } catch (error) {
-      console.error('Error generating instructions:', error);
+      console.error('Error printing instructions:', error);
       toast({
-        title: 'שגיאה',
-        description: 'לא ניתן ליצור את קובץ ההוראות',
+        title: 'שגיאה בהדפסה',
+        description: 'מנסה להוריד כקובץ במקום...',
         variant: 'destructive',
       });
+      // Fallback to download
+      try {
+        await downloadCallingInstructions(israeliNumber, localNumber, barcode);
+        toast({
+          title: 'הקובץ הורד',
+          description: 'פתח את הקובץ והדפס אותו ידנית',
+        });
+      } catch (downloadError) {
+        toast({
+          title: 'שגיאה',
+          description: 'לא ניתן ליצור את קובץ ההוראות',
+          variant: 'destructive',
+        });
+      }
     } finally {
       setDownloadingInstructions(null);
     }
@@ -827,16 +841,16 @@ export default function Rentals() {
                                   }
                                 }
                                 
-                                handleDownloadInstructions(itemId, israeliNumber || undefined, localNumber || undefined, barcode || undefined);
+                                handlePrintInstructions(itemId, israeliNumber || undefined, localNumber || undefined, barcode || undefined);
                               }}
                                 className="gap-1 text-xs w-full"
                               >
                                 {downloadingInstructions === itemId ? (
                                   <Loader2 className="h-3 w-3 animate-spin" />
                                 ) : (
-                                  <FileDown className="h-3 w-3" />
+                                  <Printer className="h-3 w-3" />
                                 )}
-                                הורד הוראות חיוג{simItems.length > 1 ? ` - ${simItem.itemName}` : ''}
+                                הדפס הוראות חיוג{simItems.length > 1 ? ` - ${simItem.itemName}` : ''}
                               </Button>
                             </div>
                           )}
