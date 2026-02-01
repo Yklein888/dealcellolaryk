@@ -3,7 +3,8 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { X, Camera, AlertCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from '@zxing/library';
+import { BrowserMultiFormatReader } from '@zxing/browser';
+import { BarcodeFormat, DecodeHintType } from '@zxing/library';
 
 interface BarcodeScannerProps {
   isOpen: boolean;
@@ -13,27 +14,35 @@ interface BarcodeScannerProps {
 
 type ScannerState = 'idle' | 'requesting' | 'active' | 'error' | 'stopping';
 
+// Scan area dimensions (percentage of video)
+const SCAN_AREA_WIDTH_PERCENT = 80;
+const SCAN_AREA_HEIGHT_PERCENT = 35;
+
 export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps) {
   const [state, setState] = useState<ScannerState>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
   const mountedRef = useRef(true);
+  const lastScannedRef = useRef<string | null>(null);
   const { toast } = useToast();
 
   // Cleanup function
-  const cleanup = useCallback(async () => {
+  const cleanup = useCallback(() => {
     console.log('[ZXing] Cleanup starting...');
     
+    // Cancel animation frame
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+
     // Stop ZXing reader
     if (readerRef.current) {
-      try {
-        readerRef.current.reset();
-      } catch (e) {
-        console.warn('[ZXing] Error resetting reader:', e);
-      }
       readerRef.current = null;
     }
 
@@ -51,8 +60,122 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
       videoRef.current.srcObject = null;
     }
 
+    lastScannedRef.current = null;
     console.log('[ZXing] Cleanup complete');
   }, []);
+
+  // Apply camera optimizations after stream starts
+  const applyTrackOptimizations = useCallback(async (track: MediaStreamTrack) => {
+    try {
+      const capabilities = track.getCapabilities?.() as any;
+      const settings: Record<string, any> = {};
+      
+      // Enable continuous autofocus for better barcode reading
+      if (capabilities?.focusMode?.includes('continuous')) {
+        settings.focusMode = 'continuous';
+      }
+      
+      // Enable auto exposure for varying lighting
+      if (capabilities?.exposureMode?.includes('continuous')) {
+        settings.exposureMode = 'continuous';
+      }
+
+      // Set zoom to 1x for maximum clarity
+      if (capabilities?.zoom) {
+        settings.zoom = capabilities.zoom.min || 1;
+      }
+      
+      if (Object.keys(settings).length > 0) {
+        await track.applyConstraints(settings);
+        console.log('[ZXing] Applied track optimizations:', settings);
+      }
+    } catch (err) {
+      console.warn('[ZXing] Could not apply track optimizations:', err);
+    }
+  }, []);
+
+  // Get cropped image data from scan area only
+  const getCroppedCanvas = useCallback(() => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas || video.readyState !== 4) return null;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    const videoWidth = video.videoWidth;
+    const videoHeight = video.videoHeight;
+
+    // Calculate scan area in video coordinates
+    const scanWidth = Math.floor(videoWidth * (SCAN_AREA_WIDTH_PERCENT / 100));
+    const scanHeight = Math.floor(videoHeight * (SCAN_AREA_HEIGHT_PERCENT / 100));
+    const scanX = Math.floor((videoWidth - scanWidth) / 2);
+    const scanY = Math.floor((videoHeight - scanHeight) / 2);
+
+    // Set canvas to scan area size
+    canvas.width = scanWidth;
+    canvas.height = scanHeight;
+
+    // Draw only the scan area portion
+    ctx.drawImage(
+      video,
+      scanX, scanY, scanWidth, scanHeight,  // Source rectangle
+      0, 0, scanWidth, scanHeight            // Destination rectangle
+    );
+
+    return canvas;
+  }, []);
+
+  // Continuous scanning loop
+  const scanLoop = useCallback(async () => {
+    if (!mountedRef.current || state !== 'active' || !readerRef.current) {
+      return;
+    }
+
+    const canvas = getCroppedCanvas();
+    if (canvas) {
+      try {
+        const result = await readerRef.current.decodeFromCanvas(canvas);
+        
+        if (result && mountedRef.current) {
+          const barcodeValue = result.getText();
+          
+          // Prevent duplicate scans
+          if (barcodeValue === lastScannedRef.current) {
+            animationFrameRef.current = requestAnimationFrame(() => scanLoop());
+            return;
+          }
+          
+          lastScannedRef.current = barcodeValue;
+          console.log('[ZXing] Barcode detected:', barcodeValue);
+          
+          // Vibrate for feedback
+          if (navigator.vibrate) {
+            navigator.vibrate(100);
+          }
+
+          // Call onScan callback
+          onScan(barcodeValue);
+          
+          toast({
+            title: 'ברקוד נסרק בהצלחה',
+            description: barcodeValue,
+          });
+
+          // Close scanner
+          onClose();
+          return;
+        }
+      } catch (err) {
+        // No barcode found, continue scanning
+      }
+    }
+
+    // Continue scanning
+    if (mountedRef.current && state === 'active') {
+      animationFrameRef.current = requestAnimationFrame(() => scanLoop());
+    }
+  }, [state, getCroppedCanvas, onScan, onClose, toast]);
 
   // Start scanner
   const startScanner = useCallback(async () => {
@@ -65,9 +188,9 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
 
     try {
       // First, ensure any previous scanner is cleaned up
-      await cleanup();
+      cleanup();
 
-      // Configure hints for barcode formats
+      // Configure hints for barcode formats - focus on retail
       const hints = new Map();
       hints.set(DecodeHintType.POSSIBLE_FORMATS, [
         BarcodeFormat.EAN_13,
@@ -76,7 +199,6 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
         BarcodeFormat.CODE_39,
         BarcodeFormat.UPC_A,
         BarcodeFormat.UPC_E,
-        BarcodeFormat.QR_CODE,
       ]);
       hints.set(DecodeHintType.TRY_HARDER, true);
 
@@ -84,72 +206,65 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
       const reader = new BrowserMultiFormatReader(hints);
       readerRef.current = reader;
 
-      // Get available video devices
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices.filter(d => d.kind === 'videoinput');
-      console.log('[ZXing] Available cameras:', videoDevices.map(d => d.label || d.deviceId));
+      // Request camera with HD resolution
+      const constraints: MediaStreamConstraints = {
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1920, min: 1280 },
+          height: { ideal: 1080, min: 720 },
+          frameRate: { ideal: 30, max: 30 },
+        },
+        audio: false,
+      };
 
-      // Find rear camera (environment facing)
-      let selectedDeviceId: string | undefined;
+      console.log('[ZXing] Requesting camera with constraints:', constraints);
       
-      // Look for back/rear camera
-      const backCamera = videoDevices.find(d => {
-        const label = (d.label || '').toLowerCase();
-        return label.includes('back') || label.includes('rear') || label.includes('environment') || label.includes('אחור');
-      });
-      
-      if (backCamera) {
-        selectedDeviceId = backCamera.deviceId;
-        console.log('[ZXing] Selected back camera:', backCamera.label);
-      } else if (videoDevices.length > 0) {
-        // Default to last camera (usually rear on mobile)
-        selectedDeviceId = videoDevices[videoDevices.length - 1].deviceId;
-        console.log('[ZXing] Defaulting to last camera');
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      streamRef.current = stream;
+
+      // Apply optimizations to video track
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack) {
+        await applyTrackOptimizations(videoTrack);
+        const settings = videoTrack.getSettings();
+        console.log('[ZXing] Camera settings:', settings);
       }
 
-      if (!videoRef.current) {
+      if (!videoRef.current || !mountedRef.current) {
         throw new Error('Video element not ready');
       }
 
-      // Start continuous decoding
-      console.log('[ZXing] Starting continuous decode...');
+      // Set video source
+      videoRef.current.srcObject = stream;
       
-      await reader.decodeFromVideoDevice(
-        selectedDeviceId,
-        videoRef.current,
-        (result, error) => {
-          if (result && mountedRef.current) {
-            const barcodeValue = result.getText();
-            console.log('[ZXing] Barcode detected:', barcodeValue);
-            
-            // Vibrate for feedback
-            if (navigator.vibrate) {
-              navigator.vibrate(100);
-            }
-
-            // Call onScan callback
-            onScan(barcodeValue);
-            
-            toast({
-              title: 'ברקוד נסרק בהצלחה',
-              description: barcodeValue,
-            });
-
-            // Close scanner
-            onClose();
-          }
-          // Ignore decode errors - they happen when no barcode is visible
-        }
-      );
-
-      // Get the stream reference for cleanup
-      if (videoRef.current.srcObject) {
-        streamRef.current = videoRef.current.srcObject as MediaStream;
-      }
+      // Wait for video to be ready
+      await new Promise<void>((resolve, reject) => {
+        const video = videoRef.current!;
+        
+        const onLoadedMetadata = () => {
+          video.removeEventListener('loadedmetadata', onLoadedMetadata);
+          video.removeEventListener('error', onError);
+          video.play()
+            .then(() => resolve())
+            .catch(reject);
+        };
+        
+        const onError = () => {
+          video.removeEventListener('loadedmetadata', onLoadedMetadata);
+          video.removeEventListener('error', onError);
+          reject(new Error('Video failed to load'));
+        };
+        
+        video.addEventListener('loadedmetadata', onLoadedMetadata);
+        video.addEventListener('error', onError);
+      });
 
       if (mountedRef.current) {
         setState('active');
-        console.log('[ZXing] Scanner active');
+        console.log('[ZXing] Scanner active, starting scan loop');
+        
+        // Start scanning loop
+        animationFrameRef.current = requestAnimationFrame(() => scanLoop());
       }
 
     } catch (err: any) {
@@ -179,7 +294,7 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
         });
       }
     }
-  }, [state, cleanup, onScan, onClose, toast]);
+  }, [state, cleanup, applyTrackOptimizations, scanLoop, toast]);
 
   // Handle dialog open/close
   useEffect(() => {
@@ -189,16 +304,13 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
       // Small delay to ensure DOM is ready
       const timer = setTimeout(() => {
         startScanner();
-      }, 100);
+      }, 150);
       return () => clearTimeout(timer);
     } else {
       setState('stopping');
-      cleanup().then(() => {
-        if (mountedRef.current) {
-          setState('idle');
-          setErrorMessage(null);
-        }
-      });
+      cleanup();
+      setState('idle');
+      setErrorMessage(null);
     }
 
     return () => {
@@ -215,7 +327,7 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
   const handleRetry = () => {
     setState('idle');
     setErrorMessage(null);
-    setTimeout(startScanner, 100);
+    setTimeout(startScanner, 150);
   };
 
   return (
@@ -228,6 +340,9 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
         <p id="barcode-scanner-description" className="sr-only">
           כוון את המצלמה אל הברקוד לסריקה אוטומטית
         </p>
+        
+        {/* Hidden canvas for cropping */}
+        <canvas ref={canvasRef} className="hidden" />
         
         {/* Header */}
         <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-3 bg-gradient-to-b from-black/70 to-transparent">
@@ -247,7 +362,7 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
 
         {/* Scanner View */}
         <div className="relative aspect-[3/4] w-full bg-black">
-          {/* Video Element */}
+          {/* Video Element - Full resolution, no CSS scaling */}
           <video
             ref={videoRef}
             className="absolute inset-0 w-full h-full object-cover"
@@ -279,32 +394,73 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
             </div>
           )}
 
-          {/* Scanning Overlay */}
+          {/* Scanning Overlay with Focused Area */}
           {state === 'active' && (
             <>
-              {/* Scan Line Animation */}
+              {/* Dimmed overlay with cutout */}
               <div className="absolute inset-0 pointer-events-none z-10">
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] max-w-[280px] aspect-[3/2]">
+                {/* Top dim area */}
+                <div 
+                  className="absolute top-0 left-0 right-0 bg-black/60"
+                  style={{ height: `${(100 - SCAN_AREA_HEIGHT_PERCENT) / 2}%` }}
+                />
+                {/* Bottom dim area */}
+                <div 
+                  className="absolute bottom-0 left-0 right-0 bg-black/60"
+                  style={{ height: `${(100 - SCAN_AREA_HEIGHT_PERCENT) / 2}%` }}
+                />
+                {/* Left dim area */}
+                <div 
+                  className="absolute bg-black/60"
+                  style={{ 
+                    top: `${(100 - SCAN_AREA_HEIGHT_PERCENT) / 2}%`,
+                    bottom: `${(100 - SCAN_AREA_HEIGHT_PERCENT) / 2}%`,
+                    left: 0,
+                    width: `${(100 - SCAN_AREA_WIDTH_PERCENT) / 2}%`
+                  }}
+                />
+                {/* Right dim area */}
+                <div 
+                  className="absolute bg-black/60"
+                  style={{ 
+                    top: `${(100 - SCAN_AREA_HEIGHT_PERCENT) / 2}%`,
+                    bottom: `${(100 - SCAN_AREA_HEIGHT_PERCENT) / 2}%`,
+                    right: 0,
+                    width: `${(100 - SCAN_AREA_WIDTH_PERCENT) / 2}%`
+                  }}
+                />
+                
+                {/* Scan area frame */}
+                <div 
+                  className="absolute border-2 border-primary rounded-lg"
+                  style={{
+                    top: `${(100 - SCAN_AREA_HEIGHT_PERCENT) / 2}%`,
+                    left: `${(100 - SCAN_AREA_WIDTH_PERCENT) / 2}%`,
+                    width: `${SCAN_AREA_WIDTH_PERCENT}%`,
+                    height: `${SCAN_AREA_HEIGHT_PERCENT}%`,
+                  }}
+                >
                   {/* Corner markers */}
-                  <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-primary rounded-tl-lg" />
-                  <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-primary rounded-tr-lg" />
-                  <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-primary rounded-bl-lg" />
-                  <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-primary rounded-br-lg" />
+                  <div className="absolute -top-0.5 -left-0.5 w-6 h-6 border-t-4 border-l-4 border-primary rounded-tl-lg" />
+                  <div className="absolute -top-0.5 -right-0.5 w-6 h-6 border-t-4 border-r-4 border-primary rounded-tr-lg" />
+                  <div className="absolute -bottom-0.5 -left-0.5 w-6 h-6 border-b-4 border-l-4 border-primary rounded-bl-lg" />
+                  <div className="absolute -bottom-0.5 -right-0.5 w-6 h-6 border-b-4 border-r-4 border-primary rounded-br-lg" />
                   
-                  {/* Scanning line */}
-                  <div className="absolute left-2 right-2 h-0.5 bg-primary/80 animate-pulse" 
-                       style={{ 
-                         top: '50%',
-                         boxShadow: '0 0 8px 2px hsl(var(--primary) / 0.5)'
-                       }} 
+                  {/* Scanning line animation */}
+                  <div 
+                    className="absolute left-2 right-2 h-0.5 bg-primary animate-pulse"
+                    style={{ 
+                      top: '50%',
+                      boxShadow: '0 0 10px 3px hsl(var(--primary) / 0.6)'
+                    }} 
                   />
                 </div>
               </div>
 
               {/* Instructions */}
-              <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
-                <p className="text-white text-center text-sm">
-                  כוון את המצלמה אל הברקוד
+              <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent z-20">
+                <p className="text-white text-center text-sm font-medium">
+                  מקם את הברקוד במסגרת לסריקה
                 </p>
               </div>
             </>
