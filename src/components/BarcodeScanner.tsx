@@ -29,8 +29,10 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
   const [manualInput, setManualInput] = useState('');
   const [cameras, setCameras] = useState<CameraDevice[]>([]);
   const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null);
+  const [needsUserGesture, setNeedsUserGesture] = useState(true);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const hasStartedRef = useRef(false);
+  const pendingStartRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const handleClose = useCallback(() => {
@@ -44,6 +46,7 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
           setIsScanning(false);
           setManualMode(false);
           setManualInput('');
+          setNeedsUserGesture(true);
           onClose();
         });
     } else {
@@ -51,6 +54,7 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
       setIsScanning(false);
       setManualMode(false);
       setManualInput('');
+      setNeedsUserGesture(true);
       onClose();
     }
   }, [onClose]);
@@ -73,6 +77,23 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
     }
     hasStartedRef.current = false;
     setIsScanning(false);
+  }, []);
+
+  // CRITICAL: Ask for camera permission directly from a user gesture.
+  // Some browsers will block permission prompts if media capture is initiated from useEffect/setTimeout.
+  const preflightCameraPermission = useCallback(async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      const err = new Error('NotSupportedError') as any;
+      err.name = 'NotSupportedError';
+      throw err;
+    }
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: true,
+      audio: false,
+    });
+    // Stop immediately; we only needed the permission prompt in a gesture context.
+    stream.getTracks().forEach((t) => t.stop());
   }, []);
 
   const startScanner = useCallback(async (cameraIdOverride?: string) => {
@@ -170,6 +191,7 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
       }
       setIsStarting(false);
       hasStartedRef.current = false;
+      setNeedsUserGesture(true);
     }
   }, [handleClose, onScan]);
 
@@ -177,18 +199,80 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
   const handleCameraChange = useCallback(async (newCameraId: string) => {
     setSelectedCameraId(newCameraId);
     await stopScanner();
-    // Small delay to ensure cleanup
-    setTimeout(() => {
-      startScanner(newCameraId);
-    }, 100);
-  }, [stopScanner, startScanner]);
-
-  useEffect(() => {
-    if (isOpen && !hasStartedRef.current && !manualMode) {
-      const timer = setTimeout(startScanner, 100);
-      return () => clearTimeout(timer);
+    // If permission was already granted and user is scanning, restart immediately.
+    if (!needsUserGesture && isOpen && !manualMode) {
+      pendingStartRef.current = true;
     }
-  }, [isOpen, startScanner, manualMode]);
+  }, [stopScanner, needsUserGesture, isOpen, manualMode]);
+
+  const requestStartFromUserGesture = useCallback(async () => {
+    setError(null);
+
+    try {
+      await preflightCameraPermission();
+      setNeedsUserGesture(false);
+    } catch (err: any) {
+      console.error('Camera permission preflight failed:', err);
+      if (err?.name === 'NotAllowedError') {
+        setError('נדרש אישור גישה למצלמה. בדוק שהדפדפן לא חסם את ההרשאה לאתר ונסה שוב.');
+      } else if (err?.name === 'NotSupportedError') {
+        setError('הדפדפן לא תומך בהפעלת מצלמה במכשיר הזה. נסה דפדפן אחר או עדכן גרסה.');
+      } else {
+        setError('לא ניתן לבקש הרשאת מצלמה. נסה לרענן את הדף ולנסות שוב.');
+      }
+      setNeedsUserGesture(true);
+      return;
+    }
+
+    // If we're in manual mode, render the camera UI first, then start.
+    if (manualMode) {
+      pendingStartRef.current = true;
+      setManualMode(false);
+      return;
+    }
+
+    // Camera UI is already mounted → start immediately.
+    startScanner(selectedCameraId ?? undefined);
+  }, [manualMode, preflightCameraPermission, selectedCameraId, startScanner]);
+
+  // When opening, if permission already granted, we can autostart safely.
+  useEffect(() => {
+    if (!isOpen) return;
+
+    setError(null);
+    // Keep manualMode as-is; don't force switching user flow.
+    (async () => {
+      try {
+        const permissionsApi = (navigator as any).permissions;
+        if (!permissionsApi?.query) return;
+        const res = await permissionsApi.query({ name: 'camera' as any });
+        if (res?.state === 'granted') {
+          setNeedsUserGesture(false);
+          // Only autostart if camera UI is visible.
+          if (!manualMode && !hasStartedRef.current) {
+            startScanner(selectedCameraId ?? undefined);
+          }
+        } else {
+          setNeedsUserGesture(true);
+        }
+      } catch {
+        // If we can't detect, fall back to requiring a user gesture.
+        setNeedsUserGesture(true);
+      }
+    })();
+  }, [isOpen, manualMode, selectedCameraId, startScanner]);
+
+  // Start after manual mode switch when the UI is mounted.
+  useEffect(() => {
+    if (!isOpen) return;
+    if (manualMode) return;
+    if (!pendingStartRef.current) return;
+    pendingStartRef.current = false;
+
+    if (!needsUserGesture && !hasStartedRef.current) {
+      startScanner(selectedCameraId ?? undefined);
+    }
+  }, [isOpen, manualMode, needsUserGesture, selectedCameraId, startScanner]);
 
   // Cleanup on unmount / close
   useEffect(() => {
@@ -248,7 +332,7 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
             <Button
               variant="ghost"
               className="text-white/70"
-              onClick={() => setManualMode(false)}
+              onClick={requestStartFromUserGesture}
             >
               חזור לסריקה
             </Button>
@@ -261,6 +345,21 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
                 id="barcode-scanner-reader"
                 className="w-full h-full [&_video]:w-full [&_video]:h-full [&_video]:object-cover"
               />
+
+              {/* User gesture gate (permission prompt) */}
+              {needsUserGesture && !isStarting && !isScanning && (
+                <div className="absolute inset-0 bg-black/70 flex items-center justify-center px-6">
+                  <div className="w-full max-w-sm text-center text-white space-y-3">
+                    <div className="text-lg font-semibold">כדי להפעיל מצלמה</div>
+                    <div className="text-sm text-white/80 leading-relaxed">
+                      לחץ על הכפתור למטה כדי לאשר הרשאת מצלמה בדפדפן.
+                    </div>
+                    <Button className="w-full" onClick={requestStartFromUserGesture}>
+                      הפעל מצלמה
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               {/* Scanning overlay */}
               {isScanning && (
@@ -302,9 +401,19 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
                   <ScanLine className="h-4 w-4" />
                   <span>החזק יציב וקרוב לברקוד</span>
                 </div>
+              ) : needsUserGesture ? (
+                <div className="text-center text-white/70 text-sm">
+                  לחץ על “הפעל מצלמה” כדי לאשר הרשאה
+                </div>
               ) : null}
 
               <div className="flex gap-3">
+                {needsUserGesture && !isScanning && !isStarting ? (
+                  <Button className="flex-1" onClick={requestStartFromUserGesture}>
+                    <Camera className="h-4 w-4 ml-2" />
+                    הפעל מצלמה
+                  </Button>
+                ) : null}
                 <Button
                   variant="secondary"
                   className="flex-1"
