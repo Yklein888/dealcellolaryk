@@ -224,6 +224,16 @@
     50% { transform: translateY(-10px); }
   }
 
+  @keyframes scan-line {
+    0% { top: 0; }
+    50% { top: calc(100% - 2px); }
+    100% { top: 0; }
+  }
+
+  .animate-scan-line {
+    animation: scan-line 1.5s ease-in-out infinite;
+  }
+
   .stat-card {
     @apply relative overflow-hidden rounded-2xl p-4 sm:p-6;
     background: hsl(var(--glass-bg));
