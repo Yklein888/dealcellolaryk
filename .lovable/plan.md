@@ -1,128 +1,165 @@
 
-מטרה
-- להפוך את “הוראות החיוג” של סים אירופאי ל”הדפסה ישירה” בלי להוריד קבצי Word למחשב, ובמקביל לשמור על העיצוב המקורי של תבנית ה‑DOCX (בלי “עיצוב מחדש”).
-- לפי הבדיקה בקוד: היום ההוראות נוצרות בשרת כ‑DOCX מתוך התבנית המקורית (Edge Function: `generate-calling-instructions`) ואז נשמרות מקומית דרך `file-saver` (הורדה).
+# תיקון הדפסת הוראות חיוג - לוגו וברקוד
 
-מה יש היום (מצב קיים בקוד)
-- `src/lib/callingInstructions.ts`:
-  - `generateCallingInstructions(...)` קורא לפונקציית backend `generate-calling-instructions` ומקבל DOCX כ‑Blob.
-  - אחר כך עושה `saveAs(blob, "...docx")` → זה יוצר קובץ במחשב (העמסה/בלגן).
-- שימושים:
-  - `src/pages/Rentals.tsx` מציג כפתור “הורד הוראות חיוג” לסים אירופאי.
-  - `src/components/rentals/NewRentalDialog.tsx` מציג אייקון הורדה (FileDown) לסים אירופאי בתוך “פריטים נבחרים”.
-- אין כרגע הדפסה ישירה, ואין שום ספריות jsPDF/html2canvas/docx-preview בפרויקט.
+## סיכום הבעיות שנמצאו
 
-הבעיה והאילוץ המרכזי
-- דפדפנים לא “מדפיסים Word” בצורה נאטיבית.
-- כל ניסיון להמיר DOCX ל‑HTML ולהדפיס – בדרך כלל הורס את הפריסה של התבנית.
-- כדי לשמור את הפריסה המקורית של התבנית, נשתמש בגישה שמדפיסה PDF שנוצר בתהליך שמנסה לשמר את העיצוב המקורי ככל האפשר.
+### בעיה 1: הברקוד לא נוצר
+מהלוגים של ה-Edge Function:
+```
+ERROR Error generating barcode: TypeError: bwipjs.toBuffer is not a function
+```
+הספריה `bwip-js` מ-esm.sh לא תומכת ב-Deno כראוי - הפונקציה `toBuffer` לא קיימת.
 
-הפתרון המוצע (לפי ההנחיות שלך)
-ניישם הדפסה ישירה כך:
-1) נמשיך לייצר DOCX מהתבנית המקורית (כמו היום) – זה שומר את “האמת” של המסמך המקורי.
-2) במקום להוריד את ה‑DOCX למחשב, נרנדר אותו בתוך הדפדפן בצורה נאמנה לתבנית באמצעות `docx-preview`.
-3) נצלם את הדפים כרינדור (Canvas) באמצעות `html2canvas` (זה נותן “תמונה” של הדף כפי שמופיע – הכי קרוב לשמירה על פריסה).
-4) נרכיב PDF מתוך התמונות בעזרת `jsPDF`.
-5) ניצור Blob של ה‑PDF בזיכרון (ללא הורדה).
-6) ניצור URL זמני עם `URL.createObjectURL`.
-7) נטעין את ה‑PDF בתוך iframe נסתר ונפעיל `print()` אוטומטית.
-8) ניקוי משאבים: הסרת iframe, הסרת קונטיינרים זמניים, `URL.revokeObjectURL`.
+### בעיה 2: הלוגו לא מופיע
+הלוגו נמצא ב-header של מסמך ה-Word המקורי. למרות ש-`docx-preview` מוגדר עם `renderHeaders: true`, הוא לא מרנדר את התמונות מה-header בצורה תקינה.
 
-הערת איכות חשובה (כדי להימנע מ”עיצוב מחדש”)
-- ה‑PDF שיודפס יהיה “תמונתי” (כל דף תמונה), כי זה מה שמאפשר לשמור פריסה ב‑100% הרבה יותר טוב.
-- החיסרון: טקסט לא יהיה “Selectable” כמו PDF טקסטואלי, אבל הדפסה תיראה כמו המקור.
+---
 
-שינויים בקוד (קבצים ותכולה)
+## פתרון מוצע
 
-A) הוספת תלויות (dependencies)
-- נוסיף חבילות:
-  - `docx-preview`
-  - `html2canvas`
-  - `jspdf`
-- עדכון `package.json` בהתאם.
+### שלב 1: תיקון יצירת הברקוד ב-Edge Function
 
-B) ריפקטור ב‑`src/lib/callingInstructions.ts`
-נפצל את האחריות ל־2 פעולות:
-1) פונקציה פנימית/חדשה שמחזירה Blob של ה‑DOCX בלי להוריד:
-   - `fetchCallingInstructionsDocx(israeliNumber, localNumber, barcode): Promise<Blob>`
-2) “הדפסה ישירה”:
-   - `printCallingInstructions(israeliNumber, localNumber, barcode): Promise<void>`
-   - שלבים:
-     - `const docxBlob = await fetchCallingInstructionsDocx(...)`
-     - יצירת `bodyContainer` + `styleContainer` נסתרים (offscreen)
-     - `await renderAsync(docxBlob, bodyContainer, styleContainer, options)`
-     - איתור דפים:
-       - אם `docx-preview` יוצר `.docx-page` → נצלם כל דף בנפרד לדיוק ומולטי‑עמודים
-       - אחרת נצלם את הקונטיינר כולו
-     - `html2canvas(pageEl, { scale: 2, useCORS: true, backgroundColor: "#fff" })`
-     - `jsPDF("p","mm","a4")` + `addImage` לכל דף
-     - `const pdfBlob = pdf.output("blob")`
-     - `const url = URL.createObjectURL(pdfBlob)`
-     - iframe נסתר:
-       - `iframe.src = url`
-       - `iframe.onload = () => iframe.contentWindow?.print()`
-     - ניקוי אחרי ~1–2 שניות:
-       - `document.body.removeChild(iframe)`
-       - `URL.revokeObjectURL(url)`
-       - הסרת הקונטיינרים של ה‑docx-preview
-3) נשאיר אופציה להורדה (למקרי גיבוי) – אבל לא כפעולה הראשית:
-   - `downloadCallingInstructions(...)` שישתמש שוב ב‑`saveAs(docxBlob, ...)`.
-   - או נשאיר את הפונקציה הקיימת כ”הורדה” ונוסיף חדשה להדפסה; אבל נעדכן את ה‑UI להשתמש בהדפסה.
+הבעיה היא שהספריה `bwip-js` מ-esm.sh לא עובדת נכון. נחליף לספריה אחרת שתומכת ב-Deno.
 
-C) עדכון ה‑UI לאירופאי (שלא יוריד קבצים)
-1) `src/pages/Rentals.tsx`
-- לשנות את הכפתור “הורד הוראות חיוג” ל:
-  - טקסט: “הדפס הוראות חיוג”
-  - אייקון: `Printer` במקום `FileDown`
-- לשנות את handler:
-  - במקום `generateCallingInstructions(...)` → `printCallingInstructions(...)`
-- Toast:
-  - במקום “הקובץ הורד בהצלחה” → הודעה בסגנון:
-    - “פותח חלון הדפסה…”
-    - ואם יש כשל: “לא ניתן לפתוח הדפסה. אפשר לנסות הורדה כגיבוי.”
+**קובץ**: `supabase/functions/generate-calling-instructions/index.ts`
 
-2) `src/components/rentals/NewRentalDialog.tsx`
-- להחליף את כפתור האייקון (FileDown) לאייקון Printer ולהדפיס ישירות באותו אופן.
-- לשמור על אותה לוגיקה של “כפתור לכל סים” כאשר יש כמה סימים.
+**שינויים**:
+- נשתמש ב-`jsr:@nicolo/barcode-generator` או ניצור SVG ידנית
+- אפשרות נוספת: להשתמש ב-`npm:bwip-js` עם deno npm support
 
-D) טיפול בקצוות (כדי למנוע “שוב זה לא עובד לי”)
-- חסימת “לחיצה כפולה” בזמן יצירה/רינדור/הדפסה:
-  - שימוש ב‑`downloadingInstructions` (אולי נרצה לשנות שם ל‑`printingInstructions`, אבל לא חובה)
-- תאימות דפדפנים:
-  - Chrome/Edge: אמור לעבוד טוב
-  - Safari/iOS: לעיתים `print()` בתוך iframe יכול להיות רגיש; נשאיר fallback “הורד כקובץ” בתוך תפריט קטן או כפתור משני (מומלץ מאוד כדי שלא תיתקע).
-- ניקוי זיכרון:
-  - חובה לוודא `revokeObjectURL` והסרת DOM זמני אחרי כל הדפסה, אחרת זה יכול לצבור זיכרון.
+### שלב 2: הטמעת הלוגו בגוף המסמך
 
-בדיקות/QA שנבצע אחרי מימוש
-1) הדפסה ישירה מסים אירופאי מתוך:
-   - כרטיס השכרה ב‑`/rentals`
-   - דיאלוג “השכרה חדשה” (`NewRentalDialog`)
-2) בדיקה עם:
-   - סים עם מספר ישראלי + מקומי
-   - סים עם מקומי בלבד
-   - ברקוד קיים
-3) בדיקת איכות:
-   - שהפריסה זהה לתבנית המקורית (כותרות/יישור/מרווחים/ברקוד בתחתית שמאל)
-4) בדיקה שאין הורדה למחשב:
-   - לא נוצר קובץ בתיקיית Downloads
-5) בדיקת ביצועים:
-   - לוודא שלא נשארים iframes/containers אחרי ההדפסה (Memory leak)
+במקום שהלוגו יהיה ב-header (שלא נתמך טוב ע"י docx-preview), נוסיף את הלוגו ישירות לתוך גוף המסמך.
 
-מה ייצא למשתמש בסוף (תוצאה)
-- לחיצה על “הדפס הוראות חיוג” תפתח מיד את דיאלוג ההדפסה של הדפדפן עם מסמך שנראה כמו התבנית המקורית.
-- לא יווצרו עשרות קבצי Word במחשב.
-- אם הדפסה נחסמת/נכשלת בדפדפן מסוים: יהיה fallback להורדה (רצוי), כדי שתמיד תהיה דרך להדפיס.
+**אפשרות א' - פשוטה (מומלץ)**:
+שמירת הלוגו כ-Base64 ב-Edge Function והוספתו ל-`word/document.xml` בתחילת הגוף.
 
-קבצים שניגע בהם
-- `package.json` (הוספת תלויות)
-- `src/lib/callingInstructions.ts` (ריפקטור + פונקציית print)
-- `src/pages/Rentals.tsx` (להחליף “הורדה” ל”הדפסה” ולשנות אייקון/טקסט/טוסטים)
-- `src/components/rentals/NewRentalDialog.tsx` (אותו שינוי בדיאלוג)
+**אפשרות ב' - מתקדמת**:
+יצירת PDF ישירות ב-Edge Function במקום DOCX (יבטיח תצוגה זהה ב-100%).
 
-סיכונים ידועים והפחתה
-- “הדפסה חייבת להיות מתוך פעולה של המשתמש”: תהליך רינדור+צילום הוא אסינכרוני, ובחלק מהדפדפנים זה עלול להיחשב לא “user gesture”.
-  - הפחתה: נשמור את ההדפסה כתגובה ישירה ללחיצה, ונפתח את ה‑iframe מיד עם “מסך טוען” ואז נחליף ל‑pdf כשהוא מוכן, או נשאיר fallback הורדה במצב שהדפסה נחסמה.
-- התאמת פונטים: אם התבנית משתמשת בפונט שלא קיים במערכת, התצוגה עשויה להשתנות.
-  - הפחתה: `docx-preview` מנסה לכבד fonts; בנוסף צילום כקנבס יקפיא את מה שנראה בפועל.
+---
+
+## יישום מפורט
+
+### A) תיקון הברקוד ב-Edge Function
+
+```typescript
+// במקום bwip-js, ניצור SVG ידנית לברקוד Code128
+// או נשתמש ב-JsBarcode עם canvas
+
+import JsBarcode from "https://esm.sh/jsbarcode@3.11.6";
+import { createCanvas } from "https://deno.land/x/canvas@v1.4.1/mod.ts";
+
+const generateBarcodeBase64 = async (barcodeText: string): Promise<string | null> => {
+  try {
+    const canvas = createCanvas(200, 80);
+    JsBarcode(canvas, barcodeText, {
+      format: "CODE128",
+      width: 2,
+      height: 40,
+      displayValue: true,
+      fontSize: 12,
+    });
+    
+    const dataUrl = canvas.toDataURL("image/png");
+    return dataUrl.split(",")[1]; // Return base64 part only
+  } catch (error) {
+    console.error('Error generating barcode:', error);
+    return null;
+  }
+};
+```
+
+### B) הוספת הלוגו לגוף המסמך
+
+1. **שמירת הלוגו ב-Storage**:
+   - הלוגו כבר קיים בתבנית, אבל הוא ב-header
+   - נעתיק אותו ל-bucket כקובץ נפרד או נשמור כ-base64
+
+2. **הוספת הלוגו ל-document.xml**:
+   - נוסיף את הלוגו כתמונה בתחילת `<w:body>` לפני המספרים
+
+```typescript
+// Create XML for logo image at top of document
+const createLogoXml = (imageRelId: string): string => {
+  const width = 2286000; // ~60mm
+  const height = 914400; // ~24mm
+  
+  return `
+    <w:p>
+      <w:pPr>
+        <w:jc w:val="center"/>
+        <w:spacing w:before="0" w:after="200"/>
+      </w:pPr>
+      <w:r>
+        <w:drawing>
+          <wp:inline>
+            <wp:extent cx="${width}" cy="${height}"/>
+            <wp:docPr id="2" name="Logo"/>
+            <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+              <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                  <pic:nvPicPr>
+                    <pic:cNvPr id="0" name="logo.png"/>
+                    <pic:cNvPicPr/>
+                  </pic:nvPicPr>
+                  <pic:blipFill>
+                    <a:blip r:embed="${imageRelId}"/>
+                    <a:stretch><a:fillRect/></a:stretch>
+                  </pic:blipFill>
+                  <pic:spPr>
+                    <a:xfrm>
+                      <a:off x="0" y="0"/>
+                      <a:ext cx="${width}" cy="${height}"/>
+                    </a:xfrm>
+                    <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+                  </pic:spPr>
+                </pic:pic>
+              </a:graphicData>
+            </a:graphic>
+          </wp:inline>
+        </w:drawing>
+      </w:r>
+    </w:p>
+  `;
+};
+```
+
+---
+
+## סדר העבודה
+
+1. **העלאת קובץ הלוגו ל-Storage**
+   - נשמור את הלוגו כ-`logo.png` ב-bucket `templates`
+
+2. **עדכון Edge Function** (`supabase/functions/generate-calling-instructions/index.ts`):
+   - תיקון יצירת הברקוד עם ספריה תואמת Deno
+   - הוספת הלוגו לגוף המסמך (לא ב-header)
+   - סדר המסמך:
+     1. לוגו (למעלה באמצע)
+     2. מספר ישראלי + מספר מקומי
+     3. תוכן המסמך המקורי
+     4. ברקוד (למטה בשמאל)
+
+3. **בדיקה**:
+   - הדפסה ישירה מדף ההשכרות
+   - וידוא שהלוגו מופיע למעלה
+   - וידוא שהברקוד מופיע למטה
+
+---
+
+## קבצים שיעודכנו
+
+| קובץ | שינוי |
+|------|-------|
+| `supabase/functions/generate-calling-instructions/index.ts` | תיקון ברקוד + הוספת לוגו לגוף המסמך |
+| Storage: `templates/logo.png` | העלאת קובץ הלוגו |
+
+---
+
+## הערות טכניות
+
+- **ללא שינוי בצד הלקוח** - כל התיקון ב-Edge Function
+- **`src/lib/callingInstructions.ts`** - נשאר כמו שהוא (הרנדור יעבוד אוטומטית כי התמונות יהיו בגוף המסמך)
+- אם `deno-canvas` לא יעבוד, נעבור לגישה של יצירת SVG לברקוד ואז המרה ל-PNG
 
