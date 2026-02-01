@@ -122,6 +122,7 @@ interface NewRentalDialogProps {
     localNumber?: string;
     israeliNumber?: string;
     expiryDate?: string;
+    simNumber?: string;
     status: 'available';
   }) => void;
 }
@@ -176,6 +177,7 @@ export function NewRentalDialog({
     localNumber: '',
     israeliNumber: '',
     expiryDate: '',
+    simNumber: '',
   });
 
   const [downloadingInstructions, setDownloadingInstructions] = useState<string | null>(null);
@@ -336,19 +338,31 @@ export function NewRentalDialog({
       });
       return;
     }
+
+    // Validate SIM number for all SIM categories (American and European)
+    if (isSim(quickAddData.category) && !quickAddData.simNumber) {
+      toast({
+        title: 'שגיאה',
+        description: 'יש להזין מספר סים (ICCID) לפריט מסוג סים',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     onAddInventoryItem({
       category: quickAddData.category,
       name: quickAddData.name,
       localNumber: quickAddData.localNumber || undefined,
       israeliNumber: quickAddData.israeliNumber || undefined,
       expiryDate: quickAddData.expiryDate || undefined,
+      simNumber: quickAddData.simNumber || undefined,
       status: 'available',
     });
     toast({
       title: 'פריט נוסף למלאי',
       description: `${quickAddData.name} נוסף למלאי`,
     });
-    setQuickAddData({ category: 'sim_european', name: '', localNumber: '', israeliNumber: '', expiryDate: '' });
+    setQuickAddData({ category: 'sim_european', name: '', localNumber: '', israeliNumber: '', expiryDate: '', simNumber: '' });
     setIsQuickAddInventoryOpen(false);
   };
 
@@ -1016,11 +1030,22 @@ export function NewRentalDialog({
             {isSim(quickAddData.category) && (
               <>
                 <div className="space-y-2">
+                  <Label>
+                    מספר סים (ICCID) <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    value={quickAddData.simNumber}
+                    onChange={(e) => setQuickAddData({ ...quickAddData, simNumber: e.target.value })}
+                    placeholder="89972..."
+                  />
+                </div>
+
+                <div className="space-y-2">
                   <Label>מספר מקומי</Label>
                   <Input
                     value={quickAddData.localNumber}
                     onChange={(e) => setQuickAddData({ ...quickAddData, localNumber: e.target.value })}
-                    placeholder="+44-7700-900123"
+                    placeholder={quickAddData.category === 'sim_american' ? "+1-555-123-4567" : "+44-7700-900123"}
                   />
                 </div>
 
