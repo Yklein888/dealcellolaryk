@@ -1,675 +1,316 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Camera, Loader2, X, ScanLine, Keyboard } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
-import {
-  buildBarcodeScannerConfig,
-  buildBarcodeVideoConstraints,
-  pickPreferredCameraId,
-  CameraDevice,
-  applyTrackOptimizations,
-} from '@/lib/barcodeScanner';
-import {
-  BarcodeScannerSettings,
-  getStoredCameraId,
-} from '@/components/barcode-scanner/BarcodeScannerSettings';
+import { X, Camera, AlertCircle, Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from '@zxing/library';
 
 interface BarcodeScannerProps {
   isOpen: boolean;
   onClose: () => void;
-  onScan: (barcodeId: string) => void;
+  onScan: (barcode: string) => void;
 }
 
-// Scanner states for lifecycle management
-type ScannerState = 'idle' | 'initializing' | 'running' | 'stopping';
+type ScannerState = 'idle' | 'requesting' | 'active' | 'error' | 'stopping';
 
 export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps) {
-  const [isStarting, setIsStarting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isScanning, setIsScanning] = useState(false);
-  const [manualMode, setManualMode] = useState(false);
-  const [manualInput, setManualInput] = useState('');
-  const [cameras, setCameras] = useState<CameraDevice[]>([]);
-  const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null);
-  const [needsUserGesture, setNeedsUserGesture] = useState(true);
+  const [state, setState] = useState<ScannerState>('idle');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
-  const scannerRef = useRef<Html5Qrcode | null>(null);
-  const scannerStateRef = useRef<ScannerState>('idle');
-  const activeStreamRef = useRef<MediaStream | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const mountedRef = useRef(true);
-  const pendingStartRef = useRef(false);
-  // Serialize start/stop operations to avoid html5-qrcode "already under transition" race
-  const opQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const { toast } = useToast();
 
-  const runExclusive = useCallback(async (fn: () => Promise<void>) => {
-    const run = opQueueRef.current.then(fn, fn);
-    // Keep queue always-resolving so one failure doesn't block subsequent operations
-    opQueueRef.current = run.then(
-      () => undefined,
-      () => undefined
-    );
-    return run;
-  }, []);
-
-  // Explicitly stop all video tracks from a stream
-  const stopAllTracks = useCallback((stream: MediaStream | null) => {
-    if (stream) {
-      stream.getTracks().forEach((track) => {
-        try {
-          track.stop();
-          console.log('Stopped track:', track.kind, track.label);
-        } catch (e) {
-          console.warn('Failed to stop track:', e);
-        }
-      });
-    }
-  }, []);
-
-  const formatCameraErrorCode = useCallback((err: any) => {
-    const errName = err?.name ? String(err.name) : 'UnknownError';
-    const errMsg = err?.message ? String(err.message) : '';
-    const errConstraint = err?.constraint ? ` (constraint: ${err.constraint})` : '';
-    const errAsString =
-      typeof err === 'string'
-        ? err
-        : typeof err?.toString === 'function'
-          ? String(err.toString())
-          : '';
-
-    const detail = errMsg || (errAsString && errAsString !== '[object Object]' ? errAsString : '');
-    return `${errName}${errConstraint}${detail ? ` - ${detail.slice(0, 120)}` : ''}`;
-  }, []);
-
-  // Full cleanup of scanner and all resources
-  const cleanupScanner = useCallback(async () => {
-    return runExclusive(async () => {
-      console.log('cleanupScanner called, current state:', scannerStateRef.current);
-
-      // If already stopping, don't double-stop (but still allow cleanup calls while idle)
-      if (scannerStateRef.current === 'stopping') {
-        console.log('Scanner already stopping, skipping cleanup');
-        return;
-      }
-
-      scannerStateRef.current = 'stopping';
-
+  // Cleanup function
+  const cleanup = useCallback(async () => {
+    console.log('[ZXing] Cleanup starting...');
+    
+    // Stop ZXing reader
+    if (readerRef.current) {
       try {
-        // Stop Html5Qrcode if exists
-        if (scannerRef.current) {
-          const instance = scannerRef.current;
-          try {
-            const state = instance.getState?.();
-            console.log('Scanner getState:', state);
-            // state 2 = SCANNING in html5-qrcode
-            if (state === 2) {
-              await instance.stop();
-            } else {
-              // Some implementations throw if stop() called when not running
-              await (instance as any).stop?.();
-            }
-          } catch (stopErr) {
-            console.warn('Error stopping Html5Qrcode:', stopErr);
-          }
-          try {
-            await (instance as any).clear?.();
-          } catch (clearErr) {
-            // clear() is not typed in all versions
-            console.warn('Error clearing Html5Qrcode:', clearErr);
-          }
-          scannerRef.current = null;
-        }
-
-        // Explicitly stop all active video tracks
-        stopAllTracks(activeStreamRef.current);
-        activeStreamRef.current = null;
-
-        // Also try to stop any lingering video elements
-        const videoElements = document.querySelectorAll('#barcode-scanner-reader video');
-        videoElements.forEach((video) => {
-          const videoEl = video as HTMLVideoElement;
-          if (videoEl.srcObject) {
-            const stream = videoEl.srcObject as MediaStream;
-            stopAllTracks(stream);
-            videoEl.srcObject = null;
-          }
-        });
-
-        // Clear the reader container to remove stale DOM/video nodes
-        const reader = document.getElementById('barcode-scanner-reader');
-        if (reader) reader.innerHTML = '';
-      } catch (err) {
-        console.warn('Cleanup error:', err);
-      } finally {
-        scannerStateRef.current = 'idle';
-        console.log('Scanner cleanup complete, state now idle');
+        readerRef.current.reset();
+      } catch (e) {
+        console.warn('[ZXing] Error resetting reader:', e);
       }
-    });
-  }, [runExclusive, stopAllTracks]);
-
-  const handleClose = useCallback(async () => {
-    await cleanupScanner();
-    
-    if (mountedRef.current) {
-      setIsScanning(false);
-      setIsStarting(false);
-      setManualMode(false);
-      setManualInput('');
-      setNeedsUserGesture(true);
-    }
-    
-    onClose();
-  }, [onClose, cleanupScanner]);
-
-  const handleManualSubmit = useCallback(() => {
-    const trimmed = manualInput.trim();
-    if (trimmed) {
-      if (navigator.vibrate) navigator.vibrate(100);
-      onScan(trimmed);
-      handleClose();
-    }
-  }, [manualInput, onScan, handleClose]);
-
-  const stopScanner = useCallback(async () => {
-    await cleanupScanner();
-    
-    if (mountedRef.current) {
-      setIsScanning(false);
-      setIsStarting(false);
-    }
-  }, [cleanupScanner]);
-
-  // Request camera permission from user gesture
-  const preflightCameraPermission = useCallback(async () => {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      const err = new Error('NotSupportedError') as any;
-      err.name = 'NotSupportedError';
-      throw err;
+      readerRef.current = null;
     }
 
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' } },
-      audio: false,
-    });
-    // Store reference and stop tracks
-    stopAllTracks(stream);
-  }, [stopAllTracks]);
-
-  const startScanner = useCallback(
-    async (cameraIdOverride?: string) => {
-      return runExclusive(async () => {
-        console.log('startScanner called, current state:', scannerStateRef.current);
-
-        // 1) Lifecycle Management: Prevent start() during initializing/running/stopping
-        if (scannerStateRef.current !== 'idle') {
-          console.log('Scanner not idle, aborting start. State:', scannerStateRef.current);
-          return;
-        }
-
-        scannerStateRef.current = 'initializing';
-        setIsStarting(true);
-        setError(null);
-
-        // 3) Delay: ensure DOM / previous instances fully cleared
-        await new Promise((resolve) => setTimeout(resolve, 300));
-
-        if (!mountedRef.current) {
-          scannerStateRef.current = 'idle';
-          return;
-        }
-
-        const scannerId = 'barcode-scanner-reader';
-        const scannerElement = document.getElementById(scannerId);
-        if (!scannerElement) {
-          setError('לא ניתן לאתחל את הסורק');
-          setIsStarting(false);
-          scannerStateRef.current = 'idle';
-          return;
-        }
-
-        const makeInstance = () =>
-          new Html5Qrcode(scannerId, {
-            formatsToSupport: [
-              Html5QrcodeSupportedFormats.CODE_128,
-              Html5QrcodeSupportedFormats.CODE_39,
-              Html5QrcodeSupportedFormats.EAN_13,
-              Html5QrcodeSupportedFormats.EAN_8,
-              Html5QrcodeSupportedFormats.UPC_A,
-              Html5QrcodeSupportedFormats.UPC_E,
-              Html5QrcodeSupportedFormats.QR_CODE,
-            ],
-            verbose: false,
-          });
-
-        // Calculate qrbox dimensions
-        const containerWidth = containerRef.current?.clientWidth || window.innerWidth;
-        const qrboxWidth = Math.min(containerWidth - 48, 400);
-        const qrboxHeight = Math.floor(qrboxWidth * 0.35);
-
-        const onDecoded = (decodedText: string) => {
-          if (navigator.vibrate) navigator.vibrate(100);
-          onScan(decodedText);
-          handleClose();
-        };
-        const onDecodeError = () => {};
-
-        // Get available cameras
-        let cameraList: CameraDevice[] = [];
-        let preferredCameraId: string | undefined;
-        try {
-          cameraList = await Html5Qrcode.getCameras();
-          setCameras(cameraList);
-
-          const storedId = getStoredCameraId();
-          preferredCameraId = cameraIdOverride || pickPreferredCameraId(cameraList, storedId);
-          if (preferredCameraId) setSelectedCameraId(preferredCameraId);
-        } catch (camErr) {
-          console.warn('Could not enumerate cameras:', camErr);
-        }
-
-        const scanConfig = buildBarcodeScannerConfig({ qrboxWidth, qrboxHeight });
-
-        // Ensure we never re-use a potentially half-transitioned instance.
-        const disposeInstance = async (instance: Html5Qrcode | null) => {
-          if (!instance) return;
-          try {
-            const state = instance.getState?.();
-            if (state === 2) {
-              await instance.stop();
-            } else {
-              await (instance as any).stop?.();
-            }
-          } catch {}
-          try {
-            await (instance as any).clear?.();
-          } catch {}
-        };
-
-        let lastErr: any = null;
-        const attemptStartFresh = async (constraints: MediaTrackConstraints, label: string) => {
-          try {
-            // Hard reset between attempts
-            await disposeInstance(scannerRef.current);
-            scannerRef.current = null;
-            stopAllTracks(activeStreamRef.current);
-            activeStreamRef.current = null;
-
-            const reader = document.getElementById(scannerId);
-            if (reader) reader.innerHTML = '';
-            document.querySelectorAll('#barcode-scanner-reader video').forEach((v) => {
-              const ve = v as HTMLVideoElement;
-              if (ve.srcObject) {
-                stopAllTracks(ve.srcObject as MediaStream);
-                ve.srcObject = null;
-              }
-            });
-
-            await new Promise((r) => setTimeout(r, 250));
-
-            console.log(`Attempting start with ${label}:`, constraints);
-            scannerRef.current = makeInstance();
-            await scannerRef.current.start(
-              constraints as any,
-              scanConfig as any,
-              onDecoded,
-              onDecodeError
-            );
-
-            // After successful start, grab active stream and apply optimizations
-            try {
-              const videoElement = document.querySelector(
-                '#barcode-scanner-reader video'
-              ) as HTMLVideoElement;
-              if (videoElement?.srcObject) {
-                const stream = videoElement.srcObject as MediaStream;
-                activeStreamRef.current = stream;
-                const videoTrack = stream.getVideoTracks()[0];
-                // Keep conservative: don't force constraints post-start unless needed
-                // (can be re-enabled later per-device)
-                // if (videoTrack) await applyTrackOptimizations(videoTrack);
-              }
-            } catch (optErr) {
-              console.warn('Could not apply optimizations:', optErr);
-            }
-
-            return true;
-          } catch (err) {
-            lastErr = err;
-            console.warn(`${label} failed:`, err);
-            return false;
-          }
-        };
-
-        try {
-          // Attempts: strict -> relaxed
-          // Start with facingMode-only first (most stable on Android)
-          let started = await attemptStartFresh(
-            buildBarcodeVideoConstraints(undefined, 'primary'),
-            'Primary (facingMode)'
-          );
-
-          if (!started) {
-            started = await attemptStartFresh(
-              { facingMode: { ideal: 'environment' } },
-              'Minimal (facingMode only)'
-            );
-          }
-
-          // Then try deviceId preference (if user chose a specific lens)
-          if (!started && preferredCameraId) {
-            started = await attemptStartFresh(
-              buildBarcodeVideoConstraints(preferredCameraId, 'primary'),
-              'Primary (deviceId)'
-            );
-          }
-
-          if (!started && preferredCameraId) {
-            started = await attemptStartFresh(
-              buildBarcodeVideoConstraints(preferredCameraId, 'fallback'),
-              'Fallback (deviceId)'
-            );
-          }
-
-          if (!started) {
-            // Surface the real underlying error instead of the generic wrapper
-            throw lastErr ?? new Error('All camera start attempts failed');
-          }
-
-          if (mountedRef.current) {
-            setIsStarting(false);
-            setIsScanning(true);
-            scannerStateRef.current = 'running';
-          }
-        } catch (err: any) {
-          console.error('Failed to start scanner:', err);
-
-          const fullErrorCode = formatCameraErrorCode(err);
-
-          if (err?.name === 'NotAllowedError') {
-            setError(
-              'נדרשת הרשאת גישה למצלמה. אם כבר אישרת ועדיין יש שגיאה, בדוק גם בהרשאות המערכת: הגדרות אנדרואיד → אפליקציות → Chrome → הרשאות → מצלמה → אפשר.\n' +
-                `קוד שגיאה: ${fullErrorCode}`
-            );
-          } else if (err?.name === 'NotFoundError') {
-            setError(`לא נמצאה מצלמה במכשיר זה.\nקוד שגיאה: ${fullErrorCode}`);
-          } else if (err?.name === 'OverconstrainedError') {
-            setError(
-              'הגדרות המצלמה לא נתמכות במצלמה שנבחרה. נסה לבחור מצלמה אחרת (⚙️) או נסה שוב.\n' +
-                `קוד שגיאה: ${fullErrorCode}`
-            );
-          } else if (err?.name === 'NotReadableError' || err?.name === 'TrackStartError') {
-            setError(
-              'המצלמה תפוסה/לא זמינה כרגע. סגור אפליקציות שמשתמשות במצלמה (WhatsApp/Instagram/מצלמה) ונסה שוב.\n' +
-                `קוד שגיאה: ${fullErrorCode}`
-            );
-          } else if (err?.name === 'NotSupportedError') {
-            setError(
-              `הדפדפן לא תומך בהפעלת מצלמה בצורה הזו. נסה דפדפן אחר או עדכן גרסה.\nקוד שגיאה: ${fullErrorCode}`
-            );
-          } else {
-            setError(`לא ניתן להפעיל את המצלמה. וודא שנתת הרשאות גישה.\nקוד שגיאה: ${fullErrorCode}`);
-          }
-
-          await cleanupScanner();
-
-          if (mountedRef.current) {
-            setIsStarting(false);
-            setNeedsUserGesture(true);
-          }
-        }
+    // Stop all media tracks
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => {
+        track.stop();
+        console.log('[ZXing] Track stopped:', track.label);
       });
-    },
-    [cleanupScanner, formatCameraErrorCode, handleClose, onScan, runExclusive, stopAllTracks]
-  );
-
-  // Handle camera selection change
-  const handleCameraChange = useCallback(async (newCameraId: string) => {
-    setSelectedCameraId(newCameraId);
-    await stopScanner();
-    
-    // If permission was already granted, restart with new camera
-    if (!needsUserGesture && isOpen && !manualMode) {
-      // Wait for cleanup to complete
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      pendingStartRef.current = true;
+      streamRef.current = null;
     }
-  }, [stopScanner, needsUserGesture, isOpen, manualMode]);
 
-  const requestStartFromUserGesture = useCallback(async () => {
-    setError(null);
+    // Clear video element
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+
+    console.log('[ZXing] Cleanup complete');
+  }, []);
+
+  // Start scanner
+  const startScanner = useCallback(async () => {
+    if (!mountedRef.current || state === 'active' || state === 'requesting') {
+      return;
+    }
+
+    setState('requesting');
+    setErrorMessage(null);
 
     try {
-      // Only do preflight when switching from manual mode
-      if (manualMode) {
-        await preflightCameraPermission();
+      // First, ensure any previous scanner is cleaned up
+      await cleanup();
+
+      // Configure hints for barcode formats
+      const hints = new Map();
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+        BarcodeFormat.EAN_13,
+        BarcodeFormat.EAN_8,
+        BarcodeFormat.CODE_128,
+        BarcodeFormat.CODE_39,
+        BarcodeFormat.UPC_A,
+        BarcodeFormat.UPC_E,
+        BarcodeFormat.QR_CODE,
+      ]);
+      hints.set(DecodeHintType.TRY_HARDER, true);
+
+      // Create new reader
+      const reader = new BrowserMultiFormatReader(hints);
+      readerRef.current = reader;
+
+      // Get available video devices
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(d => d.kind === 'videoinput');
+      console.log('[ZXing] Available cameras:', videoDevices.map(d => d.label || d.deviceId));
+
+      // Find rear camera (environment facing)
+      let selectedDeviceId: string | undefined;
+      
+      // Look for back/rear camera
+      const backCamera = videoDevices.find(d => {
+        const label = (d.label || '').toLowerCase();
+        return label.includes('back') || label.includes('rear') || label.includes('environment') || label.includes('אחור');
+      });
+      
+      if (backCamera) {
+        selectedDeviceId = backCamera.deviceId;
+        console.log('[ZXing] Selected back camera:', backCamera.label);
+      } else if (videoDevices.length > 0) {
+        // Default to last camera (usually rear on mobile)
+        selectedDeviceId = videoDevices[videoDevices.length - 1].deviceId;
+        console.log('[ZXing] Defaulting to last camera');
       }
-      setNeedsUserGesture(false);
-    } catch (err: any) {
-      console.error('Camera permission preflight failed:', err);
-      if (err?.name === 'NotAllowedError') {
-        setError('נדרש אישור גישה למצלמה. בדוק שהדפדפן לא חסם את ההרשאה לאתר ונסה שוב.');
-      } else if (err?.name === 'NotSupportedError') {
-        setError('הדפדפן לא תומך בהפעלת מצלמה במכשיר הזה. נסה דפדפן אחר או עדכן גרסה.');
-      } else {
-        setError('לא ניתן לבקש הרשאת מצלמה. נסה לרענן את הדף ולנסות שוב.');
+
+      if (!videoRef.current) {
+        throw new Error('Video element not ready');
       }
-      setNeedsUserGesture(true);
-      return;
-    }
 
-    // If in manual mode, switch to camera UI first
-    if (manualMode) {
-      pendingStartRef.current = true;
-      setManualMode(false);
-      return;
-    }
+      // Start continuous decoding
+      console.log('[ZXing] Starting continuous decode...');
+      
+      await reader.decodeFromVideoDevice(
+        selectedDeviceId,
+        videoRef.current,
+        (result, error) => {
+          if (result && mountedRef.current) {
+            const barcodeValue = result.getText();
+            console.log('[ZXing] Barcode detected:', barcodeValue);
+            
+            // Vibrate for feedback
+            if (navigator.vibrate) {
+              navigator.vibrate(100);
+            }
 
-    // Camera UI is mounted, start scanner
-    await startScanner(selectedCameraId ?? undefined);
-  }, [manualMode, preflightCameraPermission, selectedCameraId, startScanner]);
+            // Call onScan callback
+            onScan(barcodeValue);
+            
+            toast({
+              title: 'ברקוד נסרק בהצלחה',
+              description: barcodeValue,
+            });
 
-  // Check permission on open
-  useEffect(() => {
-    if (!isOpen) return;
-
-    setError(null);
-    
-    (async () => {
-      try {
-        const permissionsApi = (navigator as any).permissions;
-        if (!permissionsApi?.query) return;
-        const res = await permissionsApi.query({ name: 'camera' as any });
-        if (res?.state === 'granted') {
-          setNeedsUserGesture(false);
-          // Only autostart if camera UI is visible and we're idle
-          if (!manualMode && scannerStateRef.current === 'idle') {
-            await startScanner(selectedCameraId ?? undefined);
+            // Close scanner
+            onClose();
           }
-        } else {
-          setNeedsUserGesture(true);
+          // Ignore decode errors - they happen when no barcode is visible
         }
-      } catch {
-        setNeedsUserGesture(true);
+      );
+
+      // Get the stream reference for cleanup
+      if (videoRef.current.srcObject) {
+        streamRef.current = videoRef.current.srcObject as MediaStream;
       }
-    })();
-  }, [isOpen, manualMode, selectedCameraId, startScanner]);
 
-  // Handle pending start after mode switch
-  useEffect(() => {
-    if (!isOpen) return;
-    if (manualMode) return;
-    if (!pendingStartRef.current) return;
-    
-    pendingStartRef.current = false;
+      if (mountedRef.current) {
+        setState('active');
+        console.log('[ZXing] Scanner active');
+      }
 
-    if (!needsUserGesture && scannerStateRef.current === 'idle') {
-      startScanner(selectedCameraId ?? undefined);
+    } catch (err: any) {
+      console.error('[ZXing] Scanner error:', err);
+      
+      let message = 'שגיאה בהפעלת המצלמה';
+      
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        message = 'נא לאשר גישה למצלמה בהגדרות הדפדפן';
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        message = 'לא נמצאה מצלמה במכשיר';
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        message = 'המצלמה בשימוש על ידי אפליקציה אחרת';
+      } else if (err.name === 'OverconstrainedError') {
+        message = 'המצלמה לא תומכת בהגדרות הנדרשות';
+      } else if (err.message) {
+        message = `שגיאה: ${err.message}`;
+      }
+
+      if (mountedRef.current) {
+        setErrorMessage(message);
+        setState('error');
+        toast({
+          title: 'שגיאה',
+          description: message,
+          variant: 'destructive',
+        });
+      }
     }
-  }, [isOpen, manualMode, needsUserGesture, selectedCameraId, startScanner]);
+  }, [state, cleanup, onScan, onClose, toast]);
 
-  // Cleanup on unmount
+  // Handle dialog open/close
   useEffect(() => {
     mountedRef.current = true;
-    
+
+    if (isOpen) {
+      // Small delay to ensure DOM is ready
+      const timer = setTimeout(() => {
+        startScanner();
+      }, 100);
+      return () => clearTimeout(timer);
+    } else {
+      setState('stopping');
+      cleanup().then(() => {
+        if (mountedRef.current) {
+          setState('idle');
+          setErrorMessage(null);
+        }
+      });
+    }
+
     return () => {
       mountedRef.current = false;
-      // Async cleanup on unmount
-      cleanupScanner();
+      cleanup();
     };
-  }, [cleanupScanner]);
+  }, [isOpen, startScanner, cleanup]);
 
-  if (!isOpen) return null;
+  const handleClose = () => {
+    cleanup();
+    onClose();
+  };
+
+  const handleRetry = () => {
+    setState('idle');
+    setErrorMessage(null);
+    setTimeout(startScanner, 100);
+  };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col safe-area-top safe-area-bottom">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 bg-black/80 backdrop-blur-sm">
-        <div className="flex items-center gap-2 text-white">
-          <Camera className="h-5 w-5" />
-          <span className="font-medium">סרוק ברקוד</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <BarcodeScannerSettings
-            cameras={cameras}
-            selectedCameraId={selectedCameraId}
-            onCameraSelect={handleCameraChange}
-            isLoading={isStarting}
-          />
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
+      <DialogContent 
+        className="p-0 gap-0 max-w-lg w-[95vw] bg-black overflow-hidden"
+        aria-describedby="barcode-scanner-description"
+      >
+        <DialogTitle className="sr-only">סורק ברקוד</DialogTitle>
+        <p id="barcode-scanner-description" className="sr-only">
+          כוון את המצלמה אל הברקוד לסריקה אוטומטית
+        </p>
+        
+        {/* Header */}
+        <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-3 bg-gradient-to-b from-black/70 to-transparent">
+          <span className="text-white font-medium flex items-center gap-2">
+            <Camera className="h-5 w-5" />
+            סורק ברקוד
+          </span>
           <Button
             variant="ghost"
             size="icon"
             onClick={handleClose}
-            className="text-white hover:bg-white/20"
+            className="text-white hover:bg-white/20 h-9 w-9"
           >
             <X className="h-5 w-5" />
           </Button>
         </div>
-      </div>
 
-      {/* Main content */}
-      <div className="flex-1 flex flex-col" ref={containerRef}>
-        {manualMode ? (
-          <div className="flex-1 flex flex-col items-center justify-center px-6 gap-4">
-            <p className="text-white text-center mb-2">הקלד את מספר הברקוד</p>
-            <Input
-              value={manualInput}
-              onChange={(e) => setManualInput(e.target.value)}
-              placeholder="לדוגמה: 7290000000000"
-              className="text-center text-lg bg-white/10 border-white/30 text-white placeholder:text-white/50"
-              autoFocus
-              inputMode="numeric"
-              onKeyDown={(e) => e.key === 'Enter' && handleManualSubmit()}
-            />
-            <Button onClick={handleManualSubmit} className="w-full" disabled={!manualInput.trim()}>
-              אישור
-            </Button>
-            <Button
-              variant="ghost"
-              className="text-white/70"
-              onClick={requestStartFromUserGesture}
-            >
-              חזור לסריקה
-            </Button>
-          </div>
-        ) : (
-          <>
-            {/* Camera feed */}
-            <div className="flex-1 relative bg-black">
-              <div
-                id="barcode-scanner-reader"
-                className="w-full h-full [&_video]:w-full [&_video]:h-full [&_video]:object-cover"
-              />
+        {/* Scanner View */}
+        <div className="relative aspect-[3/4] w-full bg-black">
+          {/* Video Element */}
+          <video
+            ref={videoRef}
+            className="absolute inset-0 w-full h-full object-cover"
+            playsInline
+            muted
+            autoPlay
+          />
 
-              {/* User gesture gate */}
-              {needsUserGesture && !isStarting && !isScanning && (
-                <div className="absolute inset-0 bg-black/70 flex items-center justify-center px-6">
-                  <div className="w-full max-w-sm text-center text-white space-y-3">
-                    <div className="text-lg font-semibold">כדי להפעיל מצלמה</div>
-                    <div className="text-sm text-white/80 leading-relaxed">
-                      לחץ על הכפתור למטה כדי לאשר הרשאת מצלמה בדפדפן.
-                    </div>
-                    <Button className="w-full" onClick={requestStartFromUserGesture}>
-                      הפעל מצלמה
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Scanning overlay */}
-              {isScanning && (
-                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                  <div
-                    className={cn(
-                      'relative border-2 border-primary rounded-xl overflow-hidden',
-                      'w-[85%] max-w-[400px] h-[30%] min-h-[100px] max-h-[150px]'
-                    )}
-                  >
-                    <div className="absolute inset-x-0 h-0.5 bg-primary animate-scan-line shadow-[0_0_12px_3px] shadow-primary/60" />
-                    <div className="absolute top-0 left-0 w-6 h-6 border-t-3 border-l-3 border-primary rounded-tl-lg" />
-                    <div className="absolute top-0 right-0 w-6 h-6 border-t-3 border-r-3 border-primary rounded-tr-lg" />
-                    <div className="absolute bottom-0 left-0 w-6 h-6 border-b-3 border-l-3 border-primary rounded-bl-lg" />
-                    <div className="absolute bottom-0 right-0 w-6 h-6 border-b-3 border-r-3 border-primary rounded-br-lg" />
-                  </div>
-                </div>
-              )}
-
-              {/* Loading overlay */}
-              {isStarting && (
-                <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
-                  <div className="flex flex-col items-center gap-3 text-white">
-                    <Loader2 className="h-10 w-10 animate-spin" />
-                    <span>מאתחל מצלמה...</span>
-                  </div>
-                </div>
-              )}
+          {/* Loading State */}
+          {(state === 'idle' || state === 'requesting') && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-10">
+              <Loader2 className="h-12 w-12 text-primary animate-spin mb-4" />
+              <p className="text-white text-center">
+                {state === 'requesting' ? 'מבקש גישה למצלמה...' : 'טוען סורק...'}
+              </p>
             </div>
+          )}
 
-            {/* Bottom controls */}
-            <div className="p-4 bg-black/90 backdrop-blur-sm space-y-3">
-              {error ? (
-                <div className="text-center text-destructive text-sm bg-destructive/20 rounded-lg p-3">
-                  {error}
-                </div>
-              ) : isScanning ? (
-                <div className="text-center text-white/70 text-sm flex items-center justify-center gap-2">
-                  <ScanLine className="h-4 w-4" />
-                  <span>החזק יציב וקרוב לברקוד</span>
-                </div>
-              ) : needsUserGesture ? (
-                <div className="text-center text-white/70 text-sm">
-                  לחץ על "הפעל מצלמה" כדי לאשר הרשאה
-                </div>
-              ) : null}
+          {/* Error State */}
+          {state === 'error' && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 z-10 p-6">
+              <AlertCircle className="h-16 w-16 text-destructive mb-4" />
+              <p className="text-white text-center mb-6 text-lg">
+                {errorMessage || 'שגיאה בהפעלת המצלמה'}
+              </p>
+              <Button onClick={handleRetry} variant="secondary" size="lg">
+                נסה שוב
+              </Button>
+            </div>
+          )}
 
-              <div className="flex gap-3">
-                {needsUserGesture && !isScanning && !isStarting ? (
-                  <Button className="flex-1" onClick={requestStartFromUserGesture}>
-                    <Camera className="h-4 w-4 ml-2" />
-                    הפעל מצלמה
-                  </Button>
-                ) : null}
-                <Button
-                  variant="secondary"
-                  className="flex-1"
-                  onClick={async () => {
-                    await stopScanner();
-                    setManualMode(true);
-                  }}
-                >
-                  <Keyboard className="h-4 w-4 ml-2" />
-                  הקלדה ידנית
-                </Button>
-                <Button variant="outline" className="flex-1" onClick={handleClose}>
-                  <X className="h-4 w-4 ml-2" />
-                  ביטול
-                </Button>
+          {/* Scanning Overlay */}
+          {state === 'active' && (
+            <>
+              {/* Scan Line Animation */}
+              <div className="absolute inset-0 pointer-events-none z-10">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] max-w-[280px] aspect-[3/2]">
+                  {/* Corner markers */}
+                  <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-primary rounded-tl-lg" />
+                  <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-primary rounded-tr-lg" />
+                  <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-primary rounded-bl-lg" />
+                  <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-primary rounded-br-lg" />
+                  
+                  {/* Scanning line */}
+                  <div className="absolute left-2 right-2 h-0.5 bg-primary/80 animate-pulse" 
+                       style={{ 
+                         top: '50%',
+                         boxShadow: '0 0 8px 2px hsl(var(--primary) / 0.5)'
+                       }} 
+                  />
+                </div>
               </div>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
+
+              {/* Instructions */}
+              <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
+                <p className="text-white text-center text-sm">
+                  כוון את המצלמה אל הברקוד
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

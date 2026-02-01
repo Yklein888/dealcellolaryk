@@ -7,11 +7,10 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { HebrewCalendar, getFullHebrewDate } from '@/components/ui/hebrew-calendar';
+import { Calendar } from '@/components/ui/calendar';
 import { format, differenceInDays } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { CalendarCheck, Calendar as CalendarIcon } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 interface DateRangePickerProps {
   isOpen: boolean;
@@ -57,7 +56,7 @@ export function DateRangePicker({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-[800px] w-[95vw]">
+      <DialogContent className="max-w-[700px] w-[95vw]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <CalendarIcon className="h-5 w-5 text-primary" />
@@ -72,7 +71,7 @@ export function DateRangePicker({
               תאריך התחלה
             </Label>
             <div className="border rounded-xl p-3 bg-muted/30 flex justify-center overflow-hidden">
-              <HebrewCalendar
+              <Calendar
                 mode="single"
                 selected={tempStartDate}
                 onSelect={(date) => {
@@ -82,15 +81,14 @@ export function DateRangePicker({
                     setTempEndDate(undefined);
                   }
                 }}
+                locale={he}
+                dir="rtl"
               />
             </div>
             {tempStartDate && (
               <div className="text-center p-3 bg-primary/10 rounded-lg border border-primary/20">
                 <p className="font-medium text-foreground">
                   {format(tempStartDate, "EEEE, dd בMMMM yyyy", { locale: he })}
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {getFullHebrewDate(tempStartDate)}
                 </p>
               </div>
             )}
@@ -102,20 +100,19 @@ export function DateRangePicker({
               תאריך סיום
             </Label>
             <div className="border rounded-xl p-3 bg-muted/30 flex justify-center overflow-hidden">
-              <HebrewCalendar
+              <Calendar
                 mode="single"
                 selected={tempEndDate}
                 onSelect={setTempEndDate}
                 disabled={(date) => !!(tempStartDate && date < tempStartDate)}
+                locale={he}
+                dir="rtl"
               />
             </div>
             {tempEndDate && (
               <div className="text-center p-3 bg-primary/10 rounded-lg border border-primary/20">
                 <p className="font-medium text-foreground">
                   {format(tempEndDate, "EEEE, dd בMMMM yyyy", { locale: he })}
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {getFullHebrewDate(tempEndDate)}
                 </p>
               </div>
             )}
