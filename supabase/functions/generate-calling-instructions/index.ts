@@ -1,11 +1,110 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import JSZip from "https://esm.sh/jszip@3.10.1";
-import bwipjs from "https://esm.sh/bwip-js@4.5.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Code128 character set B encoding table
+const CODE128B: Record<string, number> = {
+  ' ': 0, '!': 1, '"': 2, '#': 3, '$': 4, '%': 5, '&': 6, "'": 7,
+  '(': 8, ')': 9, '*': 10, '+': 11, ',': 12, '-': 13, '.': 14, '/': 15,
+  '0': 16, '1': 17, '2': 18, '3': 19, '4': 20, '5': 21, '6': 22, '7': 23,
+  '8': 24, '9': 25, ':': 26, ';': 27, '<': 28, '=': 29, '>': 30, '?': 31,
+  '@': 32, 'A': 33, 'B': 34, 'C': 35, 'D': 36, 'E': 37, 'F': 38, 'G': 39,
+  'H': 40, 'I': 41, 'J': 42, 'K': 43, 'L': 44, 'M': 45, 'N': 46, 'O': 47,
+  'P': 48, 'Q': 49, 'R': 50, 'S': 51, 'T': 52, 'U': 53, 'V': 54, 'W': 55,
+  'X': 56, 'Y': 57, 'Z': 58, '[': 59, '\\': 60, ']': 61, '^': 62, '_': 63,
+  '`': 64, 'a': 65, 'b': 66, 'c': 67, 'd': 68, 'e': 69, 'f': 70, 'g': 71,
+  'h': 72, 'i': 73, 'j': 74, 'k': 75, 'l': 76, 'm': 77, 'n': 78, 'o': 79,
+  'p': 80, 'q': 81, 'r': 82, 's': 83, 't': 84, 'u': 85, 'v': 86, 'w': 87,
+  'x': 88, 'y': 89, 'z': 90, '{': 91, '|': 92, '}': 93, '~': 94,
+};
+
+// Code128 bar patterns (each value represents bars: 1=black, 0=white)
+const CODE128_PATTERNS: string[] = [
+  '11011001100', '11001101100', '11001100110', '10010011000', '10010001100',
+  '10001001100', '10011001000', '10011000100', '10001100100', '11001001000',
+  '11001000100', '11000100100', '10110011100', '10011011100', '10011001110',
+  '10111001100', '10011101100', '10011100110', '11001110010', '11001011100',
+  '11001001110', '11011100100', '11001110100', '11101101110', '11101001100',
+  '11100101100', '11100100110', '11101100100', '11100110100', '11100110010',
+  '11011011000', '11011000110', '11000110110', '10100011000', '10001011000',
+  '10001000110', '10110001000', '10001101000', '10001100010', '11010001000',
+  '11000101000', '11000100010', '10110111000', '10110001110', '10001101110',
+  '10111011000', '10111000110', '10001110110', '11101110110', '11010001110',
+  '11000101110', '11011101000', '11011100010', '11011101110', '11101011000',
+  '11101000110', '11100010110', '11101101000', '11101100010', '11100011010',
+  '11101111010', '11001000010', '11110001010', '10100110000', '10100001100',
+  '10010110000', '10010000110', '10000101100', '10000100110', '10110010000',
+  '10110000100', '10011010000', '10011000010', '10000110100', '10000110010',
+  '11000010010', '11001010000', '11110111010', '11000010100', '10001111010',
+  '10100111100', '10010111100', '10010011110', '10111100100', '10011110100',
+  '10011110010', '11110100100', '11110010100', '11110010010', '11011011110',
+  '11011110110', '11110110110', '10101111000', '10100011110', '10001011110',
+  '10111101000', '10111100010', '11110101000', '11110100010', '10111011110',
+  '10111101110', '11101011110', '11110101110', '11010000100', '11010010000',
+  '11010011100', '1100011101011',
+];
+
+const START_B = 104;
+const STOP = 106;
+
+// Generate Code128B barcode pattern
+function generateCode128Pattern(text: string): string {
+  const values: number[] = [START_B];
+  
+  for (const char of text) {
+    const value = CODE128B[char];
+    if (value !== undefined) {
+      values.push(value);
+    }
+  }
+  
+  // Calculate checksum
+  let checksum = values[0];
+  for (let i = 1; i < values.length; i++) {
+    checksum += values[i] * i;
+  }
+  checksum = checksum % 103;
+  values.push(checksum);
+  values.push(STOP);
+  
+  // Convert to bar pattern
+  return values.map(v => CODE128_PATTERNS[v]).join('');
+}
+
+// Generate SVG barcode
+function generateBarcodeSvg(text: string, width: number = 200, height: number = 60): string {
+  const pattern = generateCode128Pattern(text);
+  const barWidth = width / pattern.length;
+  const barsHeight = height - 15; // Leave space for text
+  
+  let bars = '';
+  let x = 0;
+  
+  for (const bit of pattern) {
+    if (bit === '1') {
+      bars += `<rect x="${x}" y="0" width="${barWidth}" height="${barsHeight}" fill="black"/>`;
+    }
+    x += barWidth;
+  }
+  
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <rect width="100%" height="100%" fill="white"/>
+  ${bars}
+  <text x="${width / 2}" y="${height - 2}" text-anchor="middle" font-family="Arial, sans-serif" font-size="10">${text}</text>
+</svg>`;
+  
+  return svg;
+}
+
+// Convert SVG to PNG using canvas-like approach (base64 SVG for Word)
+function svgToBase64(svg: string): string {
+  return btoa(svg);
+}
 
 // Format phone number from scientific notation to string
 const formatPhoneNumber = (num: string | undefined): string => {
@@ -56,29 +155,56 @@ const formatInternationalDisplay = (num: string): string => {
   return num;
 };
 
-// Generate barcode as PNG base64
-const generateBarcodeBase64 = async (barcodeText: string): Promise<string | null> => {
-  try {
-    const pngBuffer = await bwipjs.toBuffer({
-      bcid: 'code128',
-      text: barcodeText,
-      scale: 2,
-      height: 8,
-      includetext: true,
-      textxalign: 'center',
-      textsize: 8,
-    });
-    
-    // Convert to base64
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(pngBuffer)));
-    return base64;
-  } catch (error) {
-    console.error('Error generating barcode:', error);
-    return null;
-  }
+// Create XML for logo image at top of document
+const createLogoXml = (imageRelId: string): string => {
+  // Size: approximately 60mm x 24mm = 2286000 x 914400 EMUs (1 mm = 38100 EMUs)
+  const width = 2286000;
+  const height = 914400;
+  
+  return `
+    <w:p>
+      <w:pPr>
+        <w:jc w:val="center"/>
+        <w:spacing w:before="0" w:after="200"/>
+      </w:pPr>
+      <w:r>
+        <w:drawing>
+          <wp:inline distT="0" distB="0" distL="0" distR="0">
+            <wp:extent cx="${width}" cy="${height}"/>
+            <wp:docPr id="2" name="Logo"/>
+            <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+              <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                  <pic:nvPicPr>
+                    <pic:cNvPr id="0" name="logo.png"/>
+                    <pic:cNvPicPr/>
+                  </pic:nvPicPr>
+                  <pic:blipFill>
+                    <a:blip r:embed="${imageRelId}"/>
+                    <a:stretch>
+                      <a:fillRect/>
+                    </a:stretch>
+                  </pic:blipFill>
+                  <pic:spPr>
+                    <a:xfrm>
+                      <a:off x="0" y="0"/>
+                      <a:ext cx="${width}" cy="${height}"/>
+                    </a:xfrm>
+                    <a:prstGeom prst="rect">
+                      <a:avLst/>
+                    </a:prstGeom>
+                  </pic:spPr>
+                </pic:pic>
+              </a:graphicData>
+            </a:graphic>
+          </wp:inline>
+        </w:drawing>
+      </w:r>
+    </w:p>
+  `;
 };
 
-// Create XML for barcode image at bottom left of document
+// Create XML for barcode image at bottom left of document (SVG version)
 const createBarcodeXml = (imageRelId: string): string => {
   // Size: approximately 25mm x 12mm = 950000 x 457200 EMUs (1 mm = 38100 EMUs)
   const width = 950000;
@@ -99,7 +225,7 @@ const createBarcodeXml = (imageRelId: string): string => {
               <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
                 <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
                   <pic:nvPicPr>
-                    <pic:cNvPr id="0" name="barcode.png"/>
+                    <pic:cNvPr id="0" name="barcode.svg"/>
                     <pic:cNvPicPr/>
                   </pic:nvPicPr>
                   <pic:blipFill>
@@ -180,6 +306,8 @@ const createPhoneNumbersXml = (israeliDisplay: string, localDisplay: string): st
   `;
 };
 
+const LOGO_URL = "https://qifcynwnxmtoxzpskmmt.supabase.co/storage/v1/object/public/templates/logo.png";
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -208,6 +336,17 @@ serve(async (req) => {
     const templateBuffer = await templateResponse.arrayBuffer();
     console.log("Template fetched, size:", templateBuffer.byteLength);
 
+    // Fetch the logo
+    console.log("Fetching logo from:", LOGO_URL);
+    const logoResponse = await fetch(LOGO_URL);
+    let logoBuffer: ArrayBuffer | null = null;
+    if (logoResponse.ok) {
+      logoBuffer = await logoResponse.arrayBuffer();
+      console.log("Logo fetched, size:", logoBuffer.byteLength);
+    } else {
+      console.log("Warning: Could not fetch logo:", logoResponse.status);
+    }
+
     // Load the DOCX as a zip
     const zip = await JSZip.loadAsync(templateBuffer);
     
@@ -219,69 +358,104 @@ serve(async (req) => {
     
     console.log("Original document length:", documentXml.length);
 
-    // Create the phone numbers XML to insert at the beginning
-    const phoneNumbersXml = createPhoneNumbersXml(israeliDisplay, localDisplay);
-
-    // Insert the phone numbers after <w:body> tag
     let modifiedXml = documentXml;
-    const bodyTagMatch = modifiedXml.match(/<w:body[^>]*>/);
+    let imageIdCounter = 10; // Start from a high number to avoid conflicts
     
+    // Update [Content_Types].xml to include image types
+    let contentTypesXml = await zip.file("[Content_Types].xml")?.async("string");
+    if (contentTypesXml) {
+      if (!contentTypesXml.includes('Extension="png"')) {
+        contentTypesXml = contentTypesXml.replace(
+          '</Types>',
+          '<Default Extension="png" ContentType="image/png"/></Types>'
+        );
+      }
+      if (!contentTypesXml.includes('Extension="svg"')) {
+        contentTypesXml = contentTypesXml.replace(
+          '</Types>',
+          '<Default Extension="svg" ContentType="image/svg+xml"/></Types>'
+        );
+      }
+      if (!contentTypesXml.includes('Extension="jpeg"') && !contentTypesXml.includes('Extension="jpg"')) {
+        contentTypesXml = contentTypesXml.replace(
+          '</Types>',
+          '<Default Extension="jpeg" ContentType="image/jpeg"/></Types>'
+        );
+      }
+      zip.file("[Content_Types].xml", contentTypesXml);
+    }
+
+    // Get or create relationships file
+    let relsXml = await zip.file("word/_rels/document.xml.rels")?.async("string");
+    if (!relsXml) {
+      relsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
+    }
+
+    // Add namespace declarations if missing
+    if (!modifiedXml.includes('xmlns:wp=')) {
+      modifiedXml = modifiedXml.replace(
+        '<w:document',
+        '<w:document xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"'
+      );
+    }
+
+    // Build content to insert after <w:body>
+    let insertContent = '';
+    
+    // Add logo if available
+    if (logoBuffer) {
+      const logoId = `rIdLogo${imageIdCounter++}`;
+      zip.file("word/media/logo.png", logoBuffer);
+      
+      const logoRel = `<Relationship Id="${logoId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/logo.png"/>`;
+      relsXml = relsXml.replace('</Relationships>', logoRel + '</Relationships>');
+      
+      insertContent += createLogoXml(logoId);
+      console.log("Added logo to document body");
+    }
+
+    // Add phone numbers
+    insertContent += createPhoneNumbersXml(israeliDisplay, localDisplay);
+
+    // Insert content after <w:body> tag
+    const bodyTagMatch = modifiedXml.match(/<w:body[^>]*>/);
     if (bodyTagMatch) {
       const bodyTagEnd = modifiedXml.indexOf(bodyTagMatch[0]) + bodyTagMatch[0].length;
       modifiedXml = 
         modifiedXml.slice(0, bodyTagEnd) + 
-        phoneNumbersXml + 
+        insertContent + 
         modifiedXml.slice(bodyTagEnd);
-      console.log("Inserted phone numbers after <w:body> tag");
+      console.log("Inserted logo and phone numbers after <w:body> tag");
     } else {
       console.log("Warning: Could not find <w:body> tag");
     }
 
     // Handle barcode if provided
     if (barcode) {
-      console.log("Generating barcode image for:", barcode);
-      const barcodeBase64 = await generateBarcodeBase64(barcode);
+      console.log("Generating barcode SVG for:", barcode);
       
-      if (barcodeBase64) {
-        // Add the barcode image to the document
-        const imageId = "rIdBarcode1";
+      try {
+        const barcodeSvg = generateBarcodeSvg(barcode, 200, 60);
+        const barcodeId = `rIdBarcode${imageIdCounter++}`;
         
-        // Add image to word/media folder
-        const barcodeBuffer = Uint8Array.from(atob(barcodeBase64), c => c.charCodeAt(0));
-        zip.file("word/media/barcode.png", barcodeBuffer);
+        // Save SVG as file
+        zip.file("word/media/barcode.svg", barcodeSvg);
         
-        // Update [Content_Types].xml to include PNG
-        const contentTypesXml = await zip.file("[Content_Types].xml")?.async("string");
-        if (contentTypesXml && !contentTypesXml.includes('Extension="png"')) {
-          const updatedContentTypes = contentTypesXml.replace(
-            '</Types>',
-            '<Default Extension="png" ContentType="image/png"/></Types>'
-          );
-          zip.file("[Content_Types].xml", updatedContentTypes);
-        }
-        
-        // Update word/_rels/document.xml.rels to include the image relationship
-        let relsXml = await zip.file("word/_rels/document.xml.rels")?.async("string");
-        if (relsXml) {
-          const newRel = `<Relationship Id="${imageId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/barcode.png"/>`;
-          relsXml = relsXml.replace('</Relationships>', newRel + '</Relationships>');
-          zip.file("word/_rels/document.xml.rels", relsXml);
-        }
-        
-        // Add namespace declarations if missing
-        if (!modifiedXml.includes('xmlns:wp=')) {
-          modifiedXml = modifiedXml.replace(
-            '<w:document',
-            '<w:document xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"'
-          );
-        }
+        // Add relationship
+        const barcodeRel = `<Relationship Id="${barcodeId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/barcode.svg"/>`;
+        relsXml = relsXml.replace('</Relationships>', barcodeRel + '</Relationships>');
         
         // Insert barcode XML before </w:body>
-        const barcodeXml = createBarcodeXml(imageId);
+        const barcodeXml = createBarcodeXml(barcodeId);
         modifiedXml = modifiedXml.replace('</w:body>', barcodeXml + '</w:body>');
-        console.log("Inserted barcode image before </w:body>");
+        console.log("Inserted barcode SVG before </w:body>");
+      } catch (error) {
+        console.error('Error generating barcode:', error);
       }
     }
+
+    // Update the relationships file
+    zip.file("word/_rels/document.xml.rels", relsXml);
 
     console.log("Modified document length:", modifiedXml.length);
 
