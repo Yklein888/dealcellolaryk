@@ -159,6 +159,12 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
         setError('נדרשת הרשאת גישה למצלמה. אנא אשר את הבקשה ונסה שוב.');
       } else if (err.name === 'NotFoundError') {
         setError('לא נמצאה מצלמה במכשיר זה.');
+      } else if (err.name === 'OverconstrainedError') {
+        setError('הגדרות המצלמה לא נתמכות במצלמה שנבחרה. נסה לבחור מצלמה אחרת (⚙️) או נסה שוב.');
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        setError('המצלמה תפוסה/לא זמינה כרגע. סגור אפליקציות שמשתמשות במצלמה ונסה שוב.');
+      } else if (err.name === 'NotSupportedError') {
+        setError('הדפדפן לא תומך בהפעלת מצלמה בצורה הזו. נסה דפדפן אחר או עדכן גרסה.');
       } else {
         setError('לא ניתן להפעיל את המצלמה. וודא שנתת הרשאות גישה.');
       }
@@ -251,7 +257,10 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
           <>
             {/* Camera feed */}
             <div className="flex-1 relative bg-black">
-              <div id="barcode-scanner-reader" className="w-full h-full" />
+              <div
+                id="barcode-scanner-reader"
+                className="w-full h-full [&_video]:w-full [&_video]:h-full [&_video]:object-cover"
+              />
 
               {/* Scanning overlay */}
               {isScanning && (
