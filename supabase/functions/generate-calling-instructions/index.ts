@@ -400,15 +400,15 @@ serve(async (req) => {
 
     // === ADD OVERLAY: Phone numbers at top ===
     // Position: Right side (RTL document), below the header
+    // Numbers only - Hebrew labels are already in the template
     const fontSize = 14;
     const rightMargin = pageWidth - 50; // 50pt from right edge
-    const topY = pageHeight - 100; // 100pt from top
+    const topY = pageHeight - 120; // Position for Israeli number
 
-    // Draw Israeli number (right-aligned for RTL)
-    const israeliText = `${israeliDisplay} :מספר ישראלי`;
-    const israeliWidth = boldFont.widthOfTextAtSize(israeliText, fontSize);
+    // Draw Israeli number (right-aligned)
+    const israeliWidth = boldFont.widthOfTextAtSize(israeliDisplay, fontSize);
     page.drawText(israeliDisplay, {
-      x: rightMargin - israeliWidth + boldFont.widthOfTextAtSize(israeliDisplay, fontSize),
+      x: rightMargin - israeliWidth,
       y: topY,
       size: fontSize,
       font: boldFont,
@@ -416,10 +416,9 @@ serve(async (req) => {
     });
 
     // Draw Local number (below Israeli)
-    const localText = `${localDisplay} :מספר מקומי`;
-    const localWidth = boldFont.widthOfTextAtSize(localText, fontSize);
+    const localWidth = boldFont.widthOfTextAtSize(localDisplay, fontSize);
     page.drawText(localDisplay, {
-      x: rightMargin - localWidth + boldFont.widthOfTextAtSize(localDisplay, fontSize),
+      x: rightMargin - localWidth,
       y: topY - 25,
       size: fontSize,
       font: boldFont,
