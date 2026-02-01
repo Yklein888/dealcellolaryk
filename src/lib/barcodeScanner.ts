@@ -1,6 +1,14 @@
 export type CameraDevice = { id: string; label: string };
 
-export function pickPreferredCameraId(cameras: CameraDevice[]) {
+export function pickPreferredCameraId(
+  cameras: CameraDevice[],
+  storedCameraId?: string | null
+): string | undefined {
+  // If user has a stored preference that exists in current camera list, use it
+  if (storedCameraId && cameras.some((c) => c.id === storedCameraId)) {
+    return storedCameraId;
+  }
+  
   const label = (s: string) => (s || "").toLowerCase();
   // Prefer back/rear/environment camera
   const preferred = cameras.find((c) =>

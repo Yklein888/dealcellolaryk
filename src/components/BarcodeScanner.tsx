@@ -8,7 +8,12 @@ import {
   buildBarcodeScannerConfig,
   buildBarcodeVideoConstraints,
   pickPreferredCameraId,
+  CameraDevice,
 } from '@/lib/barcodeScanner';
+import {
+  BarcodeScannerSettings,
+  getStoredCameraId,
+} from '@/components/barcode-scanner/BarcodeScannerSettings';
 
 interface BarcodeScannerProps {
   isOpen: boolean;
@@ -22,11 +27,11 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
   const [isScanning, setIsScanning] = useState(false);
   const [manualMode, setManualMode] = useState(false);
   const [manualInput, setManualInput] = useState('');
+  const [cameras, setCameras] = useState<CameraDevice[]>([]);
+  const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const hasStartedRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  const pickPreferredCameraIdMemo = useCallback(pickPreferredCameraId, []);
 
   const handleClose = useCallback(() => {
     if (scannerRef.current) {
@@ -59,7 +64,18 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
     }
   }, [manualInput, onScan, handleClose]);
 
-  const startScanner = useCallback(async () => {
+  const stopScanner = useCallback(async () => {
+    if (scannerRef.current) {
+      try {
+        await scannerRef.current.stop();
+      } catch {}
+      scannerRef.current = null;
+    }
+    hasStartedRef.current = false;
+    setIsScanning(false);
+  }, []);
+
+  const startScanner = useCallback(async (cameraIdOverride?: string) => {
     if (hasStartedRef.current) return;
     hasStartedRef.current = true;
     setIsStarting(true);
@@ -102,10 +118,21 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
 
       const onDecodeError = () => {};
 
+      // Get available cameras and determine which to use
+      let cameraList: CameraDevice[] = [];
       let preferredCameraId: string | undefined;
+      
       try {
-        const cameras = await Html5Qrcode.getCameras();
-        preferredCameraId = pickPreferredCameraIdMemo(cameras);
+        cameraList = await Html5Qrcode.getCameras();
+        setCameras(cameraList);
+        
+        // Use override, or stored preference, or auto-detect
+        const storedId = getStoredCameraId();
+        preferredCameraId = cameraIdOverride || pickPreferredCameraId(cameraList, storedId);
+        
+        if (preferredCameraId) {
+          setSelectedCameraId(preferredCameraId);
+        }
       } catch {}
 
       try {
@@ -138,7 +165,17 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
       setIsStarting(false);
       hasStartedRef.current = false;
     }
-  }, [handleClose, onScan, pickPreferredCameraIdMemo]);
+  }, [handleClose, onScan]);
+
+  // Handle camera selection change
+  const handleCameraChange = useCallback(async (newCameraId: string) => {
+    setSelectedCameraId(newCameraId);
+    await stopScanner();
+    // Small delay to ensure cleanup
+    setTimeout(() => {
+      startScanner(newCameraId);
+    }, 100);
+  }, [stopScanner, startScanner]);
 
   useEffect(() => {
     if (isOpen && !hasStartedRef.current && !manualMode) {
@@ -167,14 +204,22 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
           <Camera className="h-5 w-5" />
           <span className="font-medium">סרוק ברקוד</span>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleClose}
-          className="text-white hover:bg-white/20"
-        >
-          <X className="h-5 w-5" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <BarcodeScannerSettings
+            cameras={cameras}
+            selectedCameraId={selectedCameraId}
+            onCameraSelect={handleCameraChange}
+            isLoading={isStarting}
+          />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleClose}
+            className="text-white hover:bg-white/20"
+          >
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
       </div>
 
       {/* Main content */}
