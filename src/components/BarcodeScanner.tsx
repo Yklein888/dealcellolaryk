@@ -4,6 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Camera, Loader2, X, ScanLine, Keyboard } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import {
+  buildBarcodeScannerConfig,
+  buildBarcodeVideoConstraints,
+  pickPreferredCameraId,
+} from '@/lib/barcodeScanner';
 
 interface BarcodeScannerProps {
   isOpen: boolean;
@@ -21,13 +26,7 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
   const hasStartedRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const pickPreferredCameraId = useCallback((cameras: Array<{ id: string; label: string }>) => {
-    const label = (s: string) => (s || '').toLowerCase();
-    const preferred = cameras.find((c) =>
-      /(back|rear|environment|facing back|camera 0|אחור)/.test(label(c.label))
-    );
-    return (preferred ?? cameras[cameras.length - 1])?.id;
-  }, []);
+  const pickPreferredCameraIdMemo = useCallback(pickPreferredCameraId, []);
 
   const handleClose = useCallback(() => {
     if (scannerRef.current) {
@@ -106,44 +105,20 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
       let preferredCameraId: string | undefined;
       try {
         const cameras = await Html5Qrcode.getCameras();
-        preferredCameraId = pickPreferredCameraId(cameras);
+        preferredCameraId = pickPreferredCameraIdMemo(cameras);
       } catch {}
 
-      const baseConfig = {
-        fps: 25,
-        qrbox: { width: qrboxWidth, height: qrboxHeight },
-        aspectRatio: 16 / 9,
-        disableFlip: true,
-      };
-
-      const highQualityVideoConstraints: MediaTrackConstraints = {
-        ...(preferredCameraId
-          ? { deviceId: { exact: preferredCameraId } }
-          : { facingMode: { ideal: 'environment' } }),
-        width: { ideal: 1920, min: 1280 },
-        height: { ideal: 1080, min: 720 },
-        frameRate: { ideal: 30, min: 15 },
-        // @ts-expect-error focusMode is valid but not in TypeScript defs
-        focusMode: { ideal: 'continuous' },
-      };
-
-      const highQualityConfig = {
-        ...baseConfig,
-        videoConstraints: highQualityVideoConstraints,
-      };
-
       try {
-        await scannerRef.current.start(
-          { facingMode: 'environment' },
-          highQualityConfig as any,
-          onDecoded,
-          onDecodeError
-        );
+        const scanConfig = buildBarcodeScannerConfig({ qrboxWidth, qrboxHeight });
+        const constraints = buildBarcodeVideoConstraints(preferredCameraId, 'primary');
+        await scannerRef.current.start(constraints as any, scanConfig as any, onDecoded, onDecodeError);
       } catch (err: any) {
-        console.warn('High-quality constraints failed, retrying with defaults:', err);
+        console.warn('Primary camera constraints failed, retrying with fallback:', err);
+        const scanConfig = buildBarcodeScannerConfig({ qrboxWidth, qrboxHeight });
+        const fallbackConstraints = buildBarcodeVideoConstraints(preferredCameraId, 'fallback');
         await scannerRef.current.start(
-          { facingMode: 'environment' },
-          baseConfig as any,
+          fallbackConstraints as any,
+          scanConfig as any,
           onDecoded,
           onDecodeError
         );
@@ -163,7 +138,7 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
       setIsStarting(false);
       hasStartedRef.current = false;
     }
-  }, [handleClose, onScan, pickPreferredCameraId]);
+  }, [handleClose, onScan, pickPreferredCameraIdMemo]);
 
   useEffect(() => {
     if (isOpen && !hasStartedRef.current && !manualMode) {
