@@ -24,6 +24,35 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
   const hasStartedRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const pickPreferredCameraId = useCallback((cameras: Array<{ id: string; label: string }>) => {
+    // Prefer a rear-facing camera when labels are available.
+    const label = (s: string) => (s || '').toLowerCase();
+    const preferred = cameras.find((c) =>
+      /(back|rear|environment|facing back|camera 0|אחור)/.test(label(c.label))
+    );
+    return (preferred ?? cameras[cameras.length - 1])?.id;
+  }, []);
+
+  const handleClose = useCallback(() => {
+    if (scannerRef.current) {
+      scannerRef.current
+        .stop()
+        .catch(() => {
+          // Ignore stop errors
+        })
+        .finally(() => {
+          scannerRef.current = null;
+          hasStartedRef.current = false;
+          setIsScanning(false);
+          onClose();
+        });
+    } else {
+      hasStartedRef.current = false;
+      setIsScanning(false);
+      onClose();
+    }
+  }, [onClose]);
+
   const startScanner = useCallback(async () => {
     if (hasStartedRef.current) return;
     
@@ -60,26 +89,63 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
       const qrboxWidth = Math.min(containerWidth - 40, 280);
       const qrboxHeight = Math.floor(qrboxWidth * 0.4); // Barcode aspect ratio
       
-      await scannerRef.current.start(
-        { facingMode: 'environment' },
-        { 
-          fps: 20, // Faster scanning
-          qrbox: { width: qrboxWidth, height: qrboxHeight },
-          aspectRatio: 16/9, // Better for barcodes
-          disableFlip: false,
-        },
-        (decodedText) => {
-          // Successfully scanned - provide haptic feedback if available
-          if (navigator.vibrate) {
-            navigator.vibrate(100);
-          }
-          onScan(decodedText);
-          handleClose();
-        },
-        () => {
-          // QR code not found - this is normal, just scanning
+      const onDecoded = (decodedText: string) => {
+        // Successfully scanned - provide haptic feedback if available
+        if (navigator.vibrate) {
+          navigator.vibrate(100);
         }
-      );
+        onScan(decodedText);
+        handleClose();
+      };
+
+      const onDecodeError = () => {
+        // Not found - normal while scanning.
+      };
+
+      // Try to force a higher quality stream (HD + continuous focus where supported).
+      // Note: html5-qrcode supports `videoConstraints` (beta) which can override camera selection.
+      let preferredCameraId: string | undefined;
+      try {
+        const cameras = await Html5Qrcode.getCameras();
+        preferredCameraId = pickPreferredCameraId(cameras);
+      } catch {
+        // Ignore camera enumeration issues and fall back to facingMode.
+      }
+
+      const baseConfig = {
+        fps: 20,
+        qrbox: { width: qrboxWidth, height: qrboxHeight },
+        aspectRatio: 16 / 9,
+        disableFlip: true,
+      };
+
+      const highQualityVideoConstraints: any = {
+        ...(preferredCameraId
+          ? { deviceId: { exact: preferredCameraId } }
+          : { facingMode: { ideal: 'environment' } }),
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+        frameRate: { ideal: 30 },
+        advanced: [
+          { focusMode: 'continuous' },
+          { exposureMode: 'continuous' },
+          { whiteBalanceMode: 'continuous' },
+        ],
+      };
+
+      const highQualityConfig: any = {
+        ...baseConfig,
+        // When provided, this may override `aspectRatio` / camera selection internally.
+        videoConstraints: highQualityVideoConstraints,
+      };
+
+      try {
+        await scannerRef.current.start({ facingMode: 'environment' }, highQualityConfig, onDecoded, onDecodeError);
+      } catch (err: any) {
+        // If the browser rejects our constraints, retry with safer defaults.
+        console.warn('High-quality camera constraints failed, retrying with defaults:', err);
+        await scannerRef.current.start({ facingMode: 'environment' }, baseConfig as any, onDecoded, onDecodeError);
+      }
       
       setIsStarting(false);
       setIsScanning(true);
@@ -95,7 +161,7 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
       setIsStarting(false);
       hasStartedRef.current = false;
     }
-  }, [onScan]);
+  }, [handleClose, onScan, pickPreferredCameraId]);
 
   useEffect(() => {
     if (isOpen && !hasStartedRef.current) {
@@ -104,23 +170,6 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
       return () => clearTimeout(timer);
     }
   }, [isOpen, startScanner]);
-
-  const handleClose = useCallback(() => {
-    if (scannerRef.current) {
-      scannerRef.current.stop().catch(() => {
-        // Ignore stop errors
-      }).finally(() => {
-        scannerRef.current = null;
-        hasStartedRef.current = false;
-        setIsScanning(false);
-        onClose();
-      });
-    } else {
-      hasStartedRef.current = false;
-      setIsScanning(false);
-      onClose();
-    }
-  }, [onClose]);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
@@ -138,9 +187,9 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
         <div className="space-y-0" ref={containerRef}>
           {/* Scanner Container */}
           <div className="relative bg-black">
-            <div 
+             <div 
               id="barcode-scanner-reader" 
-              className="w-full aspect-[4/3]"
+               className="w-full aspect-video"
             />
             
             {/* Scanning overlay with animated line */}
