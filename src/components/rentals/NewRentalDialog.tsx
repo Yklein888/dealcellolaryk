@@ -260,28 +260,28 @@ export function NewRentalDialog({
     ));
   };
 
-  // Add bundle
+  // Add bundle - only for device_simple which doesn't require inventory
+  // Note: Bundles with SIMs are no longer supported since SIMs must be from inventory
   const handleAddBundle = (bundleType: BundleType) => {
-    const bundleId = `bundle-${Date.now()}`;
-    if (bundleType === 'european_sim_simple') {
-      setSelectedItems([...selectedItems, 
-        { inventoryItemId: `${bundleId}-sim`, category: 'sim_european', name: 'סים אירופאי (באנדל)', hasIsraeliNumber: false, isGeneric: true },
-        { inventoryItemId: `${bundleId}-device`, category: 'device_simple', name: 'מכשיר פשוט (באנדל)', hasIsraeliNumber: false, isGeneric: true },
-      ]);
-    } else if (bundleType === 'european_sim_smartphone') {
-      setSelectedItems([...selectedItems, 
-        { inventoryItemId: `${bundleId}-sim`, category: 'sim_european', name: 'סים אירופאי (באנדל)', hasIsraeliNumber: false, isGeneric: true },
-        { inventoryItemId: `${bundleId}-device`, category: 'device_smartphone', name: 'סמארטפון (באנדל)', hasIsraeliNumber: false, isGeneric: true },
-      ]);
-    }
     toast({
-      title: 'באנדל נוסף',
-      description: bundleLabels[bundleType],
+      title: 'באנדלים לא זמינים',
+      description: 'יש לבחור סים מהמלאי ולהוסיף מכשיר פשוט בנפרד',
+      variant: 'destructive',
     });
   };
 
-  // Add generic item
+  // Add generic item - only allowed for device_simple
   const handleAddGenericItem = (category: ItemCategory) => {
+    // Only device_simple can be added without inventory
+    if (category !== 'device_simple') {
+      toast({
+        title: 'נדרש לבחור מהמלאי',
+        description: `${categoryLabels[category]} חייב להיבחר מהמלאי. רק מכשיר פשוט ניתן להוסיף ללא מלאי.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     const genericId = `generic-${Date.now()}`;
     setSelectedItems([...selectedItems, {
       inventoryItemId: genericId,
@@ -442,6 +442,21 @@ export function NewRentalDialog({
       toast({
         title: 'שגיאה',
         description: 'יש לבחור לפחות פריט אחד להשכרה',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validate that all non-device_simple items are from inventory (not generic)
+    const invalidItems = selectedItems.filter(item => 
+      item.isGeneric && item.category !== 'device_simple'
+    );
+    
+    if (invalidItems.length > 0) {
+      const invalidCategories = [...new Set(invalidItems.map(i => categoryLabels[i.category]))];
+      toast({
+        title: 'שגיאה',
+        description: `${invalidCategories.join(', ')} חייבים להיבחר מהמלאי. רק מכשיר פשוט ניתן להוסיף ללא מלאי.`,
         variant: 'destructive',
       });
       return;
@@ -765,66 +780,33 @@ export function NewRentalDialog({
 
             {/* Right Column - Item Selection */}
             <div className="space-y-4">
-              {/* Popular Bundles */}
+              {/* Quick Add Simple Device */}
               <div className="space-y-3">
                 <Label className="flex items-center gap-2 text-sm sm:text-base font-semibold">
-                  🎁 באנדלים פופולריים
+                  📱 הוסף מכשיר פשוט
                 </Label>
-                <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                <div className="p-3 sm:p-4 rounded-xl border-2 border-dashed border-green-400/40 bg-gradient-to-br from-green-100/50 to-green-50/30 dark:from-green-950/30 dark:to-green-900/20">
                   <button
                     type="button"
-                    onClick={() => handleAddBundle('european_sim_simple')}
-                    className="flex flex-col items-center gap-2 sm:gap-3 p-3 sm:p-5 rounded-xl border-2 border-dashed border-primary/40 bg-gradient-to-br from-primary/10 to-primary/5 hover:from-primary/20 hover:to-primary/10 hover:border-primary transition-all"
+                    onClick={() => handleAddGenericItem('device_simple')}
+                    className="w-full flex items-center justify-center gap-3 p-3 rounded-lg bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 transition-all"
                   >
-                    <div className="flex items-center gap-2 sm:gap-3 text-2xl sm:text-3xl">
-                      <span>🇪🇺</span>
-                      <span className="text-primary">+</span>
-                      <span>📱</span>
+                    <span className="text-2xl">📱</span>
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-foreground">מכשיר פשוט (כללי)</p>
+                      <p className="text-xs text-muted-foreground">לא נדרש לבחור מהמלאי</p>
                     </div>
-                    <div className="text-center">
-                      <p className="text-xs sm:text-sm font-semibold text-foreground">סים אירופאי + מכשיר פשוט</p>
-                      <p className="text-[10px] sm:text-xs text-primary mt-1">החל מ-₪200</p>
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleAddBundle('european_sim_smartphone')}
-                    className="flex flex-col items-center gap-2 sm:gap-3 p-3 sm:p-5 rounded-xl border-2 border-dashed border-purple-400/40 bg-gradient-to-br from-purple-100/50 to-purple-50/30 dark:from-purple-950/30 dark:to-purple-900/20 hover:from-purple-200/50 hover:to-purple-100/30 hover:border-purple-500 transition-all"
-                  >
-                    <div className="flex items-center gap-2 sm:gap-3 text-2xl sm:text-3xl">
-                      <span>🇪🇺</span>
-                      <span className="text-purple-500">+</span>
-                      <span>📲</span>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-xs sm:text-sm font-semibold text-foreground">סים אירופאי + סמארטפון</p>
-                      <p className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-400 mt-1">החל מ-₪200</p>
-                    </div>
+                    <Plus className="h-5 w-5 text-green-600 dark:text-green-400" />
                   </button>
                 </div>
               </div>
 
-              {/* Generic Items */}
-              <div className="space-y-3">
-                <Label className="text-sm text-muted-foreground">הוסף פריט כללי:</Label>
-                <div className="grid grid-cols-3 gap-2">
-                  {Object.entries(categoryLabels).map(([key, label]) => (
-                    <button 
-                      key={key}
-                      type="button"
-                      onClick={() => handleAddGenericItem(key as ItemCategory)}
-                      className={cn(
-                        "flex flex-col items-center gap-1 p-3 rounded-lg border-2 transition-all",
-                        categoryColors[key as ItemCategory].bg,
-                        categoryColors[key as ItemCategory].border,
-                        categoryColors[key as ItemCategory].hover
-                      )}
-                    >
-                      <span className="text-2xl">{categoryIcons[key as ItemCategory]}</span>
-                      <span className="text-[10px] text-center leading-tight font-medium">{label}</span>
-                    </button>
-                  ))}
-                </div>
+              {/* Info about inventory requirement */}
+              <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                <p className="text-xs text-amber-700 dark:text-amber-400 flex items-start gap-2">
+                  <span>⚠️</span>
+                  <span>סימים, סמארטפונים, מודמים ונטסטיקים חייבים להיבחר מהמלאי. רק מכשיר פשוט ניתן להוסיף ללא מלאי.</span>
+                </p>
               </div>
 
               {/* Inventory Items Visual Grid */}
