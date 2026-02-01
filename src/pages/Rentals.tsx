@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useLocation } from 'react-router-dom';
 import { useRental } from '@/hooks/useRental';
+import { InventoryItem } from '@/types/rental';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
 import { CallHistoryBadge } from '@/components/CallHistoryBadge';
@@ -71,10 +72,12 @@ export default function Rentals() {
   } = useRental();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [preSelectedItem, setPreSelectedItem] = useState<InventoryItem | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingRental, setEditingRental] = useState<Rental | null>(null);
   const [editFormData, setEditFormData] = useState({
@@ -318,6 +321,17 @@ export default function Rentals() {
     }
   }, []);
 
+  // Handle direct navigation from global search
+  useEffect(() => {
+    if (location.state?.addItemToRental) {
+      const item = location.state.addItemToRental as InventoryItem;
+      setPreSelectedItem(item);
+      setIsAddDialogOpen(true);
+      // Clear the state
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
+
   // Custom filter logic to handle special statuses like ending_today and upcoming
   const filteredRentals = rentals.filter(rental => {
     const matchesSearch = 
@@ -532,10 +546,14 @@ export default function Rentals() {
         </Button>
         <NewRentalDialog
           isOpen={isAddDialogOpen}
-          onOpenChange={setIsAddDialogOpen}
+          onOpenChange={(open) => {
+            setIsAddDialogOpen(open);
+            if (!open) setPreSelectedItem(null);
+          }}
           customers={customers}
           inventory={inventory}
           availableItems={availableItems}
+          preSelectedItem={preSelectedItem}
           onAddRental={addRental}
           onAddCustomer={addCustomer}
           onAddInventoryItem={addInventoryItem}
