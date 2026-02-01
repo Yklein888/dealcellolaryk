@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { X, Camera, AlertCircle, Loader2 } from 'lucide-react';
+import { X, Camera, AlertCircle, Loader2, Zap, ZapOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { BarcodeFormat, DecodeHintType } from '@zxing/library';
@@ -14,31 +14,53 @@ interface BarcodeScannerProps {
 
 type ScannerState = 'idle' | 'requesting' | 'active' | 'error' | 'stopping';
 
-// Scan area dimensions (percentage of video)
-const SCAN_AREA_WIDTH_PERCENT = 80;
-const SCAN_AREA_HEIGHT_PERCENT = 35;
+// Scan area dimensions (percentage of video) - optimized for retail barcodes
+const SCAN_AREA_WIDTH_PERCENT = 85;
+const SCAN_AREA_HEIGHT_PERCENT = 28;
+
+// Scanning interval in ms (20 attempts per second for fast detection)
+const SCAN_INTERVAL_MS = 50;
 
 export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps) {
   const [state, setState] = useState<ScannerState>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [torchEnabled, setTorchEnabled] = useState(false);
+  const [torchSupported, setTorchSupported] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
+  const scanIntervalRef = useRef<number | null>(null);
   const mountedRef = useRef(true);
   const lastScannedRef = useRef<string | null>(null);
+  const videoTrackRef = useRef<MediaStreamTrack | null>(null);
   const { toast } = useToast();
+
+  // Toggle torch/flashlight
+  const toggleTorch = useCallback(async () => {
+    if (!videoTrackRef.current || !torchSupported) return;
+    
+    try {
+      const newTorchState = !torchEnabled;
+      await videoTrackRef.current.applyConstraints({
+        advanced: [{ torch: newTorchState } as any]
+      });
+      setTorchEnabled(newTorchState);
+      console.log('[ZXing] Torch:', newTorchState ? 'ON' : 'OFF');
+    } catch (err) {
+      console.warn('[ZXing] Could not toggle torch:', err);
+    }
+  }, [torchEnabled, torchSupported]);
 
   // Cleanup function
   const cleanup = useCallback(() => {
     console.log('[ZXing] Cleanup starting...');
     
-    // Cancel animation frame
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
+    // Clear scanning interval
+    if (scanIntervalRef.current) {
+      clearInterval(scanIntervalRef.current);
+      scanIntervalRef.current = null;
     }
 
     // Stop ZXing reader
@@ -60,7 +82,10 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
       videoRef.current.srcObject = null;
     }
 
+    videoTrackRef.current = null;
     lastScannedRef.current = null;
+    setTorchEnabled(false);
+    setTorchSupported(false);
     console.log('[ZXing] Cleanup complete');
   }, []);
 
@@ -69,6 +94,12 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
     try {
       const capabilities = track.getCapabilities?.() as any;
       const settings: Record<string, any> = {};
+      
+      // Check torch support
+      if (capabilities?.torch) {
+        setTorchSupported(true);
+        console.log('[ZXing] Torch supported');
+      }
       
       // Enable continuous autofocus for better barcode reading
       if (capabilities?.focusMode?.includes('continuous')) {
@@ -94,7 +125,7 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
     }
   }, []);
 
-  // Get cropped image data from scan area only
+  // Get cropped image data from scan area only (no downscaling)
   const getCroppedCanvas = useCallback(() => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -106,17 +137,17 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
     const videoWidth = video.videoWidth;
     const videoHeight = video.videoHeight;
 
-    // Calculate scan area in video coordinates
+    // Calculate scan area in video coordinates (full resolution)
     const scanWidth = Math.floor(videoWidth * (SCAN_AREA_WIDTH_PERCENT / 100));
     const scanHeight = Math.floor(videoHeight * (SCAN_AREA_HEIGHT_PERCENT / 100));
     const scanX = Math.floor((videoWidth - scanWidth) / 2);
     const scanY = Math.floor((videoHeight - scanHeight) / 2);
 
-    // Set canvas to scan area size
+    // Set canvas to scan area size (no downscaling)
     canvas.width = scanWidth;
     canvas.height = scanHeight;
 
-    // Draw only the scan area portion
+    // Draw only the scan area portion at full resolution
     ctx.drawImage(
       video,
       scanX, scanY, scanWidth, scanHeight,  // Source rectangle
@@ -126,8 +157,8 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
     return canvas;
   }, []);
 
-  // Continuous scanning loop
-  const scanLoop = useCallback(async () => {
+  // Single scan attempt
+  const performScan = useCallback(async () => {
     if (!mountedRef.current || state !== 'active' || !readerRef.current) {
       return;
     }
@@ -142,12 +173,17 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
           
           // Prevent duplicate scans
           if (barcodeValue === lastScannedRef.current) {
-            animationFrameRef.current = requestAnimationFrame(() => scanLoop());
             return;
           }
           
           lastScannedRef.current = barcodeValue;
           console.log('[ZXing] Barcode detected:', barcodeValue);
+          
+          // Stop scanning
+          if (scanIntervalRef.current) {
+            clearInterval(scanIntervalRef.current);
+            scanIntervalRef.current = null;
+          }
           
           // Vibrate for feedback
           if (navigator.vibrate) {
@@ -169,11 +205,6 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
       } catch (err) {
         // No barcode found, continue scanning
       }
-    }
-
-    // Continue scanning
-    if (mountedRef.current && state === 'active') {
-      animationFrameRef.current = requestAnimationFrame(() => scanLoop());
     }
   }, [state, getCroppedCanvas, onScan, onClose, toast]);
 
@@ -201,18 +232,20 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
         BarcodeFormat.UPC_E,
       ]);
       hints.set(DecodeHintType.TRY_HARDER, true);
+      hints.set(DecodeHintType.ASSUME_GS1, false);
 
       // Create new reader
       const reader = new BrowserMultiFormatReader(hints);
       readerRef.current = reader;
 
-      // Request camera with HD resolution
+      // Request camera with MAXIMUM supported resolution
       const constraints: MediaStreamConstraints = {
         video: {
           facingMode: { ideal: 'environment' },
-          width: { ideal: 1920, min: 1280 },
-          height: { ideal: 1080, min: 720 },
-          frameRate: { ideal: 30, max: 30 },
+          // Request maximum resolution - device will provide best available
+          width: { ideal: 3840, min: 1280 },
+          height: { ideal: 2160, min: 720 },
+          frameRate: { ideal: 30 },
         },
         audio: false,
       };
@@ -225,9 +258,15 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
       // Apply optimizations to video track
       const videoTrack = stream.getVideoTracks()[0];
       if (videoTrack) {
+        videoTrackRef.current = videoTrack;
         await applyTrackOptimizations(videoTrack);
         const settings = videoTrack.getSettings();
-        console.log('[ZXing] Camera settings:', settings);
+        console.log('[ZXing] Camera settings:', {
+          width: settings.width,
+          height: settings.height,
+          frameRate: settings.frameRate,
+          facingMode: settings.facingMode,
+        });
       }
 
       if (!videoRef.current || !mountedRef.current) {
@@ -261,10 +300,12 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
 
       if (mountedRef.current) {
         setState('active');
-        console.log('[ZXing] Scanner active, starting scan loop');
+        console.log('[ZXing] Scanner active, starting interval-based scanning');
         
-        // Start scanning loop
-        animationFrameRef.current = requestAnimationFrame(() => scanLoop());
+        // Start high-frequency scanning interval
+        scanIntervalRef.current = window.setInterval(() => {
+          performScan();
+        }, SCAN_INTERVAL_MS);
       }
 
     } catch (err: any) {
@@ -294,7 +335,7 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
         });
       }
     }
-  }, [state, cleanup, applyTrackOptimizations, scanLoop, toast]);
+  }, [state, cleanup, applyTrackOptimizations, performScan, toast]);
 
   // Handle dialog open/close
   useEffect(() => {
@@ -350,14 +391,31 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
             <Camera className="h-5 w-5" />
             סורק ברקוד
           </span>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleClose}
-            className="text-white hover:bg-white/20 h-9 w-9"
-          >
-            <X className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* Torch button */}
+            {torchSupported && state === 'active' && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleTorch}
+                className="text-white hover:bg-white/20 h-9 w-9"
+              >
+                {torchEnabled ? (
+                  <Zap className="h-5 w-5 text-yellow-400" />
+                ) : (
+                  <ZapOff className="h-5 w-5" />
+                )}
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleClose}
+              className="text-white hover:bg-white/20 h-9 w-9"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
 
         {/* Scanner View */}
@@ -441,17 +499,17 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
                   }}
                 >
                   {/* Corner markers */}
-                  <div className="absolute -top-0.5 -left-0.5 w-6 h-6 border-t-4 border-l-4 border-primary rounded-tl-lg" />
-                  <div className="absolute -top-0.5 -right-0.5 w-6 h-6 border-t-4 border-r-4 border-primary rounded-tr-lg" />
-                  <div className="absolute -bottom-0.5 -left-0.5 w-6 h-6 border-b-4 border-l-4 border-primary rounded-bl-lg" />
-                  <div className="absolute -bottom-0.5 -right-0.5 w-6 h-6 border-b-4 border-r-4 border-primary rounded-br-lg" />
+                  <div className="absolute -top-0.5 -left-0.5 w-8 h-8 border-t-4 border-l-4 border-primary rounded-tl-lg" />
+                  <div className="absolute -top-0.5 -right-0.5 w-8 h-8 border-t-4 border-r-4 border-primary rounded-tr-lg" />
+                  <div className="absolute -bottom-0.5 -left-0.5 w-8 h-8 border-b-4 border-l-4 border-primary rounded-bl-lg" />
+                  <div className="absolute -bottom-0.5 -right-0.5 w-8 h-8 border-b-4 border-r-4 border-primary rounded-br-lg" />
                   
                   {/* Scanning line animation */}
                   <div 
-                    className="absolute left-2 right-2 h-0.5 bg-primary animate-pulse"
+                    className="absolute left-4 right-4 h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent animate-pulse"
                     style={{ 
                       top: '50%',
-                      boxShadow: '0 0 10px 3px hsl(var(--primary) / 0.6)'
+                      boxShadow: '0 0 12px 4px hsl(var(--primary) / 0.5)'
                     }} 
                   />
                 </div>
@@ -462,6 +520,11 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
                 <p className="text-white text-center text-sm font-medium">
                   מקם את הברקוד במסגרת לסריקה
                 </p>
+                {torchSupported && (
+                  <p className="text-white/60 text-center text-xs mt-1">
+                    לחץ על ⚡ להפעלת פנס
+                  </p>
+                )}
               </div>
             </>
           )}
