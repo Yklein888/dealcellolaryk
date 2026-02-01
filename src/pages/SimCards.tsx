@@ -94,7 +94,10 @@ export default function SimCards() {
     return { total, available, rented, expiring };
   }, [simCards]);
 
-  const getExpiryColor = (expiryDate: string | null): string => {
+  const getExpiryColor = (expiryDate: string | null, isActive?: boolean): string => {
+    // If explicitly marked as inactive, show red
+    if (isActive === false) return 'text-destructive bg-destructive/10';
+    
     if (!expiryDate) return '';
     
     const today = new Date();
@@ -232,9 +235,10 @@ export default function SimCards() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="text-right">מספר קצר</TableHead>
                     <TableHead className="text-right">מספר מקומי</TableHead>
                     <TableHead className="text-right">מספר ישראלי</TableHead>
-                    <TableHead className="text-right">מספר סים</TableHead>
+                    <TableHead className="text-right">ICCID</TableHead>
                     <TableHead className="text-right">תוקף</TableHead>
                     <TableHead className="text-right">סטטוס</TableHead>
                     <TableHead className="text-right">חבילה</TableHead>
@@ -242,8 +246,9 @@ export default function SimCards() {
                 </TableHeader>
                 <TableBody>
                   {filteredAndSortedSims.map((sim) => (
-                    <TableRow key={sim.id} className={getExpiryColor(sim.expiry_date)}>
-                      <TableCell className="font-medium">{sim.local_number || '-'}</TableCell>
+                    <TableRow key={sim.id} className={getExpiryColor(sim.expiry_date, sim.is_active)}>
+                      <TableCell className="font-medium">{sim.short_number || '-'}</TableCell>
+                      <TableCell>{sim.local_number || '-'}</TableCell>
                       <TableCell>{sim.israeli_number || '-'}</TableCell>
                       <TableCell className="font-mono text-xs">{sim.sim_number || '-'}</TableCell>
                       <TableCell>
@@ -253,8 +258,8 @@ export default function SimCards() {
                       </TableCell>
                       <TableCell>
                         <StatusBadge 
-                          status={sim.is_rented ? 'בהשכרה' : 'פנוי'}
-                          variant={sim.is_rented ? 'warning' : 'success'}
+                          status={sim.is_active ? 'פעיל' : 'פג תוקף'}
+                          variant={sim.is_active ? 'success' : 'destructive'}
                         />
                       </TableCell>
                       <TableCell>{sim.package_name || '-'}</TableCell>
