@@ -57,7 +57,7 @@ export function DateRangePicker({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-[800px] w-[95vw]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <CalendarIcon className="h-5 w-5 text-primary" />
@@ -71,7 +71,7 @@ export function DateRangePicker({
             <Label className="text-center block font-semibold text-lg">
               תאריך התחלה
             </Label>
-            <div className="border rounded-xl p-2 bg-muted/30 flex justify-center">
+            <div className="border rounded-xl p-3 bg-muted/30 flex justify-center overflow-hidden">
               <HebrewCalendar
                 mode="single"
                 selected={tempStartDate}
@@ -101,7 +101,7 @@ export function DateRangePicker({
             <Label className="text-center block font-semibold text-lg">
               תאריך סיום
             </Label>
-            <div className="border rounded-xl p-2 bg-muted/30 flex justify-center">
+            <div className="border rounded-xl p-3 bg-muted/30 flex justify-center overflow-hidden">
               <HebrewCalendar
                 mode="single"
                 selected={tempEndDate}
