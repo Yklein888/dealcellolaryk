@@ -73,28 +73,26 @@ export function DateRangePicker({
     ? differenceInDays(tempEndDate, tempStartDate) + 1 
     : 0;
 
-  // Custom calendar class names for spacious layout
-  const calendarClassNames = {
+  // Desktop calendar: strict fixed grid layout with large cells
+  const desktopCalendarClassNames = {
     months: "flex flex-col",
-    month: "space-y-6",
-    caption: "flex justify-center pt-2 relative items-center h-12",
-    caption_label: "text-lg font-semibold tracking-tight",
+    month: "space-y-4",
+    caption: "flex justify-center pt-1 relative items-center h-14",
+    caption_label: "text-lg font-bold tracking-tight",
     nav: "space-x-1 flex items-center",
     nav_button: cn(
-      "h-9 w-9 bg-transparent p-0 opacity-60 hover:opacity-100 hover:bg-muted rounded-full transition-all"
+      "h-10 w-10 bg-transparent p-0 opacity-70 hover:opacity-100 hover:bg-muted rounded-full transition-all inline-flex items-center justify-center"
     ),
     nav_button_previous: "absolute left-2",
     nav_button_next: "absolute right-2",
     table: "w-full border-collapse",
-    head_row: "flex justify-around mb-3",
-    head_cell: "text-muted-foreground w-12 font-medium text-sm",
-    row: "flex w-full justify-around mt-1",
-    cell: cn(
-      "relative p-0.5 text-center focus-within:relative focus-within:z-20",
-      "[&:has([aria-selected])]:bg-primary/10 [&:has([aria-selected])]:rounded-lg"
-    ),
+    head_row: "grid grid-cols-7 gap-0 mb-2",
+    head_cell: "text-muted-foreground font-semibold text-sm text-center py-2",
+    row: "grid grid-cols-7 gap-0",
+    cell: "p-1 text-center relative",
     day: cn(
-      "h-11 w-11 p-0 font-normal rounded-lg transition-all text-base",
+      "h-12 w-12 p-0 font-medium rounded-lg transition-all text-base leading-none",
+      "inline-flex items-center justify-center",
       "hover:bg-muted hover:scale-105",
       "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
       "aria-selected:opacity-100"
@@ -104,9 +102,45 @@ export function DateRangePicker({
       "bg-primary text-primary-foreground shadow-md",
       "hover:bg-primary/90 hover:scale-100"
     ),
-    day_today: "bg-accent text-accent-foreground font-bold ring-1 ring-accent",
+    day_today: "bg-accent text-accent-foreground font-bold ring-2 ring-accent",
     day_outside: "text-muted-foreground/40 hover:text-muted-foreground/60",
     day_disabled: "text-muted-foreground/30 hover:bg-transparent cursor-not-allowed",
+    day_range_middle: "aria-selected:bg-accent/40 aria-selected:text-accent-foreground",
+    day_hidden: "invisible",
+  };
+
+  // Mobile calendar: slightly smaller but still spacious
+  const mobileCalendarClassNames = {
+    months: "flex flex-col",
+    month: "space-y-4",
+    caption: "flex justify-center pt-1 relative items-center h-12",
+    caption_label: "text-base font-semibold tracking-tight",
+    nav: "space-x-1 flex items-center",
+    nav_button: cn(
+      "h-9 w-9 bg-transparent p-0 opacity-60 hover:opacity-100 hover:bg-muted rounded-full transition-all inline-flex items-center justify-center"
+    ),
+    nav_button_previous: "absolute left-1",
+    nav_button_next: "absolute right-1",
+    table: "w-full border-collapse",
+    head_row: "grid grid-cols-7 gap-0 mb-1",
+    head_cell: "text-muted-foreground font-medium text-xs text-center py-1",
+    row: "grid grid-cols-7 gap-0",
+    cell: "p-0.5 text-center relative",
+    day: cn(
+      "h-10 w-10 p-0 font-normal rounded-lg transition-all text-sm leading-none",
+      "inline-flex items-center justify-center",
+      "hover:bg-muted",
+      "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+      "aria-selected:opacity-100"
+    ),
+    day_range_end: "day-range-end",
+    day_selected: cn(
+      "bg-primary text-primary-foreground shadow-md",
+      "hover:bg-primary/90"
+    ),
+    day_today: "bg-accent text-accent-foreground font-bold ring-1 ring-accent",
+    day_outside: "text-muted-foreground/40",
+    day_disabled: "text-muted-foreground/30 cursor-not-allowed",
     day_range_middle: "aria-selected:bg-accent/40 aria-selected:text-accent-foreground",
     day_hidden: "invisible",
   };
@@ -115,7 +149,7 @@ export function DateRangePicker({
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className={cn(
         "p-0 gap-0 overflow-hidden",
-        isMobile ? "max-w-[95vw] w-full" : "max-w-[800px] w-[90vw]"
+        isMobile ? "max-w-[95vw] w-full" : "max-w-[900px] w-[95vw]"
       )}>
         {/* Header */}
         <DialogHeader className="px-6 pt-6 pb-4 border-b bg-muted/30">
@@ -193,39 +227,39 @@ export function DateRangePicker({
             // Mobile: Single calendar with tabs
             <div className="flex justify-center">
               {activeTab === 'start' ? (
-                <Calendar
+              <Calendar
                   mode="single"
                   selected={tempStartDate}
                   onSelect={handleStartDateSelect}
                   locale={he}
                   dir="rtl"
-                  classNames={calendarClassNames}
+                  classNames={mobileCalendarClassNames}
                   className="pointer-events-auto"
                 />
               ) : (
-                <Calendar
+              <Calendar
                   mode="single"
                   selected={tempEndDate}
                   onSelect={handleEndDateSelect}
                   disabled={(date) => !!(tempStartDate && date < tempStartDate)}
                   locale={he}
                   dir="rtl"
-                  classNames={calendarClassNames}
+                  classNames={mobileCalendarClassNames}
                   className="pointer-events-auto"
                 />
               )}
             </div>
           ) : (
-            // Desktop: Two calendars side by side
-            <div className="grid grid-cols-2 gap-8">
+            // Desktop: Two wide calendars side by side with proper grid
+            <div className="grid grid-cols-2 gap-10">
               {/* Start Date Calendar */}
-              <div className="space-y-4">
-                <div className="text-center">
-                  <h3 className="text-base font-semibold text-foreground mb-1">
+              <div className="space-y-3">
+                <div className="text-center pb-2 border-b">
+                  <h3 className="text-lg font-bold text-foreground mb-1">
                     תאריך התחלה
                   </h3>
                   <p className={cn(
-                    "text-sm transition-all",
+                    "text-sm transition-all h-5",
                     tempStartDate 
                       ? "text-primary font-medium" 
                       : "text-muted-foreground"
@@ -236,15 +270,15 @@ export function DateRangePicker({
                     }
                   </p>
                 </div>
-                <div className="border rounded-xl p-4 bg-card shadow-sm">
+                <div className="border rounded-xl p-5 bg-card shadow-sm min-w-[340px]">
                   <Calendar
                     mode="single"
                     selected={tempStartDate}
                     onSelect={handleStartDateSelect}
                     locale={he}
                     dir="rtl"
-                    classNames={calendarClassNames}
-                    className="pointer-events-auto"
+                    classNames={desktopCalendarClassNames}
+                    className="pointer-events-auto w-full"
                   />
                 </div>
               </div>
@@ -255,13 +289,13 @@ export function DateRangePicker({
               </div>
 
               {/* End Date Calendar */}
-              <div className="space-y-4">
-                <div className="text-center">
-                  <h3 className="text-base font-semibold text-foreground mb-1">
+              <div className="space-y-3">
+                <div className="text-center pb-2 border-b">
+                  <h3 className="text-lg font-bold text-foreground mb-1">
                     תאריך סיום
                   </h3>
                   <p className={cn(
-                    "text-sm transition-all",
+                    "text-sm transition-all h-5",
                     tempEndDate 
                       ? "text-primary font-medium" 
                       : "text-muted-foreground"
@@ -272,7 +306,7 @@ export function DateRangePicker({
                     }
                   </p>
                 </div>
-                <div className="border rounded-xl p-4 bg-card shadow-sm">
+                <div className="border rounded-xl p-5 bg-card shadow-sm min-w-[340px]">
                   <Calendar
                     mode="single"
                     selected={tempEndDate}
@@ -280,8 +314,8 @@ export function DateRangePicker({
                     disabled={(date) => !!(tempStartDate && date < tempStartDate)}
                     locale={he}
                     dir="rtl"
-                    classNames={calendarClassNames}
-                    className="pointer-events-auto"
+                    classNames={desktopCalendarClassNames}
+                    className="pointer-events-auto w-full"
                   />
                 </div>
               </div>
