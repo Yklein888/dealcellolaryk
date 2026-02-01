@@ -205,29 +205,41 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
       setIsStarting(false);
       setIsScanning(true);
     } catch (err: any) {
+      // Log full error details for debugging
       console.error('Failed to start scanner:', err);
+      console.error('Error details:', {
+        name: err?.name,
+        message: err?.message,
+        constraint: err?.constraint,
+        stack: err?.stack?.slice?.(0, 500),
+      });
+
       const errName = err?.name ? String(err.name) : 'UnknownError';
+      const errMsg = err?.message ? String(err.message) : '';
+      const errConstraint = err?.constraint ? ` (constraint: ${err.constraint})` : '';
+      const fullErrorCode = `${errName}${errConstraint}${errMsg ? ` - ${errMsg.slice(0, 80)}` : ''}`;
+
       if (err.name === 'NotAllowedError') {
         setError(
           'נדרשת הרשאת גישה למצלמה. אם כבר אישרת ועדיין יש שגיאה, בדוק גם בהרשאות המערכת: הגדרות אנדרואיד → אפליקציות → Chrome → הרשאות → מצלמה → אפשר.\n' +
-            `קוד שגיאה: ${errName}`
+            `קוד שגיאה: ${fullErrorCode}`
         );
       } else if (err.name === 'NotFoundError') {
-        setError(`לא נמצאה מצלמה במכשיר זה.\nקוד שגיאה: ${errName}`);
+        setError(`לא נמצאה מצלמה במכשיר זה.\nקוד שגיאה: ${fullErrorCode}`);
       } else if (err.name === 'OverconstrainedError') {
         setError(
           'הגדרות המצלמה לא נתמכות במצלמה שנבחרה. נסה לבחור מצלמה אחרת (⚙️) או נסה שוב.\n' +
-            `קוד שגיאה: ${errName}`
+            `קוד שגיאה: ${fullErrorCode}`
         );
       } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
         setError(
           'המצלמה תפוסה/לא זמינה כרגע. סגור אפליקציות שמשתמשות במצלמה (WhatsApp/Instagram/מצלמה) ונסה שוב.\n' +
-            `קוד שגיאה: ${errName}`
+            `קוד שגיאה: ${fullErrorCode}`
         );
       } else if (err.name === 'NotSupportedError') {
-        setError(`הדפדפן לא תומך בהפעלת מצלמה בצורה הזו. נסה דפדפן אחר או עדכן גרסה.\nקוד שגיאה: ${errName}`);
+        setError(`הדפדפן לא תומך בהפעלת מצלמה בצורה הזו. נסה דפדפן אחר או עדכן גרסה.\nקוד שגיאה: ${fullErrorCode}`);
       } else {
-        setError(`לא ניתן להפעיל את המצלמה. וודא שנתת הרשאות גישה.\nקוד שגיאה: ${errName}`);
+        setError(`לא ניתן להפעיל את המצלמה. וודא שנתת הרשאות גישה.\nקוד שגיאה: ${fullErrorCode}`);
       }
       setIsStarting(false);
       hasStartedRef.current = false;
