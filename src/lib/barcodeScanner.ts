@@ -2,18 +2,21 @@ export type CameraDevice = { id: string; label: string };
 
 export function pickPreferredCameraId(cameras: CameraDevice[]) {
   const label = (s: string) => (s || "").toLowerCase();
-  const preferred = cameras.find((c) => /(back|rear|environment|facing back|camera 0|אחור)/.test(label(c.label)));
+  // Prefer back/rear/environment camera
+  const preferred = cameras.find((c) =>
+    /(back|rear|environment|facing back|camera 0|אחור)/.test(label(c.label))
+  );
   return (preferred ?? cameras[cameras.length - 1])?.id;
 }
 
 export function buildBarcodeScannerConfig(opts: { qrboxWidth: number; qrboxHeight: number }) {
   return {
-    // Lower FPS tends to help autofocus stability and reduces CPU load.
-    fps: 12,
+    // Lower FPS to prioritize resolution and focus quality over frame rate
+    fps: 10,
     qrbox: { width: opts.qrboxWidth, height: opts.qrboxHeight },
     aspectRatio: 16 / 9,
     disableFlip: true,
-    // Use native BarcodeDetector (Chrome/Android) when available for better barcode performance.
+    // Use native BarcodeDetector (Chrome/Android) when available for better performance
     experimentalFeatures: {
       useBarCodeDetectorIfSupported: true,
     },
@@ -24,28 +27,80 @@ export function buildBarcodeVideoConstraints(
   preferredCameraId?: string,
   mode: "primary" | "fallback" = "primary"
 ): MediaTrackConstraints {
+  // Primary mode: Request high resolution (1080p) with advanced focus constraints
+  // Fallback mode: More conservative 720p if device rejects primary
+  
   const base: MediaTrackConstraints = {
-    ...(preferredCameraId
-      ? { deviceId: { exact: preferredCameraId } }
-      : { facingMode: { ideal: "environment" } }),
-    // 1080p often looks "sharp" but can hurt autofocus on some Android devices.
-    // 720p is usually the sweet spot for barcode scanning.
-    width: mode === "primary" ? { ideal: 1280, min: 960 } : { ideal: 1280 },
-    height: mode === "primary" ? { ideal: 720, min: 540 } : { ideal: 720 },
-    frameRate: mode === "primary" ? { ideal: 30, min: 15 } : { ideal: 24, min: 12 },
+    // Always use back camera for barcode scanning
+    facingMode: { exact: "environment" },
+    
+    // Resolution: prioritize 1080p for clarity, fallback to 720p
+    width: mode === "primary" 
+      ? { ideal: 1920, min: 1280 } 
+      : { ideal: 1280, min: 640 },
+    height: mode === "primary" 
+      ? { ideal: 1080, min: 720 } 
+      : { ideal: 720, min: 480 },
+    
+    // Lower frame rate to give camera more time for focus and exposure
+    frameRate: mode === "primary" 
+      ? { ideal: 15, max: 20 } 
+      : { ideal: 15, max: 24 },
   };
 
+  // If we have a specific camera ID, use it alongside facingMode
+  if (preferredCameraId) {
+    base.deviceId = { ideal: preferredCameraId };
+  }
+
   if (mode === "primary") {
-    // These are supported on many Android Chrome devices but not all.
-    // If the browser rejects them, we retry with a fallback config.
+    // Advanced constraints for better barcode scanning
+    // These are critical for focus and image quality
     (base as any).advanced = [
+      // Continuous autofocus is critical for barcode scanning
       { focusMode: "continuous" } as any,
+      // Continuous exposure helps with varying lighting
       { exposureMode: "continuous" } as any,
+      // Auto white balance
       { whiteBalanceMode: "continuous" } as any,
-      // Some devices benefit from a small zoom for barcodes.
-      { zoom: 2 } as any,
+      // Slight zoom helps camera focus on barcode without getting too close
+      { zoom: 1.5 } as any,
     ];
   }
 
   return base;
+}
+
+// Helper to apply post-start track optimizations if available
+export async function applyTrackOptimizations(videoTrack: MediaStreamTrack) {
+  try {
+    // Use 'any' to access non-standard but widely supported properties
+    const capabilities = videoTrack.getCapabilities?.() as any;
+    const settings: Record<string, any> = {};
+    
+    // Apply continuous focus if supported
+    if (capabilities?.focusMode?.includes("continuous")) {
+      settings.focusMode = "continuous";
+    }
+    
+    // Apply continuous exposure if supported
+    if (capabilities?.exposureMode?.includes("continuous")) {
+      settings.exposureMode = "continuous";
+    }
+    
+    // Apply zoom if supported (1.5x is good for barcodes)
+    if (capabilities?.zoom) {
+      const minZoom = capabilities.zoom.min || 1;
+      const maxZoom = capabilities.zoom.max || 1;
+      const targetZoom = Math.min(Math.max(1.5, minZoom), maxZoom);
+      settings.zoom = targetZoom;
+    }
+    
+    if (Object.keys(settings).length > 0) {
+      await videoTrack.applyConstraints(settings);
+      console.log("Applied track optimizations:", settings);
+    }
+  } catch (err) {
+    console.warn("Could not apply track optimizations:", err);
+  }
 }
