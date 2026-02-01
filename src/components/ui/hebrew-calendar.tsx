@@ -14,9 +14,11 @@ function HebrewDayContent(props: DayContentProps) {
   const hebrewDay = hebrewFull.split(' ')[0];
 
   return (
-    <div className="flex flex-col items-center justify-center w-full h-full overflow-hidden">
-      <span className="text-sm font-medium leading-none">{props.date.getDate()}</span>
-      <span className="text-[9px] text-muted-foreground/60 leading-none mt-0.5 truncate max-w-full">
+    <div className="flex flex-col items-center justify-center gap-px">
+      <span className="text-[13px] font-semibold leading-none tabular-nums">
+        {props.date.getDate()}
+      </span>
+      <span className="text-[8px] leading-none text-muted-foreground/50 font-medium">
         {hebrewDay}
       </span>
     </div>
@@ -34,48 +36,49 @@ function HebrewCalendar({
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
-      className={cn("p-3 pointer-events-auto", className)}
+      className={cn("p-2 pointer-events-auto select-none", className)}
       locale={he}
       dir="rtl"
       classNames={{
-        months: "flex flex-col sm:flex-row gap-2",
-        month: "space-y-2",
-        caption: "flex justify-center pt-1 relative items-center h-8",
-        caption_label: "text-sm font-semibold",
-        nav: "flex items-center gap-1",
+        months: "flex flex-col sm:flex-row gap-3",
+        month: "space-y-3",
+        caption: "flex justify-center relative items-center h-9 mb-1",
+        caption_label: "text-sm font-bold tracking-tight",
+        nav: "flex items-center",
         nav_button: cn(
-          buttonVariants({ variant: "outline" }),
-          "h-7 w-7 bg-transparent p-0 opacity-60 hover:opacity-100 transition-opacity"
+          buttonVariants({ variant: "ghost" }),
+          "h-8 w-8 bg-transparent p-0 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-200"
         ),
-        nav_button_previous: "absolute left-1",
-        nav_button_next: "absolute right-1",
+        nav_button_previous: "absolute left-0",
+        nav_button_next: "absolute right-0",
         table: "w-full border-collapse",
-        head_row: "flex",
-        head_cell:
-          "text-muted-foreground w-9 font-medium text-[11px] py-1.5 text-center",
-        row: "flex w-full mt-0.5",
+        head_row: "flex mb-1",
+        head_cell: "text-muted-foreground/70 w-8 font-semibold text-[10px] uppercase tracking-wide",
+        row: "flex w-full",
         cell: cn(
-          "relative p-0 text-center text-sm focus-within:relative focus-within:z-20",
-          "h-9 w-9",
-          "[&:has([aria-selected])]:bg-accent",
-          "[&:has([aria-selected].day-outside)]:bg-accent/50",
-          "[&:has([aria-selected].day-range-end)]:rounded-l-md",
-          "first:[&:has([aria-selected])]:rounded-r-md",
-          "last:[&:has([aria-selected])]:rounded-l-md"
+          "relative p-0.5 text-center focus-within:relative focus-within:z-20",
+          "[&:has([aria-selected])]:bg-primary/10 [&:has([aria-selected])]:rounded-lg",
+          "[&:has([aria-selected].day-outside)]:bg-primary/5"
         ),
         day: cn(
-          buttonVariants({ variant: "ghost" }),
-          "h-9 w-9 p-0 font-normal aria-selected:opacity-100 rounded-md hover:bg-muted/60 transition-colors"
+          "h-8 w-8 p-0 font-normal rounded-lg transition-all duration-150",
+          "hover:bg-muted/80 hover:scale-105",
+          "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+          "aria-selected:opacity-100"
         ),
         day_range_end: "day-range-end",
-        day_selected:
-          "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground rounded-md",
-        day_today: "bg-accent/70 text-accent-foreground font-semibold",
-        day_outside:
-          "day-outside text-muted-foreground/40 aria-selected:bg-accent/50 aria-selected:text-muted-foreground aria-selected:opacity-30",
-        day_disabled: "text-muted-foreground/40",
-        day_range_middle:
-          "aria-selected:bg-accent aria-selected:text-accent-foreground",
+        day_selected: cn(
+          "bg-primary text-primary-foreground shadow-sm",
+          "hover:bg-primary/90 hover:scale-100",
+          "focus:bg-primary focus:text-primary-foreground"
+        ),
+        day_today: cn(
+          "bg-accent/60 text-accent-foreground font-bold",
+          "ring-1 ring-accent ring-offset-1 ring-offset-background"
+        ),
+        day_outside: "text-muted-foreground/30 hover:text-muted-foreground/50",
+        day_disabled: "text-muted-foreground/20 hover:bg-transparent hover:scale-100 cursor-not-allowed",
+        day_range_middle: "aria-selected:bg-accent/30 aria-selected:text-accent-foreground rounded-none",
         day_hidden: "invisible",
         ...classNames,
       }}
