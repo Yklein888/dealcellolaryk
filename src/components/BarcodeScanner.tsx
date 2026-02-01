@@ -326,7 +326,9 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
                 const stream = videoElement.srcObject as MediaStream;
                 activeStreamRef.current = stream;
                 const videoTrack = stream.getVideoTracks()[0];
-                if (videoTrack) await applyTrackOptimizations(videoTrack);
+                // Keep conservative: don't force constraints post-start unless needed
+                // (can be re-enabled later per-device)
+                // if (videoTrack) await applyTrackOptimizations(videoTrack);
               }
             } catch (optErr) {
               console.warn('Could not apply optimizations:', optErr);
@@ -342,34 +344,32 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
 
         try {
           // Attempts: strict -> relaxed
+          // Start with facingMode-only first (most stable on Android)
           let started = await attemptStartFresh(
-            buildBarcodeVideoConstraints(preferredCameraId, 'primary'),
-            'Primary with deviceId'
+            buildBarcodeVideoConstraints(undefined, 'primary'),
+            'Primary (facingMode)'
           );
+
+          if (!started) {
+            started = await attemptStartFresh(
+              { facingMode: { ideal: 'environment' } },
+              'Minimal (facingMode only)'
+            );
+          }
+
+          // Then try deviceId preference (if user chose a specific lens)
+          if (!started && preferredCameraId) {
+            started = await attemptStartFresh(
+              buildBarcodeVideoConstraints(preferredCameraId, 'primary'),
+              'Primary (deviceId)'
+            );
+          }
 
           if (!started && preferredCameraId) {
             started = await attemptStartFresh(
               buildBarcodeVideoConstraints(preferredCameraId, 'fallback'),
-              'Fallback with deviceId'
+              'Fallback (deviceId)'
             );
-          }
-
-          if (!started) {
-            started = await attemptStartFresh(
-              buildBarcodeVideoConstraints(undefined, 'primary'),
-              'Primary without deviceId'
-            );
-          }
-
-          if (!started) {
-            started = await attemptStartFresh(
-              buildBarcodeVideoConstraints(undefined, 'fallback'),
-              'Fallback without deviceId'
-            );
-          }
-
-          if (!started) {
-            started = await attemptStartFresh({ facingMode: { ideal: 'environment' } }, 'Minimal constraints');
           }
 
           if (!started) {
