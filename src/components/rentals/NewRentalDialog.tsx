@@ -102,6 +102,7 @@ interface NewRentalDialogProps {
   customers: Customer[];
   inventory: InventoryItem[];
   availableItems: InventoryItem[];
+  preSelectedItem?: InventoryItem | null;
   onAddRental: (rental: {
     customerId: string;
     customerName: string;
@@ -131,6 +132,7 @@ export function NewRentalDialog({
   customers,
   inventory,
   availableItems,
+  preSelectedItem,
   onAddRental,
   onAddCustomer,
   onAddInventoryItem,
@@ -188,6 +190,21 @@ export function NewRentalDialog({
     setItemSearchTerm('');
     setItemCategoryFilter('all');
   };
+
+  // Auto-add pre-selected item when dialog opens
+  useEffect(() => {
+    if (isOpen && preSelectedItem && preSelectedItem.status === 'available') {
+      // Check if item is not already selected
+      if (!selectedItems.some(i => i.inventoryItemId === preSelectedItem.id)) {
+        setSelectedItems([{
+          inventoryItemId: preSelectedItem.id,
+          category: preSelectedItem.category,
+          name: preSelectedItem.name,
+          hasIsraeliNumber: false,
+        }]);
+      }
+    }
+  }, [isOpen, preSelectedItem]);
 
   // Filter customers
   const filteredCustomers = customers.filter(customer => {

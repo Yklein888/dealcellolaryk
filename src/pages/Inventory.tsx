@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useLocation } from 'react-router-dom';
 import { useRental } from '@/hooks/useRental';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -42,6 +42,7 @@ export default function Inventory() {
   const { inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem } = useRental();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -59,6 +60,16 @@ export default function Inventory() {
       setSearchParams({}, { replace: true });
     }
   }, []);
+
+  // Handle direct navigation from global search
+  useEffect(() => {
+    if (location.state?.editItem) {
+      const item = location.state.editItem as InventoryItem;
+      handleEdit(item);
+      // Clear the state
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   const [formData, setFormData] = useState({
     category: 'sim_european' as ItemCategory,
