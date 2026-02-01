@@ -3,6 +3,7 @@ export type ItemCategory =
   | 'sim_american'
   | 'sim_european'
   | 'device_simple'
+  | 'device_simple_europe' // מכשיר פשוט לאירופה - 5 ש"ח ליום
   | 'device_smartphone'
   | 'modem'
   | 'netstick';
@@ -128,6 +129,7 @@ export const categoryLabels: Record<ItemCategory, string> = {
   sim_american: 'סים אמריקאי',
   sim_european: 'סים אירופאי',
   device_simple: 'מכשיר פשוט',
+  device_simple_europe: 'מכשיר פשוט לאירופה',
   device_smartphone: 'סמארטפון',
   modem: 'מודם',
   netstick: 'נטסטיק',
@@ -137,6 +139,7 @@ export const categoryIcons: Record<ItemCategory, string> = {
   sim_american: '🇺🇸',
   sim_european: '🇪🇺',
   device_simple: '📱',
+  device_simple_europe: '🇪🇺📱',
   device_smartphone: '📲',
   modem: '📡',
   netstick: '📶',
