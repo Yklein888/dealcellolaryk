@@ -89,7 +89,8 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
     }
 
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: true,
+      // Prefer back camera on mobile; some devices behave better when facingMode is provided.
+      video: { facingMode: { ideal: 'environment' } },
       audio: false,
     });
     // Stop immediately; we only needed the permission prompt in a gesture context.
@@ -158,36 +159,75 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
 
       try {
         const scanConfig = buildBarcodeScannerConfig({ qrboxWidth, qrboxHeight });
-        const constraints = buildBarcodeVideoConstraints(preferredCameraId, 'primary');
-        await scannerRef.current.start(constraints as any, scanConfig as any, onDecoded, onDecodeError);
+
+        // Attempt 1: primary constraints (may include deviceId exact)
+        try {
+          const constraints = buildBarcodeVideoConstraints(preferredCameraId, 'primary');
+          await scannerRef.current.start(
+            constraints as any,
+            scanConfig as any,
+            onDecoded,
+            onDecodeError
+          );
+        } catch (err1: any) {
+          console.warn('Primary camera constraints failed, retrying with fallback:', err1);
+
+          // Attempt 2: fallback constraints (still may include deviceId exact)
+          try {
+            const fallbackConstraints = buildBarcodeVideoConstraints(preferredCameraId, 'fallback');
+            await scannerRef.current.start(
+              fallbackConstraints as any,
+              scanConfig as any,
+              onDecoded,
+              onDecodeError
+            );
+          } catch (err2: any) {
+            // Some Android devices reject deviceId constraints even when permission is granted.
+            // Attempt 3: try again WITHOUT deviceId (use facingMode instead).
+            if (preferredCameraId) {
+              console.warn('Fallback with deviceId failed, retrying without deviceId:', err2);
+              const noDeviceIdConstraints = buildBarcodeVideoConstraints(undefined, 'fallback');
+              await scannerRef.current.start(
+                noDeviceIdConstraints as any,
+                scanConfig as any,
+                onDecoded,
+                onDecodeError
+              );
+            } else {
+              throw err2;
+            }
+          }
+        }
       } catch (err: any) {
-        console.warn('Primary camera constraints failed, retrying with fallback:', err);
-        const scanConfig = buildBarcodeScannerConfig({ qrboxWidth, qrboxHeight });
-        const fallbackConstraints = buildBarcodeVideoConstraints(preferredCameraId, 'fallback');
-        await scannerRef.current.start(
-          fallbackConstraints as any,
-          scanConfig as any,
-          onDecoded,
-          onDecodeError
-        );
+        throw err;
       }
 
       setIsStarting(false);
       setIsScanning(true);
     } catch (err: any) {
       console.error('Failed to start scanner:', err);
+      const errName = err?.name ? String(err.name) : 'UnknownError';
       if (err.name === 'NotAllowedError') {
-        setError('נדרשת הרשאת גישה למצלמה. אנא אשר את הבקשה ונסה שוב.');
+        setError(
+          'נדרשת הרשאת גישה למצלמה. אם כבר אישרת ועדיין יש שגיאה, בדוק גם בהרשאות המערכת: הגדרות אנדרואיד → אפליקציות → Chrome → הרשאות → מצלמה → אפשר.\n' +
+            `קוד שגיאה: ${errName}`
+        );
       } else if (err.name === 'NotFoundError') {
-        setError('לא נמצאה מצלמה במכשיר זה.');
+        setError(`לא נמצאה מצלמה במכשיר זה.\nקוד שגיאה: ${errName}`);
       } else if (err.name === 'OverconstrainedError') {
-        setError('הגדרות המצלמה לא נתמכות במצלמה שנבחרה. נסה לבחור מצלמה אחרת (⚙️) או נסה שוב.');
+        setError(
+          'הגדרות המצלמה לא נתמכות במצלמה שנבחרה. נסה לבחור מצלמה אחרת (⚙️) או נסה שוב.\n' +
+            `קוד שגיאה: ${errName}`
+        );
       } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
-        setError('המצלמה תפוסה/לא זמינה כרגע. סגור אפליקציות שמשתמשות במצלמה ונסה שוב.');
+        setError(
+          'המצלמה תפוסה/לא זמינה כרגע. סגור אפליקציות שמשתמשות במצלמה (WhatsApp/Instagram/מצלמה) ונסה שוב.\n' +
+            `קוד שגיאה: ${errName}`
+        );
       } else if (err.name === 'NotSupportedError') {
-        setError('הדפדפן לא תומך בהפעלת מצלמה בצורה הזו. נסה דפדפן אחר או עדכן גרסה.');
+        setError(`הדפדפן לא תומך בהפעלת מצלמה בצורה הזו. נסה דפדפן אחר או עדכן גרסה.\nקוד שגיאה: ${errName}`);
       } else {
-        setError('לא ניתן להפעיל את המצלמה. וודא שנתת הרשאות גישה.');
+        setError(`לא ניתן להפעיל את המצלמה. וודא שנתת הרשאות גישה.\nקוד שגיאה: ${errName}`);
       }
       setIsStarting(false);
       hasStartedRef.current = false;
