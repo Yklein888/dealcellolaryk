@@ -1,14 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Camera, Loader2, X, ScanLine } from 'lucide-react';
+import { Camera, Loader2, X, ScanLine, Keyboard } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 
 interface BarcodeScannerProps {
   isOpen: boolean;
@@ -20,12 +15,13 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [manualMode, setManualMode] = useState(false);
+  const [manualInput, setManualInput] = useState('');
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const hasStartedRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const pickPreferredCameraId = useCallback((cameras: Array<{ id: string; label: string }>) => {
-    // Prefer a rear-facing camera when labels are available.
     const label = (s: string) => (s || '').toLowerCase();
     const preferred = cameras.find((c) =>
       /(back|rear|environment|facing back|camera 0|אחור)/.test(label(c.label))
@@ -37,32 +33,42 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
     if (scannerRef.current) {
       scannerRef.current
         .stop()
-        .catch(() => {
-          // Ignore stop errors
-        })
+        .catch(() => {})
         .finally(() => {
           scannerRef.current = null;
           hasStartedRef.current = false;
           setIsScanning(false);
+          setManualMode(false);
+          setManualInput('');
           onClose();
         });
     } else {
       hasStartedRef.current = false;
       setIsScanning(false);
+      setManualMode(false);
+      setManualInput('');
       onClose();
     }
   }, [onClose]);
 
+  const handleManualSubmit = useCallback(() => {
+    const trimmed = manualInput.trim();
+    if (trimmed) {
+      if (navigator.vibrate) navigator.vibrate(100);
+      onScan(trimmed);
+      handleClose();
+    }
+  }, [manualInput, onScan, handleClose]);
+
   const startScanner = useCallback(async () => {
     if (hasStartedRef.current) return;
-    
     hasStartedRef.current = true;
     setIsStarting(true);
     setError(null);
 
     const scannerId = 'barcode-scanner-reader';
     const scannerElement = document.getElementById(scannerId);
-    
+
     if (!scannerElement) {
       setError('לא ניתן לאתחל את הסורק');
       setIsStarting(false);
@@ -83,70 +89,66 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
         ],
         verbose: false,
       });
-      
-      // Get container dimensions for optimal qrbox
-      const containerWidth = containerRef.current?.clientWidth || 300;
-      const qrboxWidth = Math.min(containerWidth - 40, 280);
-      const qrboxHeight = Math.floor(qrboxWidth * 0.4); // Barcode aspect ratio
-      
+
+      // Use full container width for qrbox (larger = easier barcode capture)
+      const containerWidth = containerRef.current?.clientWidth || window.innerWidth;
+      const qrboxWidth = Math.min(containerWidth - 48, 400);
+      const qrboxHeight = Math.floor(qrboxWidth * 0.35);
+
       const onDecoded = (decodedText: string) => {
-        // Successfully scanned - provide haptic feedback if available
-        if (navigator.vibrate) {
-          navigator.vibrate(100);
-        }
+        if (navigator.vibrate) navigator.vibrate(100);
         onScan(decodedText);
         handleClose();
       };
 
-      const onDecodeError = () => {
-        // Not found - normal while scanning.
-      };
+      const onDecodeError = () => {};
 
-      // Try to force a higher quality stream (HD + continuous focus where supported).
-      // Note: html5-qrcode supports `videoConstraints` (beta) which can override camera selection.
       let preferredCameraId: string | undefined;
       try {
         const cameras = await Html5Qrcode.getCameras();
         preferredCameraId = pickPreferredCameraId(cameras);
-      } catch {
-        // Ignore camera enumeration issues and fall back to facingMode.
-      }
+      } catch {}
 
       const baseConfig = {
-        fps: 20,
+        fps: 25,
         qrbox: { width: qrboxWidth, height: qrboxHeight },
         aspectRatio: 16 / 9,
         disableFlip: true,
       };
 
-      const highQualityVideoConstraints: any = {
+      const highQualityVideoConstraints: MediaTrackConstraints = {
         ...(preferredCameraId
           ? { deviceId: { exact: preferredCameraId } }
           : { facingMode: { ideal: 'environment' } }),
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
-        frameRate: { ideal: 30 },
-        advanced: [
-          { focusMode: 'continuous' },
-          { exposureMode: 'continuous' },
-          { whiteBalanceMode: 'continuous' },
-        ],
+        width: { ideal: 1920, min: 1280 },
+        height: { ideal: 1080, min: 720 },
+        frameRate: { ideal: 30, min: 15 },
+        // @ts-expect-error focusMode is valid but not in TypeScript defs
+        focusMode: { ideal: 'continuous' },
       };
 
-      const highQualityConfig: any = {
+      const highQualityConfig = {
         ...baseConfig,
-        // When provided, this may override `aspectRatio` / camera selection internally.
         videoConstraints: highQualityVideoConstraints,
       };
 
       try {
-        await scannerRef.current.start({ facingMode: 'environment' }, highQualityConfig, onDecoded, onDecodeError);
+        await scannerRef.current.start(
+          { facingMode: 'environment' },
+          highQualityConfig as any,
+          onDecoded,
+          onDecodeError
+        );
       } catch (err: any) {
-        // If the browser rejects our constraints, retry with safer defaults.
-        console.warn('High-quality camera constraints failed, retrying with defaults:', err);
-        await scannerRef.current.start({ facingMode: 'environment' }, baseConfig as any, onDecoded, onDecodeError);
+        console.warn('High-quality constraints failed, retrying with defaults:', err);
+        await scannerRef.current.start(
+          { facingMode: 'environment' },
+          baseConfig as any,
+          onDecoded,
+          onDecodeError
+        );
       }
-      
+
       setIsStarting(false);
       setIsScanning(true);
     } catch (err: any) {
@@ -164,85 +166,141 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
   }, [handleClose, onScan, pickPreferredCameraId]);
 
   useEffect(() => {
-    if (isOpen && !hasStartedRef.current) {
-      // Small delay to ensure dialog is rendered
+    if (isOpen && !hasStartedRef.current && !manualMode) {
       const timer = setTimeout(startScanner, 100);
       return () => clearTimeout(timer);
     }
-  }, [isOpen, startScanner]);
+  }, [isOpen, startScanner, manualMode]);
+
+  // Cleanup on unmount / close
+  useEffect(() => {
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.stop().catch(() => {});
+        scannerRef.current = null;
+      }
+    };
+  }, []);
+
+  if (!isOpen) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="max-w-md p-0 overflow-hidden">
-        <DialogHeader className="p-4 pb-2">
-          <DialogTitle className="flex items-center gap-2">
-            <Camera className="h-5 w-5" />
-            סרוק ברקוד מוצר
-          </DialogTitle>
-          <DialogDescription>
-            כוון את המצלמה לעבר הברקוד שעל המוצר
-          </DialogDescription>
-        </DialogHeader>
-        
-        <div className="space-y-0" ref={containerRef}>
-          {/* Scanner Container */}
-          <div className="relative bg-black">
-             <div 
-              id="barcode-scanner-reader" 
-               className="w-full aspect-video"
+    <div className="fixed inset-0 z-50 bg-black flex flex-col safe-area-top safe-area-bottom">
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 bg-black/80 backdrop-blur-sm">
+        <div className="flex items-center gap-2 text-white">
+          <Camera className="h-5 w-5" />
+          <span className="font-medium">סרוק ברקוד</span>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleClose}
+          className="text-white hover:bg-white/20"
+        >
+          <X className="h-5 w-5" />
+        </Button>
+      </div>
+
+      {/* Main content */}
+      <div className="flex-1 flex flex-col" ref={containerRef}>
+        {manualMode ? (
+          <div className="flex-1 flex flex-col items-center justify-center px-6 gap-4">
+            <p className="text-white text-center mb-2">הקלד את מספר הברקוד</p>
+            <Input
+              value={manualInput}
+              onChange={(e) => setManualInput(e.target.value)}
+              placeholder="לדוגמה: 7290000000000"
+              className="text-center text-lg bg-white/10 border-white/30 text-white placeholder:text-white/50"
+              autoFocus
+              inputMode="numeric"
+              onKeyDown={(e) => e.key === 'Enter' && handleManualSubmit()}
             />
-            
-            {/* Scanning overlay with animated line */}
-            {isScanning && (
-              <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                <div className="relative w-[70%] h-[25%] border-2 border-primary rounded-lg overflow-hidden">
-                  {/* Animated scanning line */}
-                  <div className="absolute inset-x-0 h-0.5 bg-primary animate-scan-line shadow-[0_0_8px_2px] shadow-primary/50" />
-                  
-                  {/* Corner accents */}
-                  <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-primary" />
-                  <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-primary" />
-                  <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-primary" />
-                  <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-primary" />
-                </div>
-              </div>
-            )}
-            
-            {/* Loading overlay */}
-            {isStarting && (
-              <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
-                <div className="flex flex-col items-center gap-3 text-white">
-                  <Loader2 className="h-8 w-8 animate-spin" />
-                  <span className="text-sm">מאתחל מצלמה...</span>
-                </div>
-              </div>
-            )}
-          </div>
-          
-          {/* Error state */}
-          {error && (
-            <div className="text-center text-destructive text-sm p-4 bg-destructive/10">
-              {error}
-            </div>
-          )}
-          
-          {/* Hint text */}
-          {isScanning && !error && (
-            <div className="text-center text-muted-foreground text-xs py-2 px-4 flex items-center justify-center gap-2">
-              <ScanLine className="h-4 w-4" />
-              <span>החזק את המכשיר יציב וקרוב לברקוד</span>
-            </div>
-          )}
-          
-          {/* Cancel button */}
-          <div className="p-4 pt-2">
-            <Button variant="outline" onClick={handleClose} className="w-full">
-              <X className="h-4 w-4 ml-2" />
-              ביטול
+            <Button onClick={handleManualSubmit} className="w-full" disabled={!manualInput.trim()}>
+              אישור
+            </Button>
+            <Button
+              variant="ghost"
+              className="text-white/70"
+              onClick={() => setManualMode(false)}
+            >
+              חזור לסריקה
             </Button>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        ) : (
+          <>
+            {/* Camera feed */}
+            <div className="flex-1 relative bg-black">
+              <div id="barcode-scanner-reader" className="w-full h-full" />
+
+              {/* Scanning overlay */}
+              {isScanning && (
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                  <div
+                    className={cn(
+                      'relative border-2 border-primary rounded-xl overflow-hidden',
+                      'w-[85%] max-w-[400px] h-[30%] min-h-[100px] max-h-[150px]'
+                    )}
+                  >
+                    <div className="absolute inset-x-0 h-0.5 bg-primary animate-scan-line shadow-[0_0_12px_3px] shadow-primary/60" />
+                    <div className="absolute top-0 left-0 w-6 h-6 border-t-3 border-l-3 border-primary rounded-tl-lg" />
+                    <div className="absolute top-0 right-0 w-6 h-6 border-t-3 border-r-3 border-primary rounded-tr-lg" />
+                    <div className="absolute bottom-0 left-0 w-6 h-6 border-b-3 border-l-3 border-primary rounded-bl-lg" />
+                    <div className="absolute bottom-0 right-0 w-6 h-6 border-b-3 border-r-3 border-primary rounded-br-lg" />
+                  </div>
+                </div>
+              )}
+
+              {/* Loading overlay */}
+              {isStarting && (
+                <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
+                  <div className="flex flex-col items-center gap-3 text-white">
+                    <Loader2 className="h-10 w-10 animate-spin" />
+                    <span>מאתחל מצלמה...</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Bottom controls */}
+            <div className="p-4 bg-black/90 backdrop-blur-sm space-y-3">
+              {error ? (
+                <div className="text-center text-destructive text-sm bg-destructive/20 rounded-lg p-3">
+                  {error}
+                </div>
+              ) : isScanning ? (
+                <div className="text-center text-white/70 text-sm flex items-center justify-center gap-2">
+                  <ScanLine className="h-4 w-4" />
+                  <span>החזק יציב וקרוב לברקוד</span>
+                </div>
+              ) : null}
+
+              <div className="flex gap-3">
+                <Button
+                  variant="secondary"
+                  className="flex-1"
+                  onClick={() => {
+                    if (scannerRef.current) {
+                      scannerRef.current.stop().catch(() => {});
+                      scannerRef.current = null;
+                      hasStartedRef.current = false;
+                      setIsScanning(false);
+                    }
+                    setManualMode(true);
+                  }}
+                >
+                  <Keyboard className="h-4 w-4 ml-2" />
+                  הקלדה ידנית
+                </Button>
+                <Button variant="outline" className="flex-1" onClick={handleClose}>
+                  <X className="h-4 w-4 ml-2" />
+                  ביטול
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
