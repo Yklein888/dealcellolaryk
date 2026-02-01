@@ -71,13 +71,15 @@ export const printCallingInstructions = async (
     bodyContainer.style.left = '-9999px';
     bodyContainer.style.top = '0';
     bodyContainer.style.width = '210mm'; // A4 width
+    bodyContainer.style.minHeight = '297mm'; // A4 height
     bodyContainer.style.backgroundColor = '#ffffff';
     bodyContainer.style.direction = 'rtl';
+    bodyContainer.style.overflow = 'visible';
     
     document.body.appendChild(bodyContainer);
     document.head.appendChild(styleContainer);
 
-    // 3. Render DOCX to HTML
+    // 3. Render DOCX to HTML with all features enabled including images
     await renderAsync(docxBlob, bodyContainer, styleContainer, {
       className: 'docx-preview',
       inWrapper: true,
@@ -86,17 +88,34 @@ export const printCallingInstructions = async (
       ignoreFonts: false,
       breakPages: true,
       ignoreLastRenderedPageBreak: false,
-      experimental: false,
+      experimental: true, // Enable experimental features for better image rendering
       trimXmlDeclaration: true,
-      useBase64URL: true,
-      renderHeaders: true,
+      useBase64URL: true, // Critical for embedding images as base64
+      renderHeaders: true, // Render headers (where logo is)
       renderFooters: true,
       renderFootnotes: true,
       renderEndnotes: true,
+      debug: false,
     });
 
-    // Wait for images/fonts to load
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // Wait for images/fonts to load (longer wait for complex documents with images)
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Additional wait for any lazy-loaded images
+    const images = bodyContainer.querySelectorAll('img');
+    if (images.length > 0) {
+      await Promise.all(
+        Array.from(images).map(img => {
+          if (img.complete) return Promise.resolve();
+          return new Promise(resolve => {
+            img.onload = resolve;
+            img.onerror = resolve;
+            // Timeout after 2 seconds per image
+            setTimeout(resolve, 2000);
+          });
+        })
+      );
+    }
 
     // 4. Find pages or use container
     const pages = bodyContainer.querySelectorAll('.docx-wrapper section');
@@ -110,13 +129,16 @@ export const printCallingInstructions = async (
     for (let i = 0; i < elementsToCapture.length; i++) {
       const element = elementsToCapture[i] as HTMLElement;
       
-      // Capture as canvas with high quality
+      // Capture as canvas with high quality - ensure images are captured
       const canvas = await html2canvas(element, {
-        scale: 2,
+        scale: 3, // Higher scale for better quality
         useCORS: true,
         backgroundColor: '#ffffff',
         logging: false,
         allowTaint: true,
+        foreignObjectRendering: false, // Better compatibility
+        imageTimeout: 5000, // Wait up to 5 seconds for images
+        removeContainer: false, // Keep container for accurate rendering
       });
 
       // Calculate dimensions to fit A4
