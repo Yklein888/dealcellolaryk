@@ -25,7 +25,8 @@ import {
   FileText,
   Store,
   Settings,
-  Fingerprint
+  Fingerprint,
+  Signal
 } from 'lucide-react';
 import { BiometricSettings } from '@/components/settings/BiometricSettings';
 
@@ -35,6 +36,7 @@ const navItems = [
   { path: '/rentals', label: 'השכרות', icon: ShoppingCart, permission: 'view_rentals' as PermissionKey },
   { path: '/customers', label: 'לקוחות', icon: Users, permission: 'view_customers' as PermissionKey },
   { path: '/inventory', label: 'מלאי', icon: Package, permission: 'view_inventory' as PermissionKey },
+  { path: '/sim-cards', label: 'סימים CellStation', icon: Signal, permission: 'view_inventory' as PermissionKey },
   { path: '/repairs', label: 'תיקונים', icon: Wrench, permission: 'view_repairs' as PermissionKey },
   { path: '/payments', label: 'תשלומים', icon: CreditCard, permission: 'view_payments' as PermissionKey },
   { path: '/invoices', label: 'חשבוניות', icon: FileText, permission: 'view_invoices' as PermissionKey },
