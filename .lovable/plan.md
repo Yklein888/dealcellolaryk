@@ -1,146 +1,330 @@
 
-# תוכנית: שיפור טעינת נתונים ומניעת אובדן נתונים
+# תוכנית: הדפסה לסימים אמריקאיים + ניווט ישיר לפעולות
 
-## מה קורה עכשיו
+## סיכום הבקשות
 
-כשאתה רואה את ההודעה האדומה "חלק מהנתונים לא נטענו - נכשל בטעינת: מלאי":
+1. **הדפסת סים אמריקאי**: הוספת אפשרות הדפסה לסימים אמריקאיים בגודל קטן (להדבקה על מכשירים), שכולל:
+   - מספר אמריקאי (תמיד)
+   - מספר ישראלי (אם קיים)
+   - מספר סים (ICCID)
+   - ברקוד
 
-| מה שקורה | מה שאתה רואה |
-|-----------|--------------|
-| בקשת רשת לשרת נכשלת (בעיה זמנית) | הודעת שגיאה אדומה |
-| המערכת מנסה 3 פעמים עם המתנה | עדיין נכשל |
-| יש cache מקומי אז המלאי **לא נעלם** | אבל עדיין מופיעה הודעה מפחידה |
-
-**הנתונים שלך לא אובדים!** הם שמורים גם בשרת וגם במטמון המקומי.
+2. **ניווט ישיר לפעולות**: כשבוחרים מוצר בחיפוש ולוחצים "הוסף להשכרה", הדיאלוג של השכרה חדשה ייפתח ישירות עם הפריט מסומן (במקום לעבור לדף ההשכרות ולפתוח השכרה ידנית)
 
 ---
 
-## השיפורים המוצעים
+## חלק 1: הדפסת סים אמריקאי
 
-### 1. הרחבת ה-Cache לכל הנתונים
-כרגע רק המלאי נשמר מקומית. נוסיף cache גם ל:
-- לקוחות
-- השכרות (+ פריטי השכרה)
-- תיקונים
-
-**יתרון**: גם אם הרשת נופלת, תראה את כל הנתונים מהמטמון.
-
-### 2. שיפור הודעות השגיאה
-כשיש נתונים ב-cache:
-- **במקום**: הודעה אדומה מפחידה "חלק מהנתונים לא נטענו"
-- **יהיה**: הודעה כחולה עדינה "מוצג ממטמון מקומי, מנסה לעדכן..."
-
-### 3. ניסיון רענון ברקע
-אחרי שמציג נתונים מ-cache, המערכת תנסה לעדכן אוטומטית ברקע כל 30 שניות (עד 3 ניסיונות) בלי להפריע לך.
-
-### 4. זיהוי סוג הכשל
-המערכת תזהה האם הכשל הוא:
-- בעיית רשת זמנית (WiFi, 3G ירוד)
-- בעיית שרת
-- חסימה של תוכנת אנטי-וירוס
-
----
-
-## השינויים הטכניים
-
-### קובץ: `src/hooks/useRental.tsx`
-
-#### 1. הוספת Cache לכל הנתונים
-```javascript
-const CUSTOMERS_CACHE_KEY = 'dealcell_cache_customers_v1';
-const RENTALS_CACHE_KEY = 'dealcell_cache_rentals_v1';
-const REPAIRS_CACHE_KEY = 'dealcell_cache_repairs_v1';
-```
-
-#### 2. פונקציות שמירה/טעינה מ-Cache
-```javascript
-const loadCachedData = <T,>(key: string): T[] => {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
-};
-
-const saveToCache = <T,>(key: string, data: T[]) => {
-  try {
-    localStorage.setItem(key, JSON.stringify(data));
-  } catch { /* ignore quota errors */ }
-};
-```
-
-#### 3. אתחול State מ-Cache
-```javascript
-const [customers, setCustomers] = useState<Customer[]>(() => 
-  loadCachedData(CUSTOMERS_CACHE_KEY)
-);
-const [rentals, setRentals] = useState<Rental[]>(() => 
-  loadCachedData(RENTALS_CACHE_KEY)
-);
-const [repairs, setRepairs] = useState<Repair[]>(() => 
-  loadCachedData(REPAIRS_CACHE_KEY)
-);
-```
-
-#### 4. הודעות מותאמות
-```javascript
-// כשיש cache ורק חלק נכשל
-if (hasCachedData) {
-  toast({
-    title: 'מוצג ממטמון מקומי',
-    description: 'הנתונים מעודכנים. מנסה לסנכרן ברקע...',
-    // ללא variant: destructive = הודעה רגילה (לא אדומה)
-  });
-}
-```
-
-#### 5. רענון אוטומטי ברקע
-```javascript
-// אם נכשל, נסה שוב אחרי 30 שניות (ברקע, בלי loading)
-if (failedParts.length > 0 && backgroundRetryCount < 3) {
-  setTimeout(() => {
-    fetchDataBackground(failedTables);
-  }, 30000);
-}
-```
-
----
-
-## תרשים הזרימה החדש
+### מה נוסיף
+כפתור הדפסה חדש שמייצר מדבקה קטנה (כ-4x6 ס"מ) עם:
 
 ```text
-טעינת דף
-    │
-    ├── טען מ-Cache מיד (מהיר!)
-    │
-    ├── שלח בקשות לשרת
-    │
-    ├── הצלחה? ──┬── כן → עדכן Cache + הצג נתונים חדשים
-    │            │
-    │            └── לא → נסה שוב (עד 3 פעמים)
-    │                        │
-    │                        └── עדיין נכשל?
-    │                                │
-    │                                ├── יש Cache → הצג עם הודעה עדינה
-    │                                │              + נסה ברקע כל 30 שניות
-    │                                │
-    │                                └── אין Cache → הודעת שגיאה
+┌─────────────────────────────┐
+│    מספר אמריקאי/מקומי:     │
+│     +1-555-123-4567         │
+│ ────────────────────────── │
+│    מספר ישראלי:             │
+│     0722-587-081            │
+│ ────────────────────────── │
+│     SIM: 8972...            │
+│                             │
+│     [||||||||||||||||]      │
+│       INV-XXXXXX            │
+└─────────────────────────────┘
+```
+
+### קבצים לעריכה
+
+#### 1. `src/components/inventory/QuickActionDialog.tsx`
+- הוספת כפתור "הדפס מדבקה" לפריטים מסוג סים
+- פונקציית הדפסה חדשה שמייצרת מסמך בגודל קטן
+
+#### 2. `src/pages/Inventory.tsx`
+- הוספת אותה פונקציית הדפסת מדבקה בדיאלוג העריכה
+- עובד גם לסים אירופאי וגם לסים אמריקאי
+
+### לוגיקת ההדפסה
+
+```javascript
+const printSimLabel = (item: InventoryItem) => {
+  const printWindow = window.open('', '_blank');
+  
+  // גודל מדבקה: 4x6 ס"מ
+  // כולל:
+  // - מספר מקומי (אמריקאי/אירופאי)
+  // - מספר ישראלי (אם קיים)
+  // - מספר ICCID
+  // - ברקוד (JsBarcode)
+};
 ```
 
 ---
 
-## מה לא ישתנה
+## חלק 2: ניווט ישיר לפעולות
 
-- **הנתונים שלך בטוחים** - הם תמיד בשרת
-- **Cache הוא רק גיבוי** - לתצוגה כשאין רשת
-- **כל שינוי נשמר לשרת** - ומעדכן את ה-Cache
+### הבעיה הנוכחית
+כשלוחצים "הוסף להשכרה" בחיפוש הגלובלי:
+1. המשתמש מועבר לדף `/rentals`
+2. צריך ללחוץ ידנית על "השכרה חדשה"
+3. צריך לחפש ולבחור את הפריט מחדש
+
+### הפתרון
+הדיאלוג של השכרה חדשה ייפתח ישירות עם הפריט כבר מסומן.
+
+### קבצים לעריכה
+
+#### 1. `src/pages/Rentals.tsx`
+- הוספת `useLocation` מ-react-router
+- קריאת `location.state.addItemToRental` בטעינה
+- פתיחה אוטומטית של `isAddDialogOpen` עם הפריט
+- העברת `preSelectedItem` ל-NewRentalDialog
+
+#### 2. `src/components/rentals/NewRentalDialog.tsx`
+- הוספת prop חדש: `preSelectedItem?: InventoryItem`
+- ב-`useEffect`: אם `preSelectedItem` קיים, הוסף אותו ל-`selectedItems` אוטומטית
+
+#### 3. `src/pages/Inventory.tsx`
+- הוספת `useLocation` מ-react-router
+- קריאת `location.state.editItem` בטעינה
+- פתיחה אוטומטית של דיאלוג העריכה עם הפריט
 
 ---
 
-## סיכום
+## שינויים טכניים מפורטים
 
-| לפני | אחרי |
-|------|------|
-| הודעה אדומה מפחידה | הודעה עדינה אם יש cache |
-| רק מלאי ב-cache | כל הנתונים ב-cache |
-| צריך לרענן ידנית | רענון אוטומטי ברקע |
-| נראה כאילו נתונים אובדים | ברור שהכל שמור |
+### קובץ: `src/components/inventory/QuickActionDialog.tsx`
+
+**שינוי 1**: הוספת פונקציית הדפסת מדבקה
+
+```typescript
+const printSimLabel = () => {
+  if (!item) return;
+  
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) return;
+  
+  const localDisplay = item.localNumber || '---';
+  const israeliDisplay = item.israeliNumber || null;
+  const simDisplay = item.simNumber || '---';
+  
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html dir="rtl">
+    <head>
+      <title>מדבקת סים</title>
+      <style>
+        @page { size: 4cm 6cm; margin: 2mm; }
+        body { 
+          font-family: Arial, sans-serif; 
+          font-size: 8pt;
+          width: 4cm;
+          height: 6cm;
+          padding: 2mm;
+          direction: rtl;
+        }
+        .field { 
+          margin-bottom: 2mm; 
+          text-align: center;
+        }
+        .label { font-size: 6pt; color: #666; }
+        .value { font-size: 9pt; font-weight: bold; }
+        .barcode { margin-top: 3mm; text-align: center; }
+        .barcode svg { max-width: 100%; height: 25px; }
+      </style>
+    </head>
+    <body>
+      <div class="field">
+        <div class="label">מספר מקומי:</div>
+        <div class="value">${localDisplay}</div>
+      </div>
+      ${israeliDisplay ? `
+      <div class="field">
+        <div class="label">מספר ישראלי:</div>
+        <div class="value">${israeliDisplay}</div>
+      </div>
+      ` : ''}
+      <div class="field">
+        <div class="label">מספר סים:</div>
+        <div class="value" style="font-size: 7pt;">${simDisplay}</div>
+      </div>
+      <div class="barcode">
+        <svg id="barcode"></svg>
+      </div>
+      <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.12.3/dist/JsBarcode.all.min.js"></script>
+      <script>
+        JsBarcode("#barcode", "${item.barcode || ''}", {
+          format: "CODE128",
+          width: 1,
+          height: 25,
+          displayValue: true,
+          fontSize: 8,
+          margin: 2
+        });
+        window.onload = function() {
+          setTimeout(() => {
+            window.print();
+            window.close();
+          }, 300);
+        };
+      </script>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+};
+```
+
+**שינוי 2**: הוספת כפתור הדפסה לסימים
+
+```tsx
+{isSim && item.barcode && (
+  <Button onClick={printSimLabel} variant="outline" className="w-full">
+    <Printer className="h-4 w-4 ml-2" />
+    הדפס מדבקה
+  </Button>
+)}
+```
+
+---
+
+### קובץ: `src/pages/Rentals.tsx`
+
+**שינוי 1**: הוספת import ו-useLocation
+
+```typescript
+import { useSearchParams, useLocation } from 'react-router-dom';
+
+// בתוך הקומפוננטה:
+const location = useLocation();
+const [preSelectedItem, setPreSelectedItem] = useState<InventoryItem | null>(null);
+```
+
+**שינוי 2**: האזנה ל-state בטעינה
+
+```typescript
+useEffect(() => {
+  // בדיקה אם הגענו עם פריט לבחירה מהחיפוש הגלובלי
+  if (location.state?.addItemToRental) {
+    const item = location.state.addItemToRental as InventoryItem;
+    setPreSelectedItem(item);
+    setIsAddDialogOpen(true);
+    // ניקוי ה-state כדי שלא יישמר בהיסטוריה
+    window.history.replaceState({}, document.title);
+  }
+}, [location.state]);
+```
+
+**שינוי 3**: העברת הפריט לדיאלוג
+
+```tsx
+<NewRentalDialog
+  isOpen={isAddDialogOpen}
+  onOpenChange={setIsAddDialogOpen}
+  customers={customers}
+  inventory={inventory}
+  availableItems={availableItems}
+  preSelectedItem={preSelectedItem}  // prop חדש
+  onAddRental={addRental}
+  onAddCustomer={addCustomer}
+  onAddInventoryItem={addInventoryItem}
+/>
+```
+
+---
+
+### קובץ: `src/components/rentals/NewRentalDialog.tsx`
+
+**שינוי 1**: הוספת prop חדש
+
+```typescript
+interface NewRentalDialogProps {
+  // ... existing props
+  preSelectedItem?: InventoryItem | null;
+}
+```
+
+**שינוי 2**: הוספה אוטומטית של הפריט
+
+```typescript
+useEffect(() => {
+  if (isOpen && preSelectedItem && preSelectedItem.status === 'available') {
+    // בדיקה שהפריט לא כבר נבחר
+    if (!selectedItems.some(i => i.inventoryItemId === preSelectedItem.id)) {
+      setSelectedItems([{
+        inventoryItemId: preSelectedItem.id,
+        category: preSelectedItem.category,
+        name: preSelectedItem.name,
+        hasIsraeliNumber: false,
+      }]);
+    }
+  }
+}, [isOpen, preSelectedItem]);
+```
+
+---
+
+### קובץ: `src/pages/Inventory.tsx`
+
+**שינוי 1**: הוספת import ו-useLocation
+
+```typescript
+import { useSearchParams, useLocation } from 'react-router-dom';
+
+// בתוך הקומפוננטה:
+const location = useLocation();
+```
+
+**שינוי 2**: האזנה ל-state בטעינה
+
+```typescript
+useEffect(() => {
+  // בדיקה אם הגענו עם פריט לעריכה מהחיפוש הגלובלי
+  if (location.state?.editItem) {
+    const item = location.state.editItem as InventoryItem;
+    handleEdit(item);
+    // ניקוי ה-state
+    window.history.replaceState({}, document.title);
+  }
+}, [location.state]);
+```
+
+---
+
+## תרשים זרימה חדש
+
+```text
+משתמש מחפש מוצר בחיפוש הגלובלי
+    │
+    ├── בוחר פריט מלאי
+    │       │
+    │       └── נפתח QuickActionDialog
+    │                │
+    │                ├── "הוסף להשכרה" ──> נפתח ישירות דיאלוג השכרה
+    │                │                     עם הפריט כבר מסומן
+    │                │
+    │                ├── "ערוך פריט" ──> נפתח ישירות דיאלוג עריכה
+    │                │                   עם הפריט טעון
+    │                │
+    │                └── "הדפס מדבקה" ──> מדבקה קטנה עם כל הפרטים
+    │                                     (חדש!)
+```
+
+---
+
+## סיכום השינויים
+
+| קובץ | שינוי |
+|------|-------|
+| `QuickActionDialog.tsx` | הוספת כפתור "הדפס מדבקה" + פונקציית הדפסה |
+| `Inventory.tsx` | הוספת כפתור הדפסת מדבקה + טיפול ב-state לעריכה |
+| `Rentals.tsx` | טיפול ב-state לפתיחת דיאלוג השכרה עם פריט |
+| `NewRentalDialog.tsx` | הוספת prop `preSelectedItem` + הוספה אוטומטית |
+
+---
+
+## יתרונות
+
+1. **חסכון בזמן**: פריט נבחר אוטומטית - לא צריך לחפש פעמיים
+2. **מדבקות מקצועיות**: גודל קטן ומתאים להדבקה על מכשירים
+3. **תמיכה בכל הסימים**: גם אמריקאי וגם אירופאי
+4. **מידע מלא**: כל המספרים הרלוונטיים + ברקוד
