@@ -38,27 +38,23 @@ export function buildBarcodeVideoConstraints(
   // Primary mode: Request high resolution (1080p) with advanced focus constraints
   // Fallback mode: More conservative 720p if device rejects primary
   
+  // NOTE:
+  // - Avoid strict constraints (`exact`/`min`) because many Android devices reject them.
+  // - If a specific cameraId is provided, prefer `deviceId` and avoid adding `facingMode`
+  //   (some browsers treat the combination as overconstrained).
   const base: MediaTrackConstraints = {
-    // Always use back camera for barcode scanning
-    facingMode: { exact: "environment" },
-    
     // Resolution: prioritize 1080p for clarity, fallback to 720p
-    width: mode === "primary" 
-      ? { ideal: 1920, min: 1280 } 
-      : { ideal: 1280, min: 640 },
-    height: mode === "primary" 
-      ? { ideal: 1080, min: 720 } 
-      : { ideal: 720, min: 480 },
-    
+    width: mode === "primary" ? { ideal: 1920 } : { ideal: 1280 },
+    height: mode === "primary" ? { ideal: 1080 } : { ideal: 720 },
+
     // Lower frame rate to give camera more time for focus and exposure
-    frameRate: mode === "primary" 
-      ? { ideal: 15, max: 20 } 
-      : { ideal: 15, max: 24 },
+    frameRate: mode === "primary" ? { ideal: 15, max: 20 } : { ideal: 24, max: 30 },
   };
 
-  // If we have a specific camera ID, use it alongside facingMode
   if (preferredCameraId) {
-    base.deviceId = { ideal: preferredCameraId };
+    base.deviceId = { exact: preferredCameraId };
+  } else {
+    base.facingMode = { ideal: "environment" };
   }
 
   if (mode === "primary") {
@@ -102,6 +98,14 @@ export async function applyTrackOptimizations(videoTrack: MediaStreamTrack) {
       const maxZoom = capabilities.zoom.max || 1;
       const targetZoom = Math.min(Math.max(1.5, minZoom), maxZoom);
       settings.zoom = targetZoom;
+    }
+
+    // Apply higher contrast if supported (helps barcode edges on some devices)
+    if (capabilities?.contrast) {
+      const minC = capabilities.contrast.min ?? 0;
+      const maxC = capabilities.contrast.max ?? minC;
+      // Prefer higher contrast, but don't assume a specific scale
+      settings.contrast = maxC;
     }
     
     if (Object.keys(settings).length > 0) {
