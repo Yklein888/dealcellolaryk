@@ -622,7 +622,34 @@ export function RentalProvider({ children }: { children: ReactNode }) {
   };
 
   const addRental = async (rental: Omit<Rental, 'id' | 'createdAt'>) => {
-    // First, insert the rental
+    // Step 1: Collect all non-generic inventory item IDs
+    const nonGenericItemIds = rental.items
+      .filter(item => !item.isGeneric && item.inventoryItemId)
+      .map(item => item.inventoryItemId);
+
+    // Step 2: Verify all items are still available in the database
+    if (nonGenericItemIds.length > 0) {
+      const { data: currentInventory, error: checkError } = await supabase
+        .from('inventory')
+        .select('id, status, name')
+        .in('id', nonGenericItemIds);
+      
+      if (checkError) {
+        console.error('Error checking inventory availability:', checkError);
+        throw new Error('שגיאה בבדיקת זמינות המלאי');
+      }
+
+      const unavailableItems = currentInventory?.filter(
+        item => item.status !== 'available'
+      );
+      
+      if (unavailableItems && unavailableItems.length > 0) {
+        const itemNames = unavailableItems.map(i => i.name).join(', ');
+        throw new Error(`הפריטים הבאים כבר לא זמינים: ${itemNames}`);
+      }
+    }
+
+    // Step 3: Insert the rental
     const { data: rentalData, error: rentalError } = await supabase
       .from('rentals')
       .insert({
@@ -670,14 +697,20 @@ export function RentalProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // Update inventory status for non-generic items
-    for (const item of rental.items) {
-      if (!item.isGeneric && item.inventoryItemId) {
-        await updateInventoryItem(item.inventoryItemId, { status: 'rented' });
+    // Step 4: Update ALL inventory items to rented in a single batch operation
+    if (nonGenericItemIds.length > 0) {
+      const { error: updateError } = await supabase
+        .from('inventory')
+        .update({ status: 'rented' })
+        .in('id', nonGenericItemIds);
+      
+      if (updateError) {
+        console.error('Error updating inventory status:', updateError);
+        throw new Error('שגיאה בעדכון סטטוס המלאי');
       }
     }
 
-    // Refresh data to get the complete rental with items
+    // Step 5: Refresh all data to ensure state is synchronized
     await fetchData();
   };
 
@@ -834,8 +867,21 @@ export function RentalProvider({ children }: { children: ReactNode }) {
   };
 
   const getAvailableItems = (category?: ItemCategory) => {
+    // Get IDs of items currently in active/overdue rentals (as backup check)
+    const rentedItemIds = new Set<string>();
+    rentals
+      .filter(r => r.status !== 'returned')
+      .forEach(r => {
+        r.items.forEach(item => {
+          if (item.inventoryItemId && !item.isGeneric) {
+            rentedItemIds.add(item.inventoryItemId);
+          }
+        });
+      });
+    
     return inventory.filter(item => 
       item.status === 'available' && 
+      !rentedItemIds.has(item.id) && // Double-check: not in any active rental
       (!category || item.category === category)
     );
   };
