@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { RefreshCw, Search, Smartphone, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
+import { RefreshCw, Search, Smartphone, AlertTriangle, CheckCircle, XCircle, CloudDownload } from 'lucide-react';
 import { useCellstationSync } from '@/hooks/useCellstationSync';
 import { cn } from '@/lib/utils';
 
@@ -29,7 +29,7 @@ type FilterStatus = 'all' | 'available' | 'rented' | 'expiring';
 type SortField = 'expiry_date' | 'local_number' | 'status';
 
 export default function SimCards() {
-  const { simCards, isLoading, isRefreshing, refreshData } = useCellstationSync();
+  const { simCards, isLoading, isRefreshing, isSyncing, syncSims, refreshData } = useCellstationSync();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [sortField, setSortField] = useState<SortField>('expiry_date');
@@ -120,14 +120,25 @@ export default function SimCards() {
         title="סימים מ-CellStation"
         description={`סנכרון אחרון: ${lastSyncTime} • הנתונים מתעדכנים אוטומטית`}
       >
-        <Button 
-          onClick={refreshData}
-          disabled={isLoading || isRefreshing}
-          className="gap-2"
-        >
-          <RefreshCw className={cn("h-4 w-4", (isLoading || isRefreshing) && "animate-spin")} />
-          {isRefreshing ? 'מרענן...' : 'רענן נתונים'}
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={syncSims}
+            disabled={isLoading || isSyncing}
+            className="gap-2"
+          >
+            <CloudDownload className={cn("h-4 w-4", isSyncing && "animate-bounce")} />
+            {isSyncing ? 'מסנכרן...' : 'סנכרן סימים'}
+          </Button>
+          <Button 
+            onClick={refreshData}
+            disabled={isLoading || isRefreshing}
+            variant="outline"
+            className="gap-2"
+          >
+            <RefreshCw className={cn("h-4 w-4", (isLoading || isRefreshing) && "animate-spin")} />
+            {isRefreshing ? 'מרענן...' : 'רענן נתונים'}
+          </Button>
+        </div>
       </PageHeader>
 
       {/* Stats Cards */}

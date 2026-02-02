@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -23,6 +23,7 @@ export interface SimCard {
 export function useCellstationSync() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const { data: simCards = [], isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['sim_cards'],
@@ -64,6 +65,40 @@ export function useCellstationSync() {
     };
   }, [queryClient]);
 
+  const syncSims = async () => {
+    setIsSyncing(true);
+    try {
+      toast({
+        title: 'מתחיל סנכרון...',
+        description: 'מתחבר לשרת CellStation',
+      });
+
+      const { data, error } = await supabase.functions.invoke('cellstation-sync');
+
+      if (error) throw error;
+
+      if (data.success) {
+        toast({
+          title: 'סנכרון הושלם',
+          description: data.message,
+        });
+        // Refetch to update UI
+        await refetch();
+      } else {
+        throw new Error(data.error || 'Sync failed');
+      }
+    } catch (error: any) {
+      console.error('Sync error:', error);
+      toast({
+        title: 'שגיאה בסנכרון',
+        description: error.message || 'לא ניתן היה לסנכרן את הנתונים',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const refreshData = async () => {
     try {
       await refetch();
@@ -84,7 +119,9 @@ export function useCellstationSync() {
   return {
     simCards,
     isLoading,
+    isSyncing,
     isRefreshing: isRefetching,
+    syncSims,
     refreshData,
   };
 }
