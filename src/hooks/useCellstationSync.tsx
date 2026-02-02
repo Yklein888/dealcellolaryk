@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -42,6 +42,29 @@ export function useCellstationSync() {
       return data as SimCard[];
     },
   });
+
+  // Real-time subscription for sim_cards table
+  useEffect(() => {
+    const channel = supabase
+      .channel('sim_cards_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'sim_cards',
+        },
+        () => {
+          // Refetch data when any change occurs
+          queryClient.invalidateQueries({ queryKey: ['sim_cards'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const syncSims = async () => {
     setIsSyncing(true);
