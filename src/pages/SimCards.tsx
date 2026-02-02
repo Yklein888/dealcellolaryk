@@ -21,20 +21,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { RefreshCw, Search, Smartphone, AlertTriangle, CheckCircle, XCircle, FileText, X } from 'lucide-react';
+import { RefreshCw, Search, Smartphone, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 import { useCellstationSync } from '@/hooks/useCellstationSync';
 import { cn } from '@/lib/utils';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 type FilterStatus = 'all' | 'available' | 'rented' | 'expiring';
 type SortField = 'expiry_date' | 'local_number' | 'status';
 
 export default function SimCards() {
-  const { simCards, isLoading, isSyncing, syncSims, syncLogs, clearLogs, refetch } = useCellstationSync();
+  const { simCards, isLoading, isRefreshing, refreshData } = useCellstationSync();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [sortField, setSortField] = useState<SortField>('expiry_date');
-  const [showLogs, setShowLogs] = useState(false);
 
   const filteredAndSortedSims = useMemo(() => {
     let result = [...simCards];
@@ -112,7 +110,7 @@ export default function SimCards() {
     return '';
   };
 
-  const lastSyncTime = simCards.length > 0 
+  const lastSyncTime = simCards.length > 0 && simCards[0].last_synced
     ? format(new Date(simCards[0].last_synced), 'dd/MM/yyyy HH:mm', { locale: he })
     : 'לא סונכרן';
 
@@ -120,78 +118,17 @@ export default function SimCards() {
     <div className="space-y-6" dir="rtl">
       <PageHeader
         title="סימים מ-CellStation"
-        description={`סנכרון אחרון: ${lastSyncTime}`}
+        description={`סנכרון אחרון: ${lastSyncTime} • הנתונים מתעדכנים אוטומטית`}
       >
-        <div className="flex gap-2">
-          {syncLogs.length > 0 && (
-            <Button 
-              variant="outline"
-              onClick={() => setShowLogs(!showLogs)}
-              className="gap-2"
-            >
-              <FileText className="h-4 w-4" />
-              {showLogs ? 'הסתר לוגים' : 'הצג לוגים'}
-            </Button>
-          )}
-          <Button 
-            variant="outline"
-            onClick={() => refetch()}
-            disabled={isLoading}
-            className="gap-2"
-          >
-            <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
-            רענן נתונים
-          </Button>
-          <Button 
-            onClick={syncSims} 
-            disabled={isSyncing}
-            className="gap-2"
-          >
-            <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
-            {isSyncing ? 'מסנכרן...' : 'סנכרן סימים'}
-          </Button>
-        </div>
+        <Button 
+          onClick={refreshData}
+          disabled={isLoading || isRefreshing}
+          className="gap-2"
+        >
+          <RefreshCw className={cn("h-4 w-4", (isLoading || isRefreshing) && "animate-spin")} />
+          {isRefreshing ? 'מרענן...' : 'רענן נתונים'}
+        </Button>
       </PageHeader>
-
-      {/* Sync Logs Panel */}
-      {showLogs && syncLogs.length > 0 && (
-        <Card className="glass-card border-primary/20">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              לוגים של הסנכרון האחרון
-            </CardTitle>
-            <div className="flex gap-2">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => { clearLogs(); setShowLogs(false); }}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[400px] w-full rounded-md border bg-muted/50 p-4">
-              <pre className="text-xs font-mono whitespace-pre-wrap text-right" dir="rtl">
-                {syncLogs.map((log, index) => (
-                  <div 
-                    key={index} 
-                    className={cn(
-                      "py-1 border-b border-muted last:border-0",
-                      log.includes('✅') && "text-success",
-                      log.includes('❌') && "text-destructive",
-                      log.includes('===') && "font-bold text-primary mt-2"
-                    )}
-                  >
-                    {log}
-                  </div>
-                ))}
-              </pre>
-            </ScrollArea>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-4">
@@ -289,7 +226,7 @@ export default function SimCards() {
               <h3 className="text-lg font-semibold">אין סימים להצגה</h3>
               <p className="text-muted-foreground mt-1">
                 {simCards.length === 0 
-                  ? 'לחץ על "סנכרן סימים" כדי לייבא נתונים מ-CellStation'
+                  ? 'הנתונים מתעדכנים אוטומטית מ-CellStation'
                   : 'לא נמצאו סימים התואמים לחיפוש'}
               </p>
             </div>
