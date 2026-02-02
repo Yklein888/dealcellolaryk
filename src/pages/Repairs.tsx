@@ -116,6 +116,16 @@ export default function Repairs() {
     }
   };
 
+  // Calculate next repair number automatically
+  const nextRepairNumber = useMemo(() => {
+    if (repairs.length === 0) return '1';
+    const maxNumber = Math.max(...repairs.map(r => {
+      const num = parseInt(r.repairNumber, 10);
+      return isNaN(num) ? 0 : num;
+    }));
+    return String(maxNumber + 1);
+  }, [repairs]);
+
   const [formData, setFormData] = useState({
     repairNumber: '',
     deviceType: '',
@@ -128,6 +138,13 @@ export default function Repairs() {
     status: 'in_lab' as Repair['status'],
     isWarranty: false,
   });
+
+  // Update repair number when dialog opens
+  useEffect(() => {
+    if (isAddDialogOpen) {
+      setFormData(prev => ({ ...prev, repairNumber: nextRepairNumber }));
+    }
+  }, [isAddDialogOpen, nextRepairNumber]);
 
   const filteredRepairs = repairs.filter(repair => {
     const matchesSearch = 
@@ -663,16 +680,14 @@ export default function Repairs() {
                   </div>
                   <div>
                     <div className="flex items-center gap-3 mb-1">
-                      <p className="font-semibold text-foreground text-lg">{repair.deviceType}</p>
+                      <p className="font-semibold text-foreground text-lg">{repair.customerName}</p>
                       <StatusBadge 
                         status={repairStatusLabels[repair.status]} 
                         variant={getStatusVariant(repair.status)} 
                       />
                     </div>
-                    <p className="text-muted-foreground">{repair.customerName} • {repair.customerPhone}</p>
-                    {repair.deviceModel && (
-                      <p className="text-sm text-muted-foreground">דגם: {repair.deviceModel}</p>
-                    )}
+                    <p className="text-sm text-muted-foreground">{repair.deviceModel || repair.deviceType}</p>
+                    <p className="text-muted-foreground text-sm mt-1">{repair.customerPhone}</p>
                     <p className="text-sm text-muted-foreground mt-1">{repair.problemDescription}</p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
                       <span>התקבל: {format(parseISO(repair.receivedDate), 'dd/MM/yyyy', { locale: he })}</span>
