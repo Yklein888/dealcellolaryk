@@ -12,6 +12,7 @@ export const AVAILABLE_PERMISSIONS = [
   { key: 'view_repairs', label: 'תיקונים', description: 'צפייה וניהול תיקונים' },
   { key: 'view_payments', label: 'תשלומים', description: 'צפייה בהיסטוריית תשלומים' },
   { key: 'view_invoices', label: 'חשבוניות', description: 'צפייה וניהול חשבוניות' },
+  { key: 'view_sim_cards', label: 'סימים CellStation', description: 'צפייה וסנכרון סימים מ-CellStation' },
 ] as const;
 
 export type PermissionKey = typeof AVAILABLE_PERMISSIONS[number]['key'];

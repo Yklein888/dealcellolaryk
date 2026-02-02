@@ -114,7 +114,7 @@ export default function Rentals() {
   // Extension dialog state
   const [extendDialogOpen, setExtendDialogOpen] = useState(false);
   const [extendingRental, setExtendingRental] = useState<Rental | null>(null);
-  const [extendDays, setExtendDays] = useState(7);
+  const [extendNewEndDate, setExtendNewEndDate] = useState<Date | null>(null);
   const [isExtending, setIsExtending] = useState(false);
 
   // Notify customer about rental return reminder
@@ -533,23 +533,22 @@ export default function Rentals() {
   // Open extend dialog
   const openExtendDialog = (rental: Rental) => {
     setExtendingRental(rental);
-    setExtendDays(7);
+    // Set default to current end date + 7 days
+    setExtendNewEndDate(addDays(parseISO(rental.endDate), 7));
     setExtendDialogOpen(true);
   };
 
   // Handle extend rental
   const handleExtendRental = async () => {
-    if (!extendingRental) return;
+    if (!extendingRental || !extendNewEndDate) return;
 
     setIsExtending(true);
-    const currentEndDate = parseISO(extendingRental.endDate);
-    const newEndDate = addDays(currentEndDate, extendDays);
 
     try {
       const { error } = await supabase
         .from('rentals')
         .update({
-          end_date: format(newEndDate, 'yyyy-MM-dd'),
+          end_date: format(extendNewEndDate, 'yyyy-MM-dd'),
           updated_at: new Date().toISOString(),
         })
         .eq('id', extendingRental.id);
@@ -558,10 +557,11 @@ export default function Rentals() {
 
       toast({
         title: 'ההשכרה הוארכה',
-        description: `תאריך ההחזרה החדש: ${format(newEndDate, 'dd/MM/yyyy', { locale: he })}`,
+        description: `תאריך ההחזרה החדש: ${format(extendNewEndDate, 'dd/MM/yyyy', { locale: he })}`,
       });
       setExtendDialogOpen(false);
       setExtendingRental(null);
+      setExtendNewEndDate(null);
       // Refresh data
       window.location.reload();
     } catch (error) {
@@ -1321,19 +1321,35 @@ export default function Rentals() {
                 </p>
               </div>
               
-              {/* Extension options */}
+              {/* Date picker for new end date */}
               <div className="space-y-2">
-                <p className="text-sm font-medium">בחר תקופת הארכה:</p>
+                <p className="text-sm font-medium">בחר תאריך החזרה חדש:</p>
+                <Input
+                  type="date"
+                  value={extendNewEndDate ? format(extendNewEndDate, 'yyyy-MM-dd') : ''}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setExtendNewEndDate(new Date(e.target.value));
+                    }
+                  }}
+                  min={format(addDays(parseISO(extendingRental.endDate), 1), 'yyyy-MM-dd')}
+                  className="w-full text-center text-lg"
+                />
+              </div>
+              
+              {/* Quick extend buttons */}
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">או הארך ב:</p>
                 <div className="grid grid-cols-4 gap-2">
                   {[3, 7, 14, 30].map(days => (
                     <Button
                       key={days}
-                      variant={extendDays === days ? 'default' : 'outline'}
+                      variant="outline"
                       size="sm"
-                      onClick={() => setExtendDays(days)}
+                      onClick={() => setExtendNewEndDate(addDays(parseISO(extendingRental.endDate), days))}
                       className="flex-col h-auto py-2"
                     >
-                      <span className="text-lg font-bold">{days}</span>
+                      <span className="text-sm font-bold">+{days}</span>
                       <span className="text-xs">ימים</span>
                     </Button>
                   ))}
@@ -1341,19 +1357,21 @@ export default function Rentals() {
               </div>
               
               {/* New end date preview */}
-              <div className="p-3 rounded-lg bg-primary/10 text-center border border-primary/20">
-                <p className="text-sm text-muted-foreground">תאריך החזרה חדש</p>
-                <p className="text-lg font-bold text-primary">
-                  {format(addDays(parseISO(extendingRental.endDate), extendDays), 'dd/MM/yyyy', { locale: he })}
-                </p>
-              </div>
+              {extendNewEndDate && (
+                <div className="p-3 rounded-lg bg-primary/10 text-center border border-primary/20">
+                  <p className="text-sm text-muted-foreground">תאריך החזרה חדש</p>
+                  <p className="text-lg font-bold text-primary">
+                    {format(extendNewEndDate, 'dd/MM/yyyy', { locale: he })}
+                  </p>
+                </div>
+              )}
               
               {/* Actions */}
               <div className="flex gap-2 pt-2">
                 <Button 
                   onClick={handleExtendRental} 
                   className="flex-1"
-                  disabled={isExtending}
+                  disabled={isExtending || !extendNewEndDate}
                 >
                   {isExtending ? (
                     <>
@@ -1363,7 +1381,7 @@ export default function Rentals() {
                   ) : (
                     <>
                       <CalendarPlus className="h-4 w-4 ml-2" />
-                      הארך ב-{extendDays} ימים
+                      הארך השכרה
                     </>
                   )}
                 </Button>
