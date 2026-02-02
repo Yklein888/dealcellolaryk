@@ -764,6 +764,20 @@ export default function Rentals() {
                 <span>{format(parseISO(rental.startDate), 'dd/MM/yyyy', { locale: he })} - {format(parseISO(rental.endDate), 'dd/MM/yyyy', { locale: he })}</span>
               </div>
 
+              {/* Pickup Time - only for devices and modems */}
+              {rental.pickupTime && rental.items.some(item => 
+                item.itemCategory === 'device_simple' || 
+                item.itemCategory === 'device_smartphone' || 
+                item.itemCategory === 'modem'
+              ) && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg px-3 py-1.5 border border-amber-200/50 dark:border-amber-800/50">
+                  <span className="text-amber-600 dark:text-amber-400">🕐</span>
+                  <span className="text-amber-700 dark:text-amber-300 font-medium">
+                    שעת קבלה: {rental.pickupTime.slice(0, 5)}
+                  </span>
+                </div>
+              )}
+
               {/* Items */}
               <div className="flex flex-wrap gap-2 mb-4 flex-1">
                 {rental.items.map((item, idx) => (
