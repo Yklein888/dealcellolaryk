@@ -456,20 +456,21 @@ export default function Repairs() {
                 <span className="sm:hidden">הוסף</span>
               </Button>
             </DialogTrigger>
-          <DialogContent className="max-w-md">
+          <DialogContent>
             <DialogHeader>
               <DialogTitle>הוספת תיקון חדש</DialogTitle>
             </DialogHeader>
             
-            <div className="space-y-3 mt-4 max-h-[70vh] overflow-y-auto">
+            <div className="space-y-3 mt-4">
               {/* Row 1: Customer Name + Phone */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label>שם הלקוח *</Label>
                   <Input
                     value={formData.customerName}
                     onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
                     placeholder="שם מלא"
+                    className="min-h-[44px]"
                   />
                 </div>
                 <div className="space-y-1">
@@ -478,18 +479,20 @@ export default function Repairs() {
                     value={formData.customerPhone}
                     onChange={(e) => setFormData({ ...formData, customerPhone: e.target.value })}
                     placeholder="050-1234567"
+                    className="min-h-[44px]"
                   />
                 </div>
               </div>
 
               {/* Row 2: Device Model + Device Cost */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label>דגם המכשיר *</Label>
                   <Input
                     value={formData.deviceModel}
                     onChange={(e) => setFormData({ ...formData, deviceModel: e.target.value })}
                     placeholder="לדוגמה: iPhone 14"
+                    className="min-h-[44px]"
                   />
                 </div>
                 <div className="space-y-1">
@@ -498,6 +501,7 @@ export default function Repairs() {
                     type="number"
                     value={formData.deviceCost}
                     onChange={(e) => setFormData({ ...formData, deviceCost: e.target.value })}
+                    className="min-h-[44px]"
                     placeholder="0"
                   />
                 </div>

@@ -996,7 +996,7 @@ export default function Rentals() {
 
       {/* Edit Rental Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>עריכת השכרה</DialogTitle>
             <DialogDescription>
@@ -1005,13 +1005,14 @@ export default function Rentals() {
           </DialogHeader>
           {editingRental && (
             <div className="space-y-4 mt-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className="space-y-2">
                   <Label>תאריך התחלה</Label>
                   <Input
                     type="date"
                     value={editFormData.startDate}
                     onChange={(e) => setEditFormData({ ...editFormData, startDate: e.target.value })}
+                    className="min-h-[44px]"
                   />
                 </div>
                 <div className="space-y-2">
@@ -1020,6 +1021,7 @@ export default function Rentals() {
                     type="date"
                     value={editFormData.endDate}
                     onChange={(e) => setEditFormData({ ...editFormData, endDate: e.target.value })}
+                    className="min-h-[44px]"
                   />
                 </div>
               </div>
@@ -1061,7 +1063,7 @@ export default function Rentals() {
               <div className="border-t pt-4 mt-4">
                 <h4 className="font-medium text-sm mb-3">חיוב אוטומטי על איחור</h4>
                 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div className="space-y-2">
                     <Label>סכום ליום איחור (₪)</Label>
                     <Input
@@ -1069,6 +1071,7 @@ export default function Rentals() {
                       value={editFormData.overdueDailyRate}
                       onChange={(e) => setEditFormData({ ...editFormData, overdueDailyRate: e.target.value })}
                       placeholder="למשל: 50"
+                      className="min-h-[44px]"
                     />
                   </div>
                   <div className="space-y-2">
@@ -1079,6 +1082,7 @@ export default function Rentals() {
                       onChange={(e) => setEditFormData({ ...editFormData, overdueGraceDays: e.target.value })}
                       placeholder="0"
                       min="0"
+                      className="min-h-[44px]"
                     />
                   </div>
                 </div>
@@ -1110,7 +1114,7 @@ export default function Rentals() {
 
       {/* Payment Dialog */}
       <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>תשלום עבור השכרה</DialogTitle>
             <DialogDescription>הזן פרטי כרטיס אשראי לביצוע התשלום</DialogDescription>
@@ -1232,7 +1236,7 @@ export default function Rentals() {
                         />
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-2 gap-3 sm:gap-4">
                         <div className="space-y-2">
                           <Label>תוקף (MMYY)</Label>
                           <Input
@@ -1241,6 +1245,7 @@ export default function Rentals() {
                             placeholder="0126"
                             maxLength={4}
                             dir="ltr"
+                            className="min-h-[44px]"
                           />
                         </div>
                         <div className="space-y-2">
@@ -1252,6 +1257,7 @@ export default function Rentals() {
                             maxLength={4}
                             type="password"
                             dir="ltr"
+                            className="min-h-[44px]"
                           />
                         </div>
                       </div>
@@ -1314,7 +1320,7 @@ export default function Rentals() {
 
       {/* Extend Rental Dialog */}
       <Dialog open={extendDialogOpen} onOpenChange={setExtendDialogOpen}>
-        <DialogContent className="max-w-sm">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CalendarPlus className="h-5 w-5" />
@@ -1347,21 +1353,21 @@ export default function Rentals() {
                     }
                   }}
                   min={format(addDays(parseISO(extendingRental.endDate), 1), 'yyyy-MM-dd')}
-                  className="w-full text-center text-lg"
+                  className="w-full text-center text-lg min-h-[44px]"
                 />
               </div>
               
               {/* Quick extend buttons */}
               <div className="space-y-2">
                 <p className="text-xs text-muted-foreground">או הארך ב:</p>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {[3, 7, 14, 30].map(days => (
                     <Button
                       key={days}
                       variant="outline"
                       size="sm"
                       onClick={() => setExtendNewEndDate(addDays(parseISO(extendingRental.endDate), days))}
-                      className="flex-col h-auto py-2"
+                      className="flex-col h-auto py-3 sm:py-2 min-h-[44px]"
                     >
                       <span className="text-sm font-bold">+{days}</span>
                       <span className="text-xs">ימים</span>
