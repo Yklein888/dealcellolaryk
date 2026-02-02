@@ -30,7 +30,7 @@ type FilterStatus = 'all' | 'available' | 'rented' | 'expiring';
 type SortField = 'expiry_date' | 'local_number' | 'status';
 
 export default function SimCards() {
-  const { simCards, isLoading, isSyncing, syncSims, syncLogs, clearLogs } = useCellstationSync();
+  const { simCards, isLoading, isSyncing, syncSims, syncLogs, clearLogs, refetch } = useCellstationSync();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [sortField, setSortField] = useState<SortField>('expiry_date');
@@ -133,6 +133,15 @@ export default function SimCards() {
               {showLogs ? 'הסתר לוגים' : 'הצג לוגים'}
             </Button>
           )}
+          <Button 
+            variant="outline"
+            onClick={() => refetch()}
+            disabled={isLoading}
+            className="gap-2"
+          >
+            <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
+            רענן נתונים
+          </Button>
           <Button 
             onClick={syncSims} 
             disabled={isSyncing}
