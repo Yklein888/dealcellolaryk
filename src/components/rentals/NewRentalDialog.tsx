@@ -48,11 +48,12 @@ import {
 } from '@/types/rental';
 import { calculateRentalPrice } from '@/lib/pricing';
 import { useToast } from '@/hooks/use-toast';
-import { format, differenceInDays } from 'date-fns';
+import { format, differenceInDays, parseISO, isBefore } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { DualCurrencyPrice } from '@/components/DualCurrencyPrice';
 import { cn } from '@/lib/utils';
 import { getFullHebrewDate } from '@/components/ui/hebrew-calendar';
+import { AlertTriangle, XCircle } from 'lucide-react';
 
 // Category color mappings
 const categoryColors: Record<ItemCategory, { bg: string; border: string; hover: string }> = {
@@ -116,7 +117,7 @@ interface NewRentalDialogProps {
     deposit?: number;
     notes?: string;
     pickupTime?: string;
-  }) => void;
+  }) => Promise<void>;
   onAddCustomer: (customer: { name: string; phone: string; address?: string }) => Promise<void>;
   onAddInventoryItem: (item: {
     category: ItemCategory;
@@ -235,6 +236,43 @@ export function NewRentalDialog({
   const isSim = (category: ItemCategory) => 
     category === 'sim_american' || category === 'sim_european';
 
+  // Check if SIM expiry covers the rental period
+  const isSimValidForPeriod = (
+    item: InventoryItem, 
+    rentalEndDate: Date | undefined
+  ): 'valid' | 'warning' | 'expired' => {
+    // Only check SIMs
+    if (!isSim(item.category)) {
+      return 'valid';
+    }
+    
+    if (!item.expiryDate) return 'valid'; // No expiry = OK
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const expiryDate = parseISO(item.expiryDate);
+    
+    // Already expired
+    if (isBefore(expiryDate, today)) return 'expired';
+    
+    // No rental end date yet - just check if not expired
+    if (!rentalEndDate) return 'valid';
+    
+    // Expiry is before rental end date
+    if (isBefore(expiryDate, rentalEndDate)) return 'warning';
+    
+    return 'valid';
+  };
+
+  // Sort available items - valid SIMs first, warning SIMs last, expired at end
+  const sortedAvailableItems = [...filteredAvailableItems].sort((a, b) => {
+    const aStatus = isSimValidForPeriod(a, endDate);
+    const bStatus = isSimValidForPeriod(b, endDate);
+    
+    // Sort order: valid > warning > expired
+    const order = { valid: 0, warning: 1, expired: 2 };
+    return order[aStatus] - order[bStatus];
+  });
   const handleAddItem = (item: InventoryItem) => {
     if (selectedItems.some(i => i.inventoryItemId === item.id)) {
       toast({
@@ -242,6 +280,27 @@ export function NewRentalDialog({
         variant: 'destructive',
       });
       return;
+    }
+
+    // Check SIM expiry vs rental period
+    const validityStatus = isSimValidForPeriod(item, endDate);
+    
+    if (validityStatus === 'expired') {
+      toast({
+        title: 'סים פג תוקף',
+        description: 'לא ניתן להשכיר סים שכבר פג תוקפו',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    if (validityStatus === 'warning') {
+      const expiryFormatted = item.expiryDate ? format(parseISO(item.expiryDate), 'dd/MM/yyyy') : '';
+      const endDateFormatted = endDate ? format(endDate, 'dd/MM/yyyy') : '';
+      toast({
+        title: '⚠️ שים לב - הסים יפוג באמצע ההשכרה',
+        description: `תוקף הסים: ${expiryFormatted}. סיום השכרה: ${endDateFormatted}`,
+      });
     }
 
     setSelectedItems([...selectedItems, {
@@ -445,7 +504,7 @@ export function NewRentalDialog({
     : 0;
 
   // Submit
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formData.customerId) {
       toast({
         title: 'שגיאה',
@@ -517,29 +576,37 @@ export function NewRentalDialog({
       ? format(new Date(), 'HH:mm:ss')
       : undefined;
 
-    onAddRental({
-      customerId: customer.id,
-      customerName: customer.name,
-      items: rentalItems,
-      startDate: format(startDate, 'yyyy-MM-dd'),
-      endDate: format(endDate, 'yyyy-MM-dd'),
-      totalPrice: pricing.total,
-      currency: pricing.currency,
-      status: 'active',
-      deposit: formData.deposit ? parseFloat(formData.deposit) : undefined,
-      notes: formData.notes,
-      pickupTime,
-    });
+    try {
+      await onAddRental({
+        customerId: customer.id,
+        customerName: customer.name,
+        items: rentalItems,
+        startDate: format(startDate, 'yyyy-MM-dd'),
+        endDate: format(endDate, 'yyyy-MM-dd'),
+        totalPrice: pricing.total,
+        currency: pricing.currency,
+        status: 'active',
+        deposit: formData.deposit ? parseFloat(formData.deposit) : undefined,
+        notes: formData.notes,
+        pickupTime,
+      });
 
-    toast({
-      title: 'השכרה נוצרה',
-      description: `השכרה חדשה נוצרה עבור ${customer.name}`,
-    });
+      toast({
+        title: 'השכרה נוצרה',
+        description: `השכרה חדשה נוצרה עבור ${customer.name}`,
+      });
 
-    onOpenChange(false);
-    setTimeout(() => {
-      resetForm();
-    }, 100);
+      onOpenChange(false);
+      setTimeout(() => {
+        resetForm();
+      }, 100);
+    } catch (error: any) {
+      toast({
+        title: 'שגיאה ביצירת השכרה',
+        description: error.message || 'אחד הפריטים כבר לא זמין. נסה לרענן ולבחור שוב.',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
@@ -696,72 +763,83 @@ export function NewRentalDialog({
                   <div className="space-y-2 max-h-48 overflow-y-auto">
                     {selectedItems.map((item) => {
                       const isEuropeanSimFromInventory = item.category === 'sim_european' && !item.isGeneric;
-                      const inventoryItem = isEuropeanSimFromInventory 
-                        ? inventory.find(i => i.id === item.inventoryItemId)
-                        : null;
+                      const inventoryItem = inventory.find(i => i.id === item.inventoryItemId);
+                      const validityStatus = inventoryItem ? isSimValidForPeriod(inventoryItem, endDate) : 'valid';
 
                       return (
                         <div 
                           key={item.inventoryItemId}
                           className={cn(
-                            "flex items-center justify-between p-2 rounded-lg border",
+                            "flex flex-col p-2 rounded-lg border",
                             categoryColors[item.category].bg,
-                            categoryColors[item.category].border
+                            categoryColors[item.category].border,
+                            validityStatus === 'warning' && "ring-2 ring-amber-400/50"
                           )}
                         >
-                          <div className="flex items-center gap-2">
-                            <span className="text-lg">{categoryIcons[item.category]}</span>
-                            <span className="text-sm font-medium">{item.name}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            {item.category === 'sim_american' && (
-                              <div className="flex items-center gap-1 mr-2">
-                                <Checkbox
-                                  checked={item.hasIsraeliNumber}
-                                  onCheckedChange={() => handleToggleIsraeliNumber(item.inventoryItemId)}
-                                />
-                                <Label className="text-xs">ישראלי (+$10)</Label>
-                              </div>
-                            )}
-                            {item.category === 'sim_european' && (
-                              <div className="flex items-center gap-1 mr-2">
-                                <Checkbox
-                                  checked={item.includeEuropeanDevice}
-                                  onCheckedChange={() => handleToggleEuropeanDevice(item.inventoryItemId)}
-                                />
-                                <Label className="text-xs">+ מכשיר (₪5/יום)</Label>
-                              </div>
-                            )}
-                            {isEuropeanSimFromInventory && inventoryItem && (
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">{categoryIcons[item.category]}</span>
+                              <span className="text-sm font-medium">{item.name}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              {item.category === 'sim_american' && (
+                                <div className="flex items-center gap-1 mr-2">
+                                  <Checkbox
+                                    checked={item.hasIsraeliNumber}
+                                    onCheckedChange={() => handleToggleIsraeliNumber(item.inventoryItemId)}
+                                  />
+                                  <Label className="text-xs">ישראלי (+$10)</Label>
+                                </div>
+                              )}
+                              {item.category === 'sim_european' && (
+                                <div className="flex items-center gap-1 mr-2">
+                                  <Checkbox
+                                    checked={item.includeEuropeanDevice}
+                                    onCheckedChange={() => handleToggleEuropeanDevice(item.inventoryItemId)}
+                                  />
+                                  <Label className="text-xs">+ מכשיר (₪5/יום)</Label>
+                                </div>
+                              )}
+                              {isEuropeanSimFromInventory && inventoryItem && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  disabled={downloadingInstructions === item.inventoryItemId}
+                                  onClick={() => handlePrintInstructions(
+                                    item.inventoryItemId,
+                                    inventoryItem.israeliNumber || undefined,
+                                    inventoryItem.localNumber || undefined,
+                                    inventoryItem.barcode || undefined
+                                  )}
+                                  className="h-7 w-7 p-0"
+                                >
+                                  {downloadingInstructions === item.inventoryItemId ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Printer className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              )}
                               <Button
-                                type="button"
                                 variant="ghost"
                                 size="sm"
-                                disabled={downloadingInstructions === item.inventoryItemId}
-                                onClick={() => handlePrintInstructions(
-                                  item.inventoryItemId,
-                                  inventoryItem.israeliNumber || undefined,
-                                  inventoryItem.localNumber || undefined,
-                                  inventoryItem.barcode || undefined
-                                )}
-                                className="h-7 w-7 p-0"
+                                className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                                onClick={() => handleRemoveItem(item.inventoryItemId)}
                               >
-                                {downloadingInstructions === item.inventoryItemId ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Printer className="h-4 w-4" />
-                                )}
+                                ×
                               </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                              onClick={() => handleRemoveItem(item.inventoryItemId)}
-                            >
-                              ×
-                            </Button>
+                            </div>
                           </div>
+                          {/* SIM expiry warning */}
+                          {validityStatus === 'warning' && inventoryItem?.expiryDate && (
+                            <div className="text-[10px] text-amber-600 dark:text-amber-400 flex items-center gap-1 mt-1">
+                              <AlertTriangle className="h-3 w-3" />
+                              <span>
+                                תוקף הסים יפוג ב-{format(parseISO(inventoryItem.expiryDate), 'dd/MM/yy')} - לפני סיום ההשכרה!
+                              </span>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -912,7 +990,7 @@ export function NewRentalDialog({
 
                 {/* Visual Grid by Category */}
                 <div className="max-h-[300px] sm:max-h-[500px] overflow-y-auto space-y-4">
-                  {filteredAvailableItems.length === 0 ? (
+                  {sortedAvailableItems.length === 0 ? (
                     <div className="text-center py-12">
                       <Package className="h-16 w-16 mx-auto text-muted-foreground/30 mb-3" />
                       <p className="text-muted-foreground">
@@ -921,22 +999,28 @@ export function NewRentalDialog({
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                      {filteredAvailableItems.map((item) => {
+                      {sortedAvailableItems.map((item) => {
                         const isSelected = selectedItems.some(i => i.inventoryItemId === item.id);
                         const colors = categoryColors[item.category];
+                        const validityStatus = isSimValidForPeriod(item, endDate);
+                        const isExpiredSim = validityStatus === 'expired';
                         
                         return (
                           <button
                             key={item.id}
                             type="button"
                             onClick={() => handleAddItem(item)}
-                            disabled={isSelected}
+                            disabled={isSelected || isExpiredSim}
                             className={cn(
                               "relative flex flex-col items-center gap-1 sm:gap-2 p-3 sm:p-4 rounded-xl border-2 transition-all text-center",
                               colors.bg,
-                              isSelected 
-                                ? "border-green-500 ring-2 ring-green-500/30 cursor-default" 
-                                : cn(colors.border, colors.hover, "cursor-pointer hover:scale-[1.02]")
+                              isExpiredSim 
+                                ? "opacity-50 cursor-not-allowed border-destructive/50"
+                                : isSelected 
+                                  ? "border-green-500 ring-2 ring-green-500/30 cursor-default" 
+                                  : validityStatus === 'warning'
+                                    ? cn(colors.border, "ring-2 ring-amber-400/50 hover:border-amber-400", "cursor-pointer hover:scale-[1.02]")
+                                    : cn(colors.border, colors.hover, "cursor-pointer hover:scale-[1.02]")
                             )}
                           >
                             {isSelected && (
@@ -955,6 +1039,24 @@ export function NewRentalDialog({
                                 📱 {item.simNumber}
                               </p>
                             )}
+                            {/* SIM Expiry Status */}
+                            {isSim(item.category) && item.expiryDate && (
+                              <div className={cn(
+                                "text-[10px] flex items-center gap-1",
+                                validityStatus === 'warning' && "text-amber-600 dark:text-amber-400",
+                                validityStatus === 'expired' && "text-destructive"
+                              )}>
+                                {validityStatus === 'warning' && <AlertTriangle className="h-3 w-3" />}
+                                {validityStatus === 'expired' && <XCircle className="h-3 w-3" />}
+                                <span>תוקף: {format(parseISO(item.expiryDate), 'dd/MM/yy')}</span>
+                                {validityStatus === 'warning' && (
+                                  <span className="font-medium">(פג באמצע!)</span>
+                                )}
+                                {validityStatus === 'expired' && (
+                                  <span className="font-medium">(פג תוקף)</span>
+                                )}
+                              </div>
+                            )}
                             {/* Phone numbers display */}
                             {(item.israeliNumber || item.localNumber) && (
                               <div className="text-xs space-y-0.5">
@@ -966,7 +1068,7 @@ export function NewRentalDialog({
                                 )}
                               </div>
                             )}
-                            {!isSelected && (
+                            {!isSelected && !isExpiredSim && (
                               <div className="absolute bottom-2 left-2">
                                 <Plus className="h-5 w-5 text-primary/50" />
                               </div>
