@@ -404,7 +404,15 @@ export default function Rentals() {
   const availableItems = getAvailableItems();
 
   // Handle printing calling instructions for rental cards
-  const handlePrintInstructions = async (itemId: string, israeliNumber?: string, localNumber?: string, barcode?: string, isAmericanSim?: boolean) => {
+  const handlePrintInstructions = async (
+    itemId: string, 
+    israeliNumber?: string, 
+    localNumber?: string, 
+    barcode?: string, 
+    isAmericanSim?: boolean,
+    packageName?: string,
+    expiryDate?: string
+  ) => {
     if (!israeliNumber && !localNumber) {
       toast({
         title: 'אין מספרים',
@@ -417,7 +425,7 @@ export default function Rentals() {
     setDownloadingInstructions(itemId);
 
     try {
-      await printCallingInstructions(israeliNumber, localNumber, barcode, isAmericanSim);
+      await printCallingInstructions(israeliNumber, localNumber, barcode, isAmericanSim, packageName, expiryDate);
       toast({
         title: 'פותח חלון הדפסה',
         description: 'בחר מדפסת והדפס את ההוראות',
@@ -431,7 +439,7 @@ export default function Rentals() {
       });
       // Fallback to download
       try {
-        await downloadCallingInstructions(israeliNumber, localNumber, barcode, isAmericanSim);
+        await downloadCallingInstructions(israeliNumber, localNumber, barcode, isAmericanSim, packageName, expiryDate);
         toast({
           title: 'הקובץ הורד',
           description: 'פתח את הקובץ והדפס אותו ידנית',
@@ -857,21 +865,40 @@ export default function Rentals() {
                                 let israeliNumber = inventoryItem?.israeliNumber;
                                 let localNumber = inventoryItem?.localNumber;
                                 let barcode = inventoryItem?.barcode;
+                                let expiryDate = inventoryItem?.expiryDate;
+                                let packageName: string | undefined;
                                 
                                 if (!inventoryItem && simItem.inventoryItemId) {
                                   const { data } = await supabase
                                     .from('inventory')
-                                    .select('israeli_number, local_number, barcode')
+                                    .select('israeli_number, local_number, barcode, expiry_date, name')
                                     .eq('id', simItem.inventoryItemId)
                                     .maybeSingle();
                                   if (data) {
                                     israeliNumber = data.israeli_number || undefined;
                                     localNumber = data.local_number || undefined;
                                     barcode = data.barcode || undefined;
+                                    expiryDate = data.expiry_date || undefined;
+                                    packageName = data.name || undefined;
                                   }
+                                } else if (inventoryItem) {
+                                  packageName = inventoryItem.name;
                                 }
                                 
-                                handlePrintInstructions(itemId, israeliNumber || undefined, localNumber || undefined, barcode || undefined, isAmericanSim);
+                                // Format expiry date for display
+                                const formattedExpiry = expiryDate 
+                                  ? new Date(expiryDate).toLocaleDateString('he-IL')
+                                  : undefined;
+                                
+                                handlePrintInstructions(
+                                  itemId, 
+                                  israeliNumber || undefined, 
+                                  localNumber || undefined, 
+                                  barcode || undefined, 
+                                  isAmericanSim,
+                                  packageName,
+                                  formattedExpiry
+                                );
                               }}
                                 className="gap-1 text-xs w-full"
                               >

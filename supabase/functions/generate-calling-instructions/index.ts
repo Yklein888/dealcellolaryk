@@ -376,7 +376,7 @@ serve(async (req) => {
   }
 
   try {
-    const { israeliNumber, localNumber, barcode, isAmericanSim } = await req.json();
+    const { israeliNumber, localNumber, barcode, isAmericanSim, packageName, expiryDate } = await req.json();
     
     const formattedIsraeli = formatPhoneNumber(israeliNumber);
     const formattedLocal = formatPhoneNumber(localNumber);
@@ -391,6 +391,8 @@ serve(async (req) => {
     console.log("Input Local:", localNumber, "-> Formatted:", localDisplay);
     console.log("Barcode:", barcode);
     console.log("Is American SIM:", isAmericanSim);
+    console.log("Package Name:", packageName);
+    console.log("Expiry Date:", expiryDate);
 
     // Fetch PDF template from Storage (use different template for American SIM if available)
     const templateName = isAmericanSim 
@@ -429,44 +431,123 @@ serve(async (req) => {
 
     // === ADD OVERLAY: Phone numbers at top LEFT ===
     // Position: Left side of page, very close to top
-    const fontSize = 14;
-    const labelFontSize = 10;
     const leftMargin = 40; // 40pt from left edge
-    const topY = pageHeight - 60; // Very close to top
-
-    // Draw Israeli number with label (left-aligned, at top)
-    const israeliLabel = "- Israeli Number";
-    page.drawText(israeliLabel, {
-      x: leftMargin,
-      y: topY,
-      size: labelFontSize,
-      font,
-      color: rgb(0.3, 0.3, 0.3),
-    });
-    page.drawText(israeliDisplay, {
-      x: leftMargin + font.widthOfTextAtSize(israeliLabel, labelFontSize) + 8,
-      y: topY,
-      size: fontSize,
-      font: boldFont,
-      color: rgb(0, 0, 0),
-    });
-
-    // Draw Local number with label (below Israeli)
-    const localLabel = "- Local Number";
-    page.drawText(localLabel, {
-      x: leftMargin,
-      y: topY - 22,
-      size: labelFontSize,
-      font,
-      color: rgb(0.3, 0.3, 0.3),
-    });
-    page.drawText(localDisplay, {
-      x: leftMargin + font.widthOfTextAtSize(localLabel, labelFontSize) + 8,
-      y: topY - 22,
-      size: fontSize,
-      font: boldFont,
-      color: rgb(0, 0, 0),
-    });
+    
+    if (isAmericanSim) {
+      // American SIM: Larger text with package name and expiry date at top
+      const titleFontSize = 18;
+      const infoFontSize = 14;
+      const labelFontSize = 11;
+      let currentY = pageHeight - 50;
+      
+      // Package name (large, at very top)
+      if (packageName) {
+        page.drawText(packageName, {
+          x: leftMargin,
+          y: currentY,
+          size: titleFontSize,
+          font: boldFont,
+          color: rgb(0, 0, 0),
+        });
+        currentY -= 28;
+      }
+      
+      // Expiry date
+      if (expiryDate) {
+        const expiryLabel = "Expiry: ";
+        page.drawText(expiryLabel, {
+          x: leftMargin,
+          y: currentY,
+          size: labelFontSize,
+          font,
+          color: rgb(0.3, 0.3, 0.3),
+        });
+        page.drawText(expiryDate, {
+          x: leftMargin + font.widthOfTextAtSize(expiryLabel, labelFontSize) + 4,
+          y: currentY,
+          size: infoFontSize,
+          font: boldFont,
+          color: rgb(0, 0, 0),
+        });
+        currentY -= 24;
+      }
+      
+      // Israeli number
+      const israeliLabel = "Israeli: ";
+      page.drawText(israeliLabel, {
+        x: leftMargin,
+        y: currentY,
+        size: labelFontSize,
+        font,
+        color: rgb(0.3, 0.3, 0.3),
+      });
+      page.drawText(israeliDisplay, {
+        x: leftMargin + font.widthOfTextAtSize(israeliLabel, labelFontSize) + 4,
+        y: currentY,
+        size: infoFontSize,
+        font: boldFont,
+        color: rgb(0, 0, 0),
+      });
+      currentY -= 24;
+      
+      // Local (American) number
+      const localLabel = "US Number: ";
+      page.drawText(localLabel, {
+        x: leftMargin,
+        y: currentY,
+        size: labelFontSize,
+        font,
+        color: rgb(0.3, 0.3, 0.3),
+      });
+      page.drawText(localDisplay, {
+        x: leftMargin + font.widthOfTextAtSize(localLabel, labelFontSize) + 4,
+        y: currentY,
+        size: infoFontSize,
+        font: boldFont,
+        color: rgb(0, 0, 0),
+      });
+    } else {
+      // European SIM: Hebrew labels (displayed as English since Hebrew fonts not embedded)
+      // Using RTL-friendly format with Hebrew text
+      const fontSize = 14;
+      const labelFontSize = 10;
+      const topY = pageHeight - 60;
+      
+      // Draw Israeli number with Hebrew label
+      // Note: Hebrew text "מספר ישראלי" - we write it reversed for PDF display
+      const israeliLabel = ": Israeli Number";
+      page.drawText(israeliLabel, {
+        x: leftMargin,
+        y: topY,
+        size: labelFontSize,
+        font,
+        color: rgb(0.3, 0.3, 0.3),
+      });
+      page.drawText(israeliDisplay, {
+        x: leftMargin + font.widthOfTextAtSize(israeliLabel, labelFontSize) + 8,
+        y: topY,
+        size: fontSize,
+        font: boldFont,
+        color: rgb(0, 0, 0),
+      });
+      
+      // Draw Local number with Hebrew label  
+      const localLabel = ": Local Number";
+      page.drawText(localLabel, {
+        x: leftMargin,
+        y: topY - 22,
+        size: labelFontSize,
+        font,
+        color: rgb(0.3, 0.3, 0.3),
+      });
+      page.drawText(localDisplay, {
+        x: leftMargin + font.widthOfTextAtSize(localLabel, labelFontSize) + 8,
+        y: topY - 22,
+        size: fontSize,
+        font: boldFont,
+        color: rgb(0, 0, 0),
+      });
+    }
 
     // === ADD OVERLAY: Barcode at bottom center ===
     if (barcode) {
