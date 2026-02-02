@@ -20,7 +20,9 @@ const fetchCallingInstructionsPdf = async (
   israeliNumber: string | undefined,
   localNumber: string | undefined,
   barcode?: string,
-  isAmericanSim?: boolean
+  isAmericanSim?: boolean,
+  packageName?: string,
+  expiryDate?: string
 ): Promise<Blob> => {
   const response = await fetch(
     `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-calling-instructions`,
@@ -35,6 +37,8 @@ const fetchCallingInstructionsPdf = async (
         localNumber,
         barcode,
         isAmericanSim,
+        packageName,
+        expiryDate,
       }),
     }
   );
@@ -52,13 +56,15 @@ export const printCallingInstructions = async (
   israeliNumber: string | undefined,
   localNumber: string | undefined,
   barcode?: string,
-  isAmericanSim?: boolean
+  isAmericanSim?: boolean,
+  packageName?: string,
+  expiryDate?: string
 ): Promise<void> => {
   const formattedIsraeli = formatPhoneNumber(israeliNumber);
 
   try {
     // 1. Fetch PDF from backend (already has overlay with numbers and barcode)
-    const pdfBlob = await fetchCallingInstructionsPdf(israeliNumber, localNumber, barcode, isAmericanSim);
+    const pdfBlob = await fetchCallingInstructionsPdf(israeliNumber, localNumber, barcode, isAmericanSim, packageName, expiryDate);
     const pdfUrl = URL.createObjectURL(pdfBlob);
 
     // 2. Create hidden iframe for printing
@@ -103,12 +109,14 @@ export const downloadCallingInstructions = async (
   israeliNumber: string | undefined,
   localNumber: string | undefined,
   barcode?: string,
-  isAmericanSim?: boolean
+  isAmericanSim?: boolean,
+  packageName?: string,
+  expiryDate?: string
 ): Promise<void> => {
   const formattedIsraeli = formatPhoneNumber(israeliNumber);
 
   try {
-    const pdfBlob = await fetchCallingInstructionsPdf(israeliNumber, localNumber, barcode, isAmericanSim);
+    const pdfBlob = await fetchCallingInstructionsPdf(israeliNumber, localNumber, barcode, isAmericanSim, packageName, expiryDate);
     const simType = isAmericanSim ? 'אמריקאי' : 'אירופאי';
     saveAs(pdfBlob, `הוראות-חיוג-${simType}-${formattedIsraeli || 'sim'}.pdf`);
   } catch (error) {
@@ -122,7 +130,9 @@ export const generateCallingInstructions = async (
   israeliNumber: string | undefined,
   localNumber: string | undefined,
   barcode?: string,
-  isAmericanSim?: boolean
+  isAmericanSim?: boolean,
+  packageName?: string,
+  expiryDate?: string
 ): Promise<void> => {
-  return printCallingInstructions(israeliNumber, localNumber, barcode, isAmericanSim);
+  return printCallingInstructions(israeliNumber, localNumber, barcode, isAmericanSim, packageName, expiryDate);
 };
