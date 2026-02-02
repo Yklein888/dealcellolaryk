@@ -1,270 +1,291 @@
 
 
-# תוכנית משולבת: תיקון זמינות מלאי + אזהרת תוקף סימים
+# תוכנית יישום: עדכון sync-cellstation לשרת Render חיצוני
 
-## סקירה כללית
+## סיכום מהיר
 
-התוכנית כוללת שתי יכולות משולבות:
-1. **תיקון בעיית הזמינות** - מניעת השכרה כפולה של אותו פריט
-2. **אזהרת תוקף סימים** - הצגת אזהרה כשסים פג באמצע תקופת ההשכרה ומיון חכם של הסימים
+עדכון ה-Edge Function לקרוא לשרת Puppeteer חיצוני במקום לעשות scraping ישירות.
 
 ---
 
-## חלק א': תיקון בעיית זמינות המלאי
+## שינוי 1: עדכון Edge Function
 
-### הבעיה
-כאשר נוצרת השכרה (אפילו עם תאריך עתידי), הפריט לא מוסר מיידית מרשימת הפריטים הזמינים, מה שמאפשר להשכיר אותו שוב.
+**קובץ:** `supabase/functions/sync-cellstation/index.ts`
 
-### הפתרון
-
-**1. אימות זמינות מול מסד הנתונים לפני יצירת השכרה**
-
-בפונקציית `addRental`, לפני יצירת ההשכרה, נבצע שאילתה ישירה למסד הנתונים לוודא שכל הפריטים באמת זמינים:
+### הקוד החדש (מפושט):
 
 ```typescript
-// Step 1: Verify all items are still available in database
-const nonGenericItemIds = rental.items
-  .filter(item => !item.isGeneric && item.inventoryItemId)
-  .map(item => item.inventoryItemId);
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-if (nonGenericItemIds.length > 0) {
-  const { data: currentInventory } = await supabase
-    .from('inventory')
-    .select('id, status, name')
-    .in('id', nonGenericItemIds);
-  
-  const unavailableItems = currentInventory?.filter(
-    item => item.status !== 'available'
-  );
-  
-  if (unavailableItems && unavailableItems.length > 0) {
-    const itemNames = unavailableItems.map(i => i.name).join(', ');
-    throw new Error(`הפריטים הבאים כבר לא זמינים: ${itemNames}`);
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  const logs: string[] = [];
+  const log = (msg: string) => { logs.push(msg); console.log(msg); };
+
+  try {
+    log('🚀 התחלת סנכרון CellStation');
+    
+    // קריאת secrets
+    const username = Deno.env.get('CELLSTATION_USERNAME');
+    const password = Deno.env.get('CELLSTATION_PASSWORD');
+    const scraperUrl = Deno.env.get('SCRAPER_URL');
+    
+    if (!username || !password) {
+      throw new Error('Missing CellStation credentials');
+    }
+    
+    if (!scraperUrl) {
+      throw new Error('SCRAPER_URL not configured');
+    }
+    
+    log(`📡 קורא לשרת Puppeteer: ${scraperUrl}`);
+    
+    // קריאה לשרת Render
+    const response = await fetch(`${scraperUrl}/scrape-cellstation`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Scraper error: ${response.status} - ${errorText}`);
+    }
+    
+    const data = await response.json();
+    
+    if (!data.success) {
+      throw new Error(data.error || 'Scraping failed');
+    }
+    
+    const sims = data.sims || [];
+    log(`✅ התקבלו ${sims.length} סימים מהשרת`);
+    
+    // התחברות ל-Supabase
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    
+    // מחיקת רשומות קיימות
+    log('🗑️ מוחק רשומות קיימות...');
+    await supabase
+      .from('sim_cards')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000');
+    
+    // הוספת רשומות חדשות
+    if (sims.length > 0) {
+      const simsWithTimestamp = sims.map((sim: any) => ({
+        ...sim,
+        last_synced: new Date().toISOString(),
+      }));
+      
+      log('💾 שומר סימים חדשים...');
+      const { error: insertError } = await supabase
+        .from('sim_cards')
+        .insert(simsWithTimestamp);
+      
+      if (insertError) {
+        log(`❌ שגיאה בהוספה: ${insertError.message}`);
+        throw insertError;
+      }
+    }
+    
+    log('🎉 סנכרון הושלם!');
+    
+    return new Response(
+      JSON.stringify({ success: true, count: sims.length, logs }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+    
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    log(`❌ שגיאה: ${errorMessage}`);
+    return new Response(
+      JSON.stringify({ success: false, error: errorMessage, logs }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});
+```
+
+---
+
+## שינוי 2: הוספת Secret
+
+| Secret | ערך זמני |
+|--------|----------|
+| SCRAPER_URL | https://example.com |
+
+---
+
+## קוד לשרת Render (להעתקה אחרי האישור)
+
+### package.json
+```json
+{
+  "name": "cellstation-scraper",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "puppeteer": "^22.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
 ```
 
-**2. עדכון batch במקום לולאה**
+### server.js
+```javascript
+const express = require('express');
+const puppeteer = require('puppeteer');
 
-במקום לעדכן כל פריט בנפרד (שגורם לבעיית stale closure):
+const app = express();
+app.use(express.json());
 
-```typescript
-// Update ALL items at once using batch update
-if (nonGenericItemIds.length > 0) {
-  const { error: updateError } = await supabase
-    .from('inventory')
-    .update({ status: 'rented' })
-    .in('id', nonGenericItemIds);
+// Health check
+app.get('/', (req, res) => {
+  res.json({ status: 'ok', message: 'CellStation Scraper API' });
+});
+
+// Main scraping endpoint
+app.post('/scrape-cellstation', async (req, res) => {
+  const { username, password } = req.body;
   
-  if (updateError) throw updateError;
-}
-
-// Then refresh all data
-await fetchData();
-```
-
-**3. שיפור פונקציית getAvailableItems עם בדיקה כפולה**
-
-הוספת בדיקת גיבוי שמוודאת שהפריט לא מופיע בהשכרה פעילה:
-
-```typescript
-const getAvailableItems = (category?: ItemCategory) => {
-  // Get IDs of items in active rentals (as backup check)
-  const rentedItemIds = new Set<string>();
-  rentals
-    .filter(r => r.status !== 'returned')
-    .forEach(r => {
-      r.items.forEach(item => {
-        if (item.inventoryItemId && !item.isGeneric) {
-          rentedItemIds.add(item.inventoryItemId);
+  if (!username || !password) {
+    return res.status(400).json({ success: false, error: 'Missing credentials' });
+  }
+  
+  console.log('Starting scrape for user:', username);
+  let browser;
+  
+  try {
+    browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+    });
+    
+    const page = await browser.newPage();
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+    
+    console.log('Navigating to login page...');
+    await page.goto('https://cellstation.co.il/portal/login.php', { 
+      waitUntil: 'networkidle2',
+      timeout: 30000 
+    });
+    
+    // מילוי טופס התחברות
+    console.log('Filling login form...');
+    await page.type('input[type="text"], input[name="username"]', username);
+    await page.type('input[type="password"]', password);
+    
+    // לחיצה והמתנה לניווט
+    await Promise.all([
+      page.click('button[type="submit"], input[type="submit"]'),
+      page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 })
+    ]);
+    
+    console.log('Logged in, waiting for cards...');
+    
+    // המתנה ל-cards
+    await page.waitForSelector('.card', { timeout: 15000 });
+    
+    // חילוץ הנתונים
+    const sims = await page.evaluate(() => {
+      const cards = document.querySelectorAll('.card');
+      const results = [];
+      
+      cards.forEach(card => {
+        const shortNumber = card.querySelector('.pstyle')?.textContent?.trim() || null;
+        const planEl = card.querySelector('.plan');
+        const packageName = planEl?.textContent?.trim() || null;
+        
+        // חילוץ מספרים מהטקסט
+        const cardText = card.textContent || '';
+        const numberMatches = cardText.match(/\d{10,20}/g) || [];
+        
+        let localNumber = null;
+        let israeliNumber = null;
+        let simNumber = null;
+        
+        // ICCID הוא 18-20 ספרות
+        const iccidMatch = numberMatches.find(n => n.length >= 18);
+        if (iccidMatch) simNumber = iccidMatch;
+        
+        // מספר ישראלי מתחיל ב-07 או 05
+        const israeliMatch = numberMatches.find(n => n.length === 10 && (n.startsWith('07') || n.startsWith('05')));
+        if (israeliMatch) israeliNumber = israeliMatch;
+        
+        // מספר מקומי
+        const localMatch = numberMatches.find(n => 
+          n.length >= 10 && n.length <= 12 && 
+          n !== israeliNumber && 
+          n !== simNumber
+        );
+        if (localMatch) localNumber = localMatch;
+        
+        // תאריך תוקף
+        const expiryMatch = cardText.match(/(\d{4}-\d{2}-\d{2})/);
+        const expiryDate = expiryMatch ? expiryMatch[1] : null;
+        
+        // בדיקת פעילות לפי צבע
+        const headerDiv = card.querySelector('[style*="background"]');
+        const style = headerDiv?.getAttribute('style') || '';
+        const isActive = style.includes('green') || !style.includes('red');
+        
+        if (shortNumber || localNumber || israeliNumber || simNumber) {
+          results.push({
+            short_number: shortNumber,
+            local_number: localNumber,
+            israeli_number: israeliNumber,
+            sim_number: simNumber,
+            package_name: packageName,
+            expiry_date: expiryDate,
+            is_active: isActive,
+            is_rented: false,
+            status: isActive ? 'active' : 'expired'
+          });
         }
       });
+      
+      return results;
     });
-  
-  return inventory.filter(item => 
-    item.status === 'available' && 
-    !rentedItemIds.has(item.id) && // Double-check
-    (!category || item.category === category)
-  );
-};
-```
-
-**4. טיפול בשגיאה ב-NewRentalDialog**
-
-הוספת try/catch ב-handleSubmit:
-
-```typescript
-try {
-  await onAddRental({ ... });
-  toast({ title: 'השכרה נוצרה', ... });
-  onOpenChange(false);
-} catch (error: any) {
-  toast({
-    title: 'שגיאה ביצירת השכרה',
-    description: error.message || 'אחד הפריטים כבר לא זמין',
-    variant: 'destructive',
-  });
-  return; // Don't close dialog
-}
-```
-
----
-
-## חלק ב': אזהרת תוקף סימים ומיון חכם
-
-### הדרישה
-כאשר בוחרים סים מהמלאי ותוקף הסים פג באמצע תקופת ההשכרה - להציג אזהרה ולהציע בעדיפות ראשונה סימים שתקפים לכל תקופת ההשכרה.
-
-### הפתרון
-
-**1. פונקציה לבדיקת התאמת תוקף לתקופת השכרה**
-
-```typescript
-// Check if SIM expiry covers the rental period
-const isSimValidForPeriod = (
-  item: InventoryItem, 
-  rentalEndDate: Date | undefined
-): 'valid' | 'warning' | 'expired' => {
-  // Only check SIMs
-  if (item.category !== 'sim_american' && item.category !== 'sim_european') {
-    return 'valid';
-  }
-  
-  if (!item.expiryDate) return 'valid'; // No expiry = OK
-  
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const expiryDate = parseISO(item.expiryDate);
-  
-  // Already expired
-  if (isBefore(expiryDate, today)) return 'expired';
-  
-  // No rental end date yet - just check if not expired
-  if (!rentalEndDate) return 'valid';
-  
-  // Expiry is before rental end date
-  if (isBefore(expiryDate, rentalEndDate)) return 'warning';
-  
-  return 'valid';
-};
-```
-
-**2. מיון רשימת הפריטים הזמינים**
-
-הסימים ימוינו לפי התאמת התוקף - תקינים בראש, אזהרות בסוף:
-
-```typescript
-// Sort available items - valid SIMs first, warning SIMs last
-const sortedAvailableItems = useMemo(() => {
-  if (!endDate) return filteredAvailableItems;
-  
-  return [...filteredAvailableItems].sort((a, b) => {
-    const aStatus = isSimValidForPeriod(a, endDate);
-    const bStatus = isSimValidForPeriod(b, endDate);
     
-    // Sort order: valid > warning > expired
-    const order = { valid: 0, warning: 1, expired: 2 };
-    return order[aStatus] - order[bStatus];
-  });
-}, [filteredAvailableItems, endDate]);
-```
-
-**3. הצגה ויזואלית של מצב התוקף**
-
-בכרטיס כל סים ברשימה, הצגת אייקון/צבע לפי מצב התוקף:
-
-```typescript
-{/* In item card */}
-{isSim(item.category) && item.expiryDate && (
-  <div className={cn(
-    "text-[10px] flex items-center gap-1",
-    validityStatus === 'warning' && "text-amber-600 dark:text-amber-400",
-    validityStatus === 'expired' && "text-red-500"
-  )}>
-    {validityStatus === 'warning' && <AlertTriangle className="h-3 w-3" />}
-    {validityStatus === 'expired' && <XCircle className="h-3 w-3" />}
-    <span>תוקף: {format(parseISO(item.expiryDate), 'dd/MM/yy')}</span>
-    {validityStatus === 'warning' && (
-      <span className="font-medium">(פג באמצע!)</span>
-    )}
-  </div>
-)}
-```
-
-**4. אזהרה בבחירת סים עם תוקף בעייתי**
-
-כשמשתמש בוחר סים שהתוקף שלו פג באמצע תקופת ההשכרה:
-
-```typescript
-const handleAddItem = (item: InventoryItem) => {
-  // ... existing validation ...
-  
-  // Check SIM expiry vs rental period
-  const validityStatus = isSimValidForPeriod(item, endDate);
-  
-  if (validityStatus === 'expired') {
-    toast({
-      title: 'סים פג תוקף',
-      description: 'לא ניתן להשכיר סים שכבר פג תוקפו',
-      variant: 'destructive',
-    });
-    return;
+    console.log(`Found ${sims.length} SIMs`);
+    await browser.close();
+    res.json({ success: true, sims, count: sims.length });
+    
+  } catch (error) {
+    console.error('Scraping error:', error.message);
+    if (browser) await browser.close();
+    res.status(500).json({ success: false, error: error.message });
   }
-  
-  if (validityStatus === 'warning') {
-    toast({
-      title: '⚠️ שים לב - הסים יפוג באמצע ההשכרה',
-      description: `תוקף הסים: ${item.expiryDate}. תאריך סיום השכרה: ${endDate ? format(endDate, 'dd/MM/yyyy') : '-'}`,
-      variant: 'warning',
-    });
-  }
-  
-  // Continue adding the item...
-};
-```
+});
 
-**5. סיכום בפריטים נבחרים עם אזהרה**
-
-ברשימת הפריטים הנבחרים, הצגת אזהרה אם יש סים עם בעיית תוקף:
-
-```typescript
-{/* In selected items section */}
-{validityStatus === 'warning' && (
-  <div className="text-[10px] text-amber-600 dark:text-amber-400 flex items-center gap-1 mt-1">
-    <AlertTriangle className="h-3 w-3" />
-    <span>תוקף הסים יפוג ב-{item.expiryDate} - לפני סיום ההשכרה!</span>
-  </div>
-)}
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 ```
 
 ---
 
-## קבצים שיעודכנו
+## השלבים שלך אחרי האישור
 
-1. **`src/hooks/useRental.tsx`**
-   - שיפור `addRental` עם אימות זמינות ועדכון batch
-   - שיפור `getAvailableItems` עם בדיקה כפולה
-
-2. **`src/components/rentals/NewRentalDialog.tsx`**
-   - הוספת פונקציית `isSimValidForPeriod`
-   - מיון חכם של רשימת הפריטים הזמינים
-   - הצגה ויזואלית של מצב התוקף בכרטיסי הסימים
-   - אזהרת toast בבחירת סים עם תוקף בעייתי
-   - הצגת אזהרה ברשימת הפריטים הנבחרים
-   - טיפול בשגיאות זמינות עם try/catch
-
----
-
-## תוצאה צפויה
-
-### לגבי זמינות מלאי:
-- פריט שנבחר להשכרה יוסר מיידית מרשימת הזמינים
-- אם שני משתמשים מנסים להשכיר את אותו פריט - הראשון יצליח והשני יקבל הודעת שגיאה ברורה
-- גם השכרות עם תאריך עתידי יסמנו את הפריט כ-"מושכר" מיידית
-
-### לגבי אזהרת תוקף סימים:
-- סימים תקפים לכל תקופת ההשכרה יופיעו בראש הרשימה
-- סימים שיפוג תוקפם באמצע יופיעו בסוף עם סימון צהוב
-- בבחירת סים עם תוקף בעייתי - תוצג הודעת אזהרה ברורה
-- המשתמש עדיין יכול לבחור את הסים הזה אם הוא רוצה (זו רק אזהרה, לא חסימה)
+1. **אני אעדכן** את sync-cellstation ואוסיף את ה-Secret
+2. **אתה תיצור** repo חדש ב-GitHub עם package.json + server.js
+3. **אתה תעלה** ל-Render.com (Web Service חינמי)
+4. **אתה תעדכן** את SCRAPER_URL עם ה-URL האמיתי
+5. **בדיקה** - לחץ "סנכרן סימים"
 
