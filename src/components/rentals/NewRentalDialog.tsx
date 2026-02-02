@@ -115,6 +115,7 @@ interface NewRentalDialogProps {
     status: 'active';
     deposit?: number;
     notes?: string;
+    pickupTime?: string;
   }) => void;
   onAddCustomer: (customer: { name: string; phone: string; address?: string }) => Promise<void>;
   onAddInventoryItem: (item: {
@@ -504,6 +505,18 @@ export function NewRentalDialog({
       isGeneric: item.isGeneric,
     }));
 
+    // Check if rental includes devices or modems - if so, add current time
+    const hasDeviceOrModem = selectedItems.some(item => 
+      item.category === 'device_simple' || 
+      item.category === 'device_smartphone' || 
+      item.category === 'modem'
+    );
+    
+    // Format current time as HH:MM:SS for devices/modems only
+    const pickupTime = hasDeviceOrModem 
+      ? format(new Date(), 'HH:mm:ss')
+      : undefined;
+
     onAddRental({
       customerId: customer.id,
       customerName: customer.name,
@@ -515,6 +528,7 @@ export function NewRentalDialog({
       status: 'active',
       deposit: formData.deposit ? parseFloat(formData.deposit) : undefined,
       notes: formData.notes,
+      pickupTime,
     });
 
     toast({

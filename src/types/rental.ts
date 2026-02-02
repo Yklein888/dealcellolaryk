@@ -63,6 +63,8 @@ export interface Rental {
   deposit?: number;
   notes?: string;
   createdAt: string;
+  // Pickup time - automatically set for devices and modems
+  pickupTime?: string;
   // Overdue charging configuration
   overdueDailyRate?: number;
   overdueGraceDays?: number;
