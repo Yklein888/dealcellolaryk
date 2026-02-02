@@ -427,28 +427,42 @@ serve(async (req) => {
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-    // === ADD OVERLAY: Phone numbers at top ===
-    // Position: Right side (RTL document), below the header
-    // Numbers only - Hebrew labels are already in the template
+    // === ADD OVERLAY: Phone numbers at top LEFT ===
+    // Position: Left side of page, very close to top
     const fontSize = 14;
-    const rightMargin = pageWidth - 50; // 50pt from right edge
-    const topY = pageHeight - 120; // Position for Israeli number
+    const labelFontSize = 10;
+    const leftMargin = 40; // 40pt from left edge
+    const topY = pageHeight - 60; // Very close to top
 
-    // Draw Israeli number (right-aligned)
-    const israeliWidth = boldFont.widthOfTextAtSize(israeliDisplay, fontSize);
+    // Draw Israeli number with label (left-aligned, at top)
+    const israeliLabel = "- Israeli Number";
+    page.drawText(israeliLabel, {
+      x: leftMargin,
+      y: topY,
+      size: labelFontSize,
+      font,
+      color: rgb(0.3, 0.3, 0.3),
+    });
     page.drawText(israeliDisplay, {
-      x: rightMargin - israeliWidth,
+      x: leftMargin + font.widthOfTextAtSize(israeliLabel, labelFontSize) + 8,
       y: topY,
       size: fontSize,
       font: boldFont,
       color: rgb(0, 0, 0),
     });
 
-    // Draw Local number (below Israeli)
-    const localWidth = boldFont.widthOfTextAtSize(localDisplay, fontSize);
+    // Draw Local number with label (below Israeli)
+    const localLabel = "- Local Number";
+    page.drawText(localLabel, {
+      x: leftMargin,
+      y: topY - 22,
+      size: labelFontSize,
+      font,
+      color: rgb(0.3, 0.3, 0.3),
+    });
     page.drawText(localDisplay, {
-      x: rightMargin - localWidth,
-      y: topY - 25,
+      x: leftMargin + font.widthOfTextAtSize(localLabel, labelFontSize) + 8,
+      y: topY - 22,
       size: fontSize,
       font: boldFont,
       color: rgb(0, 0, 0),
