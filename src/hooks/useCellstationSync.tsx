@@ -22,6 +22,7 @@ export interface SimCard {
 
 export function useCellstationSync() {
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncLogs, setSyncLogs] = useState<string[]>([]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -44,6 +45,7 @@ export function useCellstationSync() {
 
   const syncSims = async () => {
     setIsSyncing(true);
+    setSyncLogs([]);
     
     try {
       toast({
@@ -55,6 +57,11 @@ export function useCellstationSync() {
 
       if (error) {
         throw new Error(error.message || 'שגיאה בסנכרון');
+      }
+
+      // Save logs from response
+      if (data?.logs) {
+        setSyncLogs(data.logs);
       }
 
       if (!data.success) {
@@ -82,11 +89,15 @@ export function useCellstationSync() {
     }
   };
 
+  const clearLogs = () => setSyncLogs([]);
+
   return {
     simCards,
     isLoading,
     isSyncing,
     syncSims,
     refetch,
+    syncLogs,
+    clearLogs,
   };
 }
