@@ -625,6 +625,7 @@ export type Database = {
           notes: string | null
           overdue_daily_rate: number | null
           overdue_grace_days: number | null
+          pickup_time: string | null
           start_date: string
           status: Database["public"]["Enums"]["rental_status"]
           total_price: number
@@ -642,6 +643,7 @@ export type Database = {
           notes?: string | null
           overdue_daily_rate?: number | null
           overdue_grace_days?: number | null
+          pickup_time?: string | null
           start_date: string
           status?: Database["public"]["Enums"]["rental_status"]
           total_price?: number
@@ -659,6 +661,7 @@ export type Database = {
           notes?: string | null
           overdue_daily_rate?: number | null
           overdue_grace_days?: number | null
+          pickup_time?: string | null
           start_date?: string
           status?: Database["public"]["Enums"]["rental_status"]
           total_price?: number
