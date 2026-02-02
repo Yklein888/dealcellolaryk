@@ -71,25 +71,25 @@ export function DateRangePicker({
     ? differenceInDays(tempEndDate, tempStartDate) + 1 
     : 0;
 
-  // Single calendar classNames - spacious and readable
+  // Single calendar classNames - mobile-optimized and spacious
   const calendarClassNames = {
     months: "flex flex-col",
-    month: "space-y-4",
-    caption: "flex justify-center pt-1 relative items-center h-14",
-    caption_label: "text-lg font-bold tracking-tight",
+    month: "space-y-3 sm:space-y-4",
+    caption: "flex justify-center pt-1 relative items-center h-12 sm:h-14",
+    caption_label: "text-base sm:text-lg font-bold tracking-tight",
     nav: "space-x-1 flex items-center",
     nav_button: cn(
-      "h-10 w-10 bg-transparent p-0 opacity-70 hover:opacity-100 hover:bg-muted rounded-full transition-all inline-flex items-center justify-center"
+      "h-9 w-9 sm:h-10 sm:w-10 bg-transparent p-0 opacity-70 hover:opacity-100 hover:bg-muted rounded-full transition-all inline-flex items-center justify-center touch-target"
     ),
-    nav_button_previous: "absolute left-2",
-    nav_button_next: "absolute right-2",
+    nav_button_previous: "absolute left-1 sm:left-2",
+    nav_button_next: "absolute right-1 sm:right-2",
     table: "w-full border-collapse",
-    head_row: "grid grid-cols-7 gap-0 mb-2",
-    head_cell: "text-muted-foreground font-semibold text-sm text-center py-2",
+    head_row: "grid grid-cols-7 gap-0 mb-1 sm:mb-2",
+    head_cell: "text-muted-foreground font-semibold text-xs sm:text-sm text-center py-1 sm:py-2",
     row: "grid grid-cols-7 gap-0",
-    cell: "p-1 text-center relative",
+    cell: "p-0.5 sm:p-1 text-center relative",
     day: cn(
-      "h-11 w-11 sm:h-12 sm:w-12 p-0 font-medium rounded-lg transition-all text-base leading-none",
+      "h-9 w-9 sm:h-11 sm:w-11 p-0 font-medium rounded-lg transition-all text-sm sm:text-base leading-none",
       "inline-flex items-center justify-center",
       "hover:bg-muted hover:scale-105",
       "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
@@ -109,12 +109,12 @@ export function DateRangePicker({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="p-0 gap-0 overflow-hidden max-w-[450px] w-[95vw]">
+      <DialogContent className="p-0 gap-0 overflow-hidden w-[95vw] max-w-[400px] sm:max-w-[450px]">
         {/* Header */}
-        <DialogHeader className="px-6 pt-6 pb-4 border-b bg-muted/30">
-          <DialogTitle className="flex items-center gap-3 text-xl font-semibold">
-            <div className="p-2 rounded-full bg-primary/10">
-              <CalendarIcon className="h-5 w-5 text-primary" />
+        <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-3 sm:pb-4 border-b bg-muted/30">
+          <DialogTitle className="flex items-center gap-2 sm:gap-3 text-lg sm:text-xl font-semibold">
+            <div className="p-1.5 sm:p-2 rounded-full bg-primary/10">
+              <CalendarIcon className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
             </div>
             בחירת תאריכי השכרה
           </DialogTitle>
@@ -176,7 +176,7 @@ export function DateRangePicker({
         </div>
 
         {/* Single Calendar */}
-        <div className="p-6 bg-background flex justify-center">
+        <div className="p-3 sm:p-6 bg-background flex justify-center overflow-x-auto">
           {activeTab === 'start' ? (
             <Calendar
               mode="single"
@@ -202,28 +202,28 @@ export function DateRangePicker({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t bg-muted/30">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-t bg-muted/30">
           {/* Duration Summary */}
           {rentalDays > 0 && (
-            <div className="mb-4 p-3 bg-primary/5 border border-primary/20 rounded-lg text-center">
-              <span className="text-2xl font-bold text-primary">{rentalDays}</span>
-              <span className="text-muted-foreground mr-2">ימי השכרה</span>
+            <div className="mb-3 sm:mb-4 p-2 sm:p-3 bg-primary/5 border border-primary/20 rounded-lg text-center">
+              <span className="text-xl sm:text-2xl font-bold text-primary">{rentalDays}</span>
+              <span className="text-muted-foreground mr-2 text-sm sm:text-base">ימי השכרה</span>
             </div>
           )}
 
           {/* Action Buttons */}
-          <div className="flex justify-end gap-3">
+          <div className="flex justify-end gap-2 sm:gap-3">
             <Button 
               variant="ghost" 
               onClick={handleCancel}
-              className="px-6"
+              className="px-4 sm:px-6 min-h-[44px]"
             >
               ביטול
             </Button>
             <Button 
               onClick={handleConfirm}
               disabled={!tempStartDate || !tempEndDate}
-              className="gap-2 px-6 shadow-sm"
+              className="gap-2 px-4 sm:px-6 shadow-sm min-h-[44px]"
             >
               <CalendarCheck className="h-4 w-4" />
               אישור
