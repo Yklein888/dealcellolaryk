@@ -26,6 +26,7 @@ import { useCellstationSync } from '@/hooks/useCellstationSync';
 import { useRental } from '@/hooks/useRental';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { SimActivationButton } from '@/components/SimActivationButton';
 
 type FilterStatus = 'all' | 'available' | 'rented' | 'active' | 'inactive';
 type SortField = 'expiry_date' | 'local_number' | 'status';
@@ -291,6 +292,7 @@ export default function SimCards() {
                     <TableHead className="text-right">תוקף</TableHead>
                     <TableHead className="text-right">סטטוס</TableHead>
                     <TableHead className="text-right">חבילה</TableHead>
+                    <TableHead className="text-right">הפעלה</TableHead>
                     <TableHead className="text-right w-[120px]">פעולות</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -322,6 +324,12 @@ export default function SimCards() {
                           />
                         </TableCell>
                         <TableCell>{sim.package_name || '-'}</TableCell>
+                        <TableCell>
+                          <SimActivationButton
+                            simNumber={sim.sim_number || ''}
+                            compact
+                          />
+                        </TableCell>
                         <TableCell>
                           {isInInventory ? (
                             <span className="inline-flex items-center gap-1 text-success text-sm">
