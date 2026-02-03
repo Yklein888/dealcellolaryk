@@ -1,76 +1,70 @@
 
 
-# תוכנית: יצירת Edge Function לסנכרון CellStation
+# תוכנית: סנכרון סימים מ-Google Apps Script
 
 ## סקירה
-ניצור Edge Function חדשה בשם `cellstation-sync` שתקרא לשרת ה-Puppeteer ב-Render ותעדכן את טבלת `sim_cards` ב-Supabase.
+נחליף את ה-Edge Function הקיימת שמסתמכת על שרת Puppeteer חיצוני, בפונקציה פשוטה יותר שמושכת נתונים ישירות מ-Google Apps Script Web App ומעדכנת את טבלת `sim_cards`.
+
+## מקור הנתונים
+```text
+URL: https://script.google.com/macros/s/AKfycby_K6f6OOf5STuF2xQQ5STu/exec
+Format: JSON עם מערך 'services'
+```
 
 ## שינויים נדרשים
 
-### 1. יצירת Edge Function חדשה
+### 1. עדכון Edge Function `cellstation-sync`
 **קובץ:** `supabase/functions/cellstation-sync/index.ts`
 
-הפונקציה תכלול:
-- קריאה ל-Scraper URL עם פרטי ההתחברות
-- מחיקת כל הרשומות הישנות בטבלה
-- הכנסת הנתונים החדשים עם timestamp של `last_synced`
-
-**שימוש ב-Secrets קיימים:**
-- `CELLSTATION_USERNAME` (במקום SITE_USERNAME)
-- `CELLSTATION_PASSWORD` (במקום SITE_PASSWORD)
-- `SCRAPER_URL` (כבר קיים - כתובת שרת ה-Puppeteer)
-- `SUPABASE_URL` (קיים אוטומטית)
-- `SUPABASE_SERVICE_ROLE_KEY` (קיים אוטומטית)
-
-### 2. עדכון ה-Hook `useCellstationSync.tsx`
-נוסיף פונקציית `syncSims` שתקרא ל-Edge Function:
+**לוגיקה חדשה:**
 ```text
-syncSims:
-  - קריאה ל-Edge Function cellstation-sync
-  - עדכון ה-UI עם תוצאות הסנכרון
-  - הצגת הודעות הצלחה/שגיאה
+1. קריאה ל-Google Apps Script URL
+2. קבלת אובייקט JSON עם מערך 'services'
+3. לכל פריט במערך:
+   - חיפוש לפי sim_number בטבלה
+   - אם קיים: UPDATE
+   - אם לא קיים: INSERT
+4. החזרת סיכום (כמה עודכנו / נוספו)
 ```
 
-### 3. עדכון דף SimCards
-נוסיף כפתור "סנכרן סימים" ליד כפתור "רענן נתונים":
-```text
-כפתורים בהדר:
-  [סנכרן סימים] - קורא ל-Edge Function (כפתור ראשי)
-  [רענן נתונים] - רק טוען מחדש מהטבלה (כפתור משני)
-```
+**מיפוי שדות מה-API לטבלה:**
+| שדה ב-API | שדה בטבלה |
+|-----------|------------|
+| sim | sim_number (מזהה ייחודי) |
+| local_number | local_number |
+| israel_number | israeli_number |
+| plan | package_name |
+| expiry | expiry_date |
+| status | is_active (true אם status = "active") |
+
+### 2. עדכון ה-Hook והממשק
+**אין צורך בשינויים** - ה-hook והממשק כבר מוכנים עם כפתור "סנכרן סימים" שקורא ל-Edge Function. רק נעדכן את התוכן של ה-Edge Function.
 
 ---
 
 ## פרטים טכניים
 
-### Edge Function Flow:
+### מבנה ה-Edge Function החדשה:
 ```text
-1. קבלת בקשה
-2. קריאה ל-Scraper URL עם username/password
-3. קבלת רשימת סימים מה-Scraper
-4. מחיקת כל הרשומות בטבלת sim_cards
-5. הכנסת הרשומות החדשות עם last_synced
-6. החזרת תוצאה (הצלחה/שגיאה)
+1. CORS headers
+2. Fetch מ-Google Apps Script
+3. Parse JSON → services array
+4. Loop על כל service:
+   - upsert לטבלת sim_cards לפי sim_number
+5. ספירת updated vs inserted
+6. החזרת תוצאה עם toast message
 ```
 
-### שמות Secrets (כבר קיימים):
-- `CELLSTATION_USERNAME` = D0548499222
-- `CELLSTATION_PASSWORD` = M&deal20151218
-- `SCRAPER_URL` = https://sims-sync.onrender.com
+### יתרונות הפתרון:
+- **פשוט** - קריאה ישירה ל-API ללא צורך בשרתים חיצוניים
+- **מהיר** - אין scraping, רק fetch של JSON
+- **אמין** - Google Apps Script זמין תמיד
+- **Upsert logic** - עדכון קיימים + הוספת חדשים (לא מחיקה)
 
-**הערה חשובה:** אם ערכי ה-Secrets השמורים שונים מהערכים שסיפקת, תצטרך לעדכן אותם דרך Cloud View.
-
-### תוספות לקובץ config.toml:
-```toml
-[functions.cellstation-sync]
-verify_jwt = false
+### הודעות למשתמש:
+```text
+בזמן סנכרון: "מסנכרן עם CellStation..."
+הצלחה: "X סימים עודכנו, Y סימים נוספו"
+שגיאה: הודעת שגיאה מפורטת
 ```
-
----
-
-## תוצאה צפויה
-לאחר היישום:
-1. כפתור "סנכרן סימים" יקרא לשרת ה-Puppeteer ב-Render
-2. הנתונים יתעדכנו בטבלה ויופיעו מיד בממשק (בזכות Real-time)
-3. כפתור "רענן נתונים" ימשיך לפעול לרענון ידני מהטבלה
 
