@@ -5,73 +5,148 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
+const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby_K6f6OOf5STuF2xQQ5STu/exec';
+
+interface ServiceItem {
+  sim: string;
+  local_number: string;
+  israel_number: string;
+  plan: string;
+  expiry: string;
+  status: string;
+}
+
+interface ApiResponse {
+  services: ServiceItem[];
+}
+
+function parseExpiryDate(expiry: string): string | null {
+  if (!expiry) return null;
+  
+  // Try to parse various date formats
+  // Expected format from API might be "DD/MM/YYYY" or "YYYY-MM-DD"
+  const parts = expiry.split('/');
+  if (parts.length === 3) {
+    // DD/MM/YYYY format
+    const [day, month, year] = parts;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+  
+  // If already in YYYY-MM-DD format or other standard format
+  const date = new Date(expiry);
+  if (!isNaN(date.getTime())) {
+    return date.toISOString().split('T')[0];
+  }
+  
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    console.log('🚀 התחלת סנכרון CellStation');
+    console.log('🚀 התחלת סנכרון CellStation מ-Google Apps Script');
 
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const CELLSTATION_USERNAME = Deno.env.get('CELLSTATION_USERNAME')!;
-    const CELLSTATION_PASSWORD = Deno.env.get('CELLSTATION_PASSWORD')!;
-    const SCRAPER_URL = Deno.env.get('SCRAPER_URL')!;
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    console.log('📡 קורא לשרת Puppeteer...');
+    // Fetch data from Google Apps Script
+    console.log('📡 מושך נתונים מ-Google Apps Script...');
     
-    const response = await fetch(`${SCRAPER_URL}/scrape-cellstation`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        username: CELLSTATION_USERNAME,
-        password: CELLSTATION_PASSWORD
-      })
+    const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Scraper error: ${response.status} - ${errorText}`);
+      throw new Error(`Google Apps Script error: ${response.status} - ${response.statusText}`);
     }
 
-    const { success, sims, error } = await response.json();
-
-    if (!success) {
-      throw new Error(error || 'Scraping failed');
+    const data: ApiResponse = await response.json();
+    
+    if (!data.services || !Array.isArray(data.services)) {
+      throw new Error('Invalid response format: missing services array');
     }
 
-    console.log(`✅ התקבלו ${sims.length} סימים`);
+    console.log(`✅ התקבלו ${data.services.length} סימים מה-API`);
 
-    console.log('🗑️ מוחק רשומות ישנות...');
-    await supabase
-      .from('sim_cards')
-      .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000');
+    let updated = 0;
+    let inserted = 0;
 
-    if (sims.length > 0) {
-      const simsWithTimestamp = sims.map((sim: any) => ({
-        ...sim,
+    // Process each SIM
+    for (const service of data.services) {
+      const simNumber = service.sim?.trim();
+      
+      if (!simNumber) {
+        console.log('⚠️ דילוג על רשומה ללא מספר SIM');
+        continue;
+      }
+
+      const simData = {
+        sim_number: simNumber,
+        local_number: service.local_number?.trim() || null,
+        israeli_number: service.israel_number?.trim() || null,
+        package_name: service.plan?.trim() || null,
+        expiry_date: parseExpiryDate(service.expiry),
+        is_active: service.status?.toLowerCase() === 'active',
         last_synced: new Date().toISOString(),
-      }));
+        updated_at: new Date().toISOString(),
+      };
 
-      console.log('💾 שומר סימים חדשים...');
-      const { error: insertError } = await supabase
+      // Check if SIM exists
+      const { data: existingSim, error: selectError } = await supabase
         .from('sim_cards')
-        .insert(simsWithTimestamp);
+        .select('id')
+        .eq('sim_number', simNumber)
+        .maybeSingle();
 
-      if (insertError) throw insertError;
+      if (selectError) {
+        console.error(`❌ שגיאה בחיפוש סים ${simNumber}:`, selectError.message);
+        continue;
+      }
+
+      if (existingSim) {
+        // Update existing record
+        const { error: updateError } = await supabase
+          .from('sim_cards')
+          .update(simData)
+          .eq('id', existingSim.id);
+
+        if (updateError) {
+          console.error(`❌ שגיאה בעדכון סים ${simNumber}:`, updateError.message);
+        } else {
+          updated++;
+        }
+      } else {
+        // Insert new record
+        const { error: insertError } = await supabase
+          .from('sim_cards')
+          .insert({
+            ...simData,
+            created_at: new Date().toISOString(),
+          });
+
+        if (insertError) {
+          console.error(`❌ שגיאה בהוספת סים ${simNumber}:`, insertError.message);
+        } else {
+          inserted++;
+        }
+      }
     }
 
-    console.log('🎉 סנכרון הושלם בהצלחה!');
+    console.log(`🎉 סנכרון הושלם: ${updated} עודכנו, ${inserted} נוספו`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        count: sims.length,
-        message: `${sims.length} סימים סונכרנו בהצלחה`,
+        updated,
+        inserted,
+        total: data.services.length,
+        message: `${updated} סימים עודכנו, ${inserted} סימים נוספו`,
         timestamp: new Date().toISOString()
       }),
       {
