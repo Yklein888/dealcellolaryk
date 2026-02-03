@@ -13,6 +13,8 @@ export interface SimActivationData {
   linkedCustomerId: string | null;
 }
 
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw5Zv5OWnH8UI0dCzfBR37maMDRf0NwIsX8PxREugD5lSSLKC2KYx9P72c0qQkb-TpA/exec";
+
 export function useSimActivation() {
   const { toast } = useToast();
   const [activatingSimNumbers, setActivatingSimNumbers] = useState<Set<string>>(new Set());
@@ -34,25 +36,66 @@ export function useSimActivation() {
     setActivatingSimNumbers(prev => new Set(prev).add(simNumber));
 
     try {
-      const { data, error } = await supabase.functions.invoke('sim-activation-request', {
-        body: {
-          sim_number: simNumber,
-          rental_id: rentalId || null,
-          customer_id: customerId || null,
+      // Fetch customer name if customer_id provided
+      let customerName = '';
+      if (customerId) {
+        const { data: customerData } = await supabase
+          .from('customers')
+          .select('name')
+          .eq('id', customerId)
+          .single();
+        customerName = customerData?.name || '';
+      }
+
+      // Fetch rental dates if rental_id provided
+      let startDate = '';
+      let endDate = '';
+      if (rentalId) {
+        const { data: rentalData } = await supabase
+          .from('rentals')
+          .select('start_date, end_date, customer_name')
+          .eq('id', rentalId)
+          .single();
+        startDate = rentalData?.start_date || '';
+        endDate = rentalData?.end_date || '';
+        // Use rental customer name if no customer id provided
+        if (!customerName) {
+          customerName = rentalData?.customer_name || '';
+        }
+      }
+
+      // Update local database status first
+      await supabase
+        .from('sim_cards')
+        .update({
+          activation_status: 'pending',
+          activation_requested_at: new Date().toISOString(),
+          linked_rental_id: rentalId || null,
+          linked_customer_id: customerId || null,
+        })
+        .eq('sim_number', simNumber);
+
+      // Send POST request to Google Apps Script with no-cors mode
+      const payload = {
+        action: "set_pending",
+        sim: simNumber,
+        customerName: customerName,
+        startDate: startDate,
+        endDate: endDate,
+      };
+
+      await fetch(GOOGLE_SCRIPT_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
         },
+        body: JSON.stringify(payload),
+        mode: 'no-cors',
       });
 
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      if (data?.error) {
-        throw new Error(data.error);
-      }
-
       toast({
-        title: 'בקשת הפעלה נשלחה',
-        description: `הסים ${simNumber} סומן להפעלה. הפעל את ה-Bookmarklet באתר CellStation.`,
+        title: 'הפקודה נשלחה!',
+        description: 'כעת לחץ על ה-Bookmarklet באתר CellStation',
       });
 
       return true;
