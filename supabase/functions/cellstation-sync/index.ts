@@ -61,8 +61,10 @@ Deno.serve(async (req) => {
 
       const simData = {
         sim_number: simNumber,
-        local_number: item.local_number ? String(item.local_number).trim() : null,
-        israeli_number: item.israel_number ? String(item.israel_number).trim() : null,
+        // Swapped: israel_number from source contains local numbers (7225...)
+        // and local_number from source contains Israeli numbers (44...)
+        local_number: item.israel_number ? String(item.israel_number).trim() : null,
+        israeli_number: item.local_number ? String(item.local_number).trim() : null,
         package_name: item.plan ? String(item.plan).trim() : null,
         expiry_date: parseExpiryDate(String(item.expiry || '')),
         is_active: String(item.status || '').toLowerCase() === 'active',
