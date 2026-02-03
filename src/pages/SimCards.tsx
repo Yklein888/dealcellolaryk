@@ -21,18 +21,29 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { RefreshCw, Search, Smartphone, AlertTriangle, CheckCircle, XCircle, CloudDownload } from 'lucide-react';
+import { RefreshCw, Search, Smartphone, CheckCircle, XCircle, CloudDownload, Plus, Check, Package } from 'lucide-react';
 import { useCellstationSync } from '@/hooks/useCellstationSync';
+import { useRental } from '@/hooks/useRental';
+import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
-type FilterStatus = 'all' | 'available' | 'rented' | 'expiring';
+type FilterStatus = 'all' | 'available' | 'rented' | 'active' | 'inactive';
 type SortField = 'expiry_date' | 'local_number' | 'status';
 
 export default function SimCards() {
   const { simCards, isLoading, isRefreshing, isSyncing, syncSims, refreshData } = useCellstationSync();
+  const { inventory, addInventoryItem } = useRental();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [sortField, setSortField] = useState<SortField>('expiry_date');
+  const [addingSimId, setAddingSimId] = useState<string | null>(null);
+
+  // Check if a SIM is already in inventory (by sim_number/ICCID)
+  const isSimInInventory = (simNumber: string | null): boolean => {
+    if (!simNumber) return false;
+    return inventory.some(item => item.simNumber === simNumber);
+  };
 
   const filteredAndSortedSims = useMemo(() => {
     let result = [...simCards];
@@ -53,13 +64,10 @@ export default function SimCards() {
         result = result.filter(sim => !sim.is_rented);
       } else if (filterStatus === 'rented') {
         result = result.filter(sim => sim.is_rented);
-      } else if (filterStatus === 'expiring') {
-        const today = new Date();
-        result = result.filter(sim => {
-          if (!sim.expiry_date) return false;
-          const daysUntilExpiry = differenceInDays(parseISO(sim.expiry_date), today);
-          return daysUntilExpiry <= 30 && daysUntilExpiry >= 0;
-        });
+      } else if (filterStatus === 'active') {
+        result = result.filter(sim => sim.is_active === true);
+      } else if (filterStatus === 'inactive') {
+        result = result.filter(sim => sim.is_active === false);
       }
     }
 
@@ -81,18 +89,15 @@ export default function SimCards() {
   }, [simCards, searchQuery, filterStatus, sortField]);
 
   const stats = useMemo(() => {
-    const today = new Date();
     const total = simCards.length;
-    const available = simCards.filter(s => !s.is_rented).length;
-    const rented = simCards.filter(s => s.is_rented).length;
-    const expiring = simCards.filter(s => {
-      if (!s.expiry_date) return false;
-      const daysUntilExpiry = differenceInDays(parseISO(s.expiry_date), today);
-      return daysUntilExpiry <= 30 && daysUntilExpiry >= 0;
-    }).length;
+    const active = simCards.filter(s => s.is_active === true).length;
+    // Available for inventory = active SIMs not yet in main inventory
+    const availableForInventory = simCards.filter(s => 
+      s.is_active === true && !isSimInInventory(s.sim_number)
+    ).length;
 
-    return { total, available, rented, expiring };
-  }, [simCards]);
+    return { total, active, availableForInventory };
+  }, [simCards, inventory]);
 
   const getExpiryColor = (expiryDate: string | null, isActive?: boolean): string => {
     // If explicitly marked as inactive, show red
@@ -108,6 +113,49 @@ export default function SimCards() {
     if (daysUntilExpiry <= 7) return 'text-destructive bg-destructive/10';
     if (daysUntilExpiry <= 30) return 'text-warning bg-warning/10';
     return '';
+  };
+
+  const handleAddToInventory = async (sim: typeof simCards[0]) => {
+    if (!sim.sim_number) {
+      toast({
+        title: 'שגיאה',
+        description: 'לסים זה אין מספר ICCID ולכן לא ניתן להוסיפו למלאי',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setAddingSimId(sim.id);
+    try {
+      // Determine category based on number pattern
+      // Israeli numbers (44...) should be categorized as sim_european based on user's instruction
+      const category = sim.israeli_number?.startsWith('44') ? 'sim_european' : 'sim_american';
+      
+      await addInventoryItem({
+        category: category as any,
+        name: `סים ${sim.local_number || sim.sim_number}`,
+        localNumber: sim.local_number || undefined,
+        israeliNumber: sim.israeli_number || undefined,
+        expiryDate: sim.expiry_date || undefined,
+        simNumber: sim.sim_number,
+        status: 'available',
+        notes: sim.package_name ? `חבילה: ${sim.package_name}` : undefined,
+      });
+
+      toast({
+        title: 'נוסף למלאי',
+        description: `הסים ${sim.local_number || sim.sim_number} נוסף בהצלחה למלאי`,
+      });
+    } catch (error) {
+      console.error('Error adding SIM to inventory:', error);
+      toast({
+        title: 'שגיאה',
+        description: 'לא ניתן להוסיף את הסים למלאי',
+        variant: 'destructive',
+      });
+    } finally {
+      setAddingSimId(null);
+    }
   };
 
   const lastSyncTime = simCards.length > 0 && simCards[0].last_synced
@@ -141,45 +189,38 @@ export default function SimCards() {
         </div>
       </PageHeader>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      {/* Stats Cards - Updated to show Total, Active, Available for Inventory */}
+      <div className="grid gap-4 md:grid-cols-3">
         <Card className="glass-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">סה"כ סימים</CardTitle>
+            <CardTitle className="text-sm font-medium">סה"כ במערכת</CardTitle>
             <Smartphone className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.total}</div>
+            <p className="text-xs text-muted-foreground">סימים מ-CellStation</p>
           </CardContent>
         </Card>
 
         <Card className="glass-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">פנויים</CardTitle>
+            <CardTitle className="text-sm font-medium">סימים פעילים</CardTitle>
             <CheckCircle className="h-4 w-4 text-success" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-success">{stats.available}</div>
+            <div className="text-2xl font-bold text-success">{stats.active}</div>
+            <p className="text-xs text-muted-foreground">סטטוס פעיל</p>
           </CardContent>
         </Card>
 
         <Card className="glass-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">בהשכרה</CardTitle>
-            <XCircle className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">זמינים להוספה למלאי</CardTitle>
+            <Package className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.rented}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">פגי תוקף בקרוב</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-warning" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-warning">{stats.expiring}</div>
+            <div className="text-2xl font-bold text-primary">{stats.availableForInventory}</div>
+            <p className="text-xs text-muted-foreground">פעילים ולא במלאי</p>
           </CardContent>
         </Card>
       </div>
@@ -191,7 +232,7 @@ export default function SimCards() {
             <div className="relative flex-1">
               <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="חיפוש לפי מספר טלפון או סים..."
+                placeholder="חיפוש לפי מספר טלפון, ICCID או מספר מקומי..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pr-10"
@@ -204,9 +245,10 @@ export default function SimCards() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">כל הסימים</SelectItem>
+                <SelectItem value="active">פעילים</SelectItem>
+                <SelectItem value="inactive">לא פעילים</SelectItem>
                 <SelectItem value="available">פנויים</SelectItem>
                 <SelectItem value="rented">בהשכרה</SelectItem>
-                <SelectItem value="expiring">פגי תוקף בקרוב</SelectItem>
               </SelectContent>
             </Select>
 
@@ -246,36 +288,71 @@ export default function SimCards() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="text-right">מספר קצר</TableHead>
-                    <TableHead className="text-right">מספר מקומי</TableHead>
                     <TableHead className="text-right">מספר ישראלי</TableHead>
+                    <TableHead className="text-right">מספר מקומי</TableHead>
                     <TableHead className="text-right">ICCID</TableHead>
                     <TableHead className="text-right">תוקף</TableHead>
                     <TableHead className="text-right">סטטוס</TableHead>
                     <TableHead className="text-right">חבילה</TableHead>
+                    <TableHead className="text-right w-[120px]">פעולות</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredAndSortedSims.map((sim) => (
-                    <TableRow key={sim.id} className={getExpiryColor(sim.expiry_date, sim.is_active)}>
-                      <TableCell className="font-medium">{sim.short_number || '-'}</TableCell>
-                      <TableCell>{sim.local_number || '-'}</TableCell>
-                      <TableCell>{sim.israeli_number || '-'}</TableCell>
-                      <TableCell className="font-mono text-xs">{sim.sim_number || '-'}</TableCell>
-                      <TableCell>
-                        {sim.expiry_date 
-                          ? format(parseISO(sim.expiry_date), 'dd/MM/yyyy')
-                          : '-'}
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge 
-                          status={sim.is_active ? 'פעיל' : 'פג תוקף'}
-                          variant={sim.is_active ? 'success' : 'destructive'}
-                        />
-                      </TableCell>
-                      <TableCell>{sim.package_name || '-'}</TableCell>
-                    </TableRow>
-                  ))}
+                  {filteredAndSortedSims.map((sim) => {
+                    const isInInventory = isSimInInventory(sim.sim_number);
+                    const isAdding = addingSimId === sim.id;
+                    
+                    return (
+                      <TableRow key={sim.id} className={getExpiryColor(sim.expiry_date, sim.is_active)}>
+                        {/* Swapped: 44... numbers are now Israel Number */}
+                        <TableCell className="font-medium whitespace-nowrap">
+                          {sim.israeli_number || '-'}
+                        </TableCell>
+                        {/* Swapped: 7225... numbers are now Local Number */}
+                        <TableCell className="whitespace-nowrap">
+                          {sim.local_number || '-'}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">{sim.sim_number || '-'}</TableCell>
+                        <TableCell>
+                          {sim.expiry_date 
+                            ? format(parseISO(sim.expiry_date), 'dd/MM/yyyy')
+                            : '-'}
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge 
+                            status={sim.is_active ? 'פעיל' : 'לא פעיל'}
+                            variant={sim.is_active ? 'success' : 'destructive'}
+                          />
+                        </TableCell>
+                        <TableCell>{sim.package_name || '-'}</TableCell>
+                        <TableCell>
+                          {isInInventory ? (
+                            <span className="inline-flex items-center gap-1 text-success text-sm">
+                              <Check className="h-4 w-4" />
+                              במלאי
+                            </span>
+                          ) : sim.is_active ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleAddToInventory(sim)}
+                              disabled={isAdding}
+                              className="gap-1"
+                            >
+                              {isAdding ? (
+                                <RefreshCw className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Plus className="h-3 w-3" />
+                              )}
+                              הוסף למלאי
+                            </Button>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">לא פעיל</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
