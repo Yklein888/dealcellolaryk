@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyxjoYYqxkjPI059oPtQZpjtHAnpFNzkzcmlROwdDkBl89ucsXX1qEh8qaoC4xHl3Sa/exec";
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw5Zv5OWnH8UI0dCzfBR37maMDRf0NwIsX8PxREugD5lSSLKC2KYx9P72c0qQkb-TpA/exec";
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
