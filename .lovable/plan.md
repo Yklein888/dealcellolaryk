@@ -1,141 +1,220 @@
 
-# תוכנית: סנכרון דו-כיווני להפעלת סימים
+# תוכנית: דאשבורד CellStation מלא עם הפעלת סימים ויצירת השכרות
 
 ## סקירה כללית
-מערכת שמאפשרת להפעיל סימים מתוך Lovable, לתקשר עם Google Apps Script שמנהל תור פקודות, ולהשתמש ב-Bookmarklet לביצוע ההפעלה בפועל באתר CellStation.
+יצירת דאשבורד CellStation חדש ומקיף שמאפשר:
+1. תצוגת מלאי סימים מ-CellStation עם סטטיסטיקות
+2. הפעלת סים מתוך הממשק עם בחירת לקוח
+3. יצירת השכרה אוטומטית עם הסים שהופעל
+4. הדפסת הוראות חיוג ישירות מהדאשבורד
+5. ממשק אינטואיטיבי עם לשוניות (מלאי, הפעלה חדשה, לקוחות)
 
-## תהליך העבודה
+## מבנה הפתרון
+
+### שלב 1: יצירת קומפוננטת דאשבורד CellStation חכמה
+קובץ חדש: `src/components/cellstation/CellStationDashboard.tsx`
+
+הקומפוננטה תכלול:
+- **לשונית מלאי סימים**: תצוגת טבלה עם כל הסימים, סינון וחיפוש
+- **לשונית הפעלה חדשה**: 
+  - בחירת סים פנוי מהמלאי
+  - בחירת לקוח קיים או הוספת לקוח חדש
+  - בחירת תאריכי השכרה
+  - כפתור הפעלה שמבצע:
+    1. שליחת פקודה ל-Google Script
+    2. יצירת השכרה חדשה במערכת
+    3. הוספה למלאי אם הסים לא קיים
+- **לשונית לקוחות**: רשימת לקוחות עם אפשרות הוספה
+
+### שלב 2: עדכון דף SimCards
+עדכון `src/pages/SimCards.tsx` להשתמש בדאשבורד החדש
+
+### שלב 3: אינטגרציה עם מערכת ההשכרות
+חיבור לפונקציות קיימות:
+- `addRental` - יצירת השכרה חדשה
+- `addInventoryItem` - הוספת סים למלאי
+- `addCustomer` - הוספת לקוח חדש
+- `printCallingInstructions` - הדפסת הוראות
+
+## פירוט טכני
+
+### קומפוננטות חדשות
 
 ```text
-┌─────────────────┐     ┌──────────────────────┐     ┌────────────────────┐
-│   Lovable UI    │────▶│  Google Apps Script  │────▶│   Bookmarklet      │
-│  (Activate SIM) │     │   (Command Queue)    │     │  (Execute on Site) │
-└─────────────────┘     └──────────────────────┘     └────────────────────┘
-         │                       │                            │
-         │                       │                            │
-         ▼                       ▼                            ▼
-┌─────────────────┐     ┌──────────────────────┐     ┌────────────────────┐
-│   sim_cards DB  │◀────│  Status Callback     │◀────│   Confirmation     │
-│  (Update Status)│     │  (Mark as Done)      │     │   (Success/Fail)   │
-└─────────────────┘     └──────────────────────┘     └────────────────────┘
+src/components/cellstation/
+├── CellStationDashboard.tsx      # קומפוננטה ראשית
+├── SimInventoryTab.tsx           # לשונית מלאי
+├── ActivationTab.tsx             # לשונית הפעלה
+├── CustomersTab.tsx              # לשונית לקוחות
+└── SimActivationForm.tsx         # טופס הפעלה מלא
 ```
 
----
+### תהליך הפעלה משולב
 
-## רכיב 1: עדכון מסד הנתונים
-
-### הוספת שדות לטבלת sim_cards
-- `activation_status` - סטטוס ההפעלה: `none` | `pending` | `activated` | `failed`
-- `activation_requested_at` - מתי נשלחה הבקשה
-- `activation_completed_at` - מתי ההפעלה הושלמה
-- `linked_rental_id` - קישור להשכרה (אופציונלי)
-- `linked_customer_id` - קישור ללקוח (אופציונלי)
-
----
-
-## רכיב 2: Edge Functions
-
-### 2.1 פונקציה: `sim-activation-request`
-- **מטרה**: שולחת בקשת הפעלה ל-Google Apps Script
-- **קלט**: sim_number, rental_id (אופציונלי), customer_id (אופציונלי)
-- **פעולות**:
-  1. מעדכנת את sim_cards עם `activation_status = 'pending'`
-  2. שולחת POST ל-Google Apps Script עם פרטי הסים
-  3. Google Apps Script שומר את הבקשה ב-Google Sheet ("תור הפעלות")
-
-### 2.2 פונקציה: `sim-activation-callback`
-- **מטרה**: מקבלת עדכון מה-Bookmarklet לאחר ההפעלה
-- **קלט**: sim_number, success/failure, error_message
-- **פעולות**:
-  1. מעדכנת את sim_cards עם `activation_status = 'activated'` או `'failed'`
-  2. מעדכנת את `is_active = true` אם ההפעלה הצליחה
-
----
-
-## רכיב 3: ממשק משתמש (Rentals Page)
-
-### כפתור "הפעל סים" בכרטיס השכרה
-- מוצג רק עבור השכרות פעילות עם סימים
-- מציג את הסימים הקשורים להשכרה
-- כשנלחץ:
-  1. שולח בקשת הפעלה ל-Edge Function
-  2. מעדכן את הסטטוס ל-"ממתין להפעלה"
-  3. מציג Toast עם הודעת "בקשת ההפעלה נשלחה"
-
-### אינדיקטור סטטוס הפעלה
-- 🔄 ממתין להפעלה (pending)
-- ✅ הופעל (activated)
-- ❌ נכשל (failed)
-
----
-
-## רכיב 4: Google Apps Script (עדכון)
-
-### Endpoint חדש: doPost
-הוספת handler לבקשות POST שמקבל פקודות הפעלה:
 ```text
+┌─────────────────────────────────────────────────────────────────┐
+│                    תהליך הפעלת סים חכם                         │
+├─────────────────────────────────────────────────────────────────┤
+│  1. בחירת סים פנוי                                              │
+│     ↓                                                          │
+│  2. בחירת/הוספת לקוח                                            │
+│     ↓                                                          │
+│  3. בחירת תאריכי השכרה                                          │
+│     ↓                                                          │
+│  4. לחיצה על "הפעל והשכר"                                       │
+│     ↓                                                          │
+│  ┌──────────────────────────────────────────────────────┐      │
+│  │ פעולות אוטומטיות:                                    │      │
+│  │  a. שליחת POST ל-Google Script (set_pending)        │      │
+│  │  b. עדכון סטטוס סים ל-pending                        │      │
+│  │  c. הוספת סים למלאי (אם לא קיים)                     │      │
+│  │  d. יצירת השכרה חדשה                                 │      │
+│  │  e. הצעת הדפסת הוראות חיוג                           │      │
+│  └──────────────────────────────────────────────────────┘      │
+│     ↓                                                          │
+│  5. הודעה למשתמש: "לחץ על Bookmarklet ב-CellStation"           │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### ממשק משתמש
+
+**לשונית מלאי סימים:**
+- כרטיסי סטטיסטיקה (סה"כ, פעילים, פנויים, עומדים לפוג)
+- חיפוש לפי ICCID, מספר ישראלי, מספר מקומי
+- סינון לפי סטטוס (פעיל/לא פעיל/פנוי/בהשכרה)
+- טבלה עם עמודות: SIM, מספר מקומי, מספר ישראלי, תוכנית, תוקף, סטטוס, פעולות
+- כפתורי פעולה: הפעל, הוסף למלאי, הדפס הוראות
+
+**לשונית הפעלה חדשה:**
+- בחירת סים מרשימה נפתחת (רק סימים פנויים)
+- תצוגת פרטי הסים הנבחר
+- חיפוש ובחירת לקוח מרשימה
+- כפתור הוספת לקוח חדש מהיר
+- בחירת טווח תאריכים עם לוח עברי
+- תצוגת מחיר מחושב
+- כפתור "הפעל והשכר" ראשי
+
+**לשונית לקוחות:**
+- רשימת לקוחות קיימים
+- חיפוש לקוחות
+- כפתור הוספת לקוח חדש
+
+### שדות נתונים
+
+**SimCard (מ-CellStation):**
+- sim_number (ICCID)
+- local_number (מספר מקומי)
+- israeli_number (מספר ישראלי)
+- package_name (תוכנית)
+- expiry_date (תוקף)
+- is_active (האם פעיל)
+- activation_status (none/pending/activated/failed)
+
+**הפעלה + השכרה:**
+- selectedSim: SimCard
+- selectedCustomerId: string
+- customerName: string
+- startDate: Date
+- endDate: Date
+- deposit?: number
+- notes?: string
+
+### פעולות API
+
+1. **שליחת הפעלה ל-Google Script:**
+```typescript
+POST https://script.google.com/macros/s/AKfycbw5Zv5OWnH8UI0dCzfBR37maMDRf0NwIsX8PxREugD5lSSLKC2KYx9P72c0qQkb-TpA/exec
 {
-  "action": "activate",
-  "sim_number": "8972...",
-  "rental_id": "uuid",
-  "customer_id": "uuid"
+  action: 'set_pending',
+  sim: simNumber,
+  customerName: customerName,
+  startDate: startDate,
+  endDate: endDate
 }
 ```
 
-### שמירה ב-Sheet חדש: "Activation Queue"
-עמודות:
-- sim_number
-- status (pending/processing/done/failed)
-- requested_at
-- completed_at
-- rental_id
-- customer_id
+2. **הוספת סים למלאי (אם לא קיים):**
+```typescript
+addInventoryItem({
+  category: 'sim_european',
+  name: `סים ${localNumber || simNumber}`,
+  localNumber,
+  israeliNumber,
+  expiryDate,
+  simNumber,
+  status: 'available'
+})
+```
 
----
+3. **יצירת השכרה:**
+```typescript
+addRental({
+  customerId,
+  customerName,
+  items: [{
+    inventoryItemId,
+    itemCategory: 'sim_european',
+    itemName: `סים אירופאי - ${localNumber}`,
+    hasIsraeliNumber: false
+  }],
+  startDate,
+  endDate,
+  totalPrice,
+  currency: 'USD',
+  status: 'active'
+})
+```
 
-## רכיב 5: Bookmarklet
+4. **הדפסת הוראות:**
+```typescript
+printCallingInstructions(israeliNumber, localNumber, barcode, false, packageName, expiryDate)
+```
 
-### קוד ה-Bookmarklet
-סקריפט JavaScript שרץ בדף CellStation ו:
-1. מושך את רשימת הסימים הממתינים מ-Google Apps Script
-2. לכל סים בתור:
-   - מוצא את הסים בטבלה בדף
-   - מבצע את פעולת ההפעלה (קליק על כפתור/מילוי טופס)
-   - שולח עדכון ל-Google Apps Script שהפעולה הושלמה
-3. Google Apps Script שולח callback ל-Lovable לעדכון הסטטוס
+### תצוגת סטטוס הפעלה
 
----
+| סטטוס | אייקון | צבע | הודעה |
+|-------|--------|-----|--------|
+| none | ⚪ | אפור | לא הופעל |
+| pending | 🔄 | צהוב | ממתין להפעלה |
+| activated | ✅ | ירוק | הופעל |
+| failed | ❌ | אדום | נכשל |
 
-## סדר יישום
+### דיאלוג אישור לאחר הפעלה
 
-### שלב 1: עדכון מסד נתונים
-- הוספת עמודות חדשות לטבלת sim_cards
+לאחר הפעלה מוצלחת:
+```
+┌─────────────────────────────────────────────┐
+│           ✅ ההפעלה נשלחה בהצלחה!           │
+├─────────────────────────────────────────────┤
+│  SIM: 8972509020123456789                   │
+│  לקוח: ישראל ישראלי                         │
+│  תאריכים: 03/02/2026 - 10/02/2026          │
+│                                             │
+│  ⚠️ לחץ על Bookmarklet באתר CellStation    │
+│     כדי להשלים את ההפעלה                    │
+│                                             │
+│  ┌─────────────┐  ┌──────────────────┐     │
+│  │ 🖨️ הדפס     │  │ ← חזור לדאשבורד │     │
+│  │   הוראות   │  │                  │     │
+│  └─────────────┘  └──────────────────┘     │
+└─────────────────────────────────────────────┘
+```
 
-### שלב 2: Edge Functions
-- יצירת `sim-activation-request`
-- יצירת `sim-activation-callback`
+## קבצים שייווצרו/יעודכנו
 
-### שלב 3: ממשק משתמש
-- הוספת כפתור "הפעל סים" לדף ההשכרות
-- הוספת אינדיקטור סטטוס הפעלה
+| קובץ | פעולה | תיאור |
+|------|-------|--------|
+| `src/components/cellstation/CellStationDashboard.tsx` | חדש | קומפוננטה ראשית |
+| `src/components/cellstation/SimInventoryTab.tsx` | חדש | לשונית מלאי |
+| `src/components/cellstation/ActivationTab.tsx` | חדש | לשונית הפעלה |
+| `src/components/cellstation/SimActivationForm.tsx` | חדש | טופס הפעלה מלא |
+| `src/pages/SimCards.tsx` | עדכון | שימוש בדאשבורד החדש |
 
-### שלב 4: תיעוד Google Apps Script
-- הוראות להוספת ה-Endpoint החדש
-- מבנה ה-Sheet לתור ההפעלות
+## יתרונות הפתרון
 
-### שלב 5: קוד Bookmarklet
-- סקריפט מוכן להתקנה בדפדפן
-- הוראות שימוש
-
----
-
-## שיקולי אבטחה
-- Edge Function callback מוגן עם API key
-- וידוא שרק סימים במצב 'pending' ניתנים לעדכון
-- לוגים מפורטים לכל פעולה
-
-## הערות
-- ה-Bookmarklet דורש הרצה ידנית על ידי המשתמש
-- Google Apps Script משמש כ-middleware בין Lovable ל-Bookmarklet
-- הסנכרון הרגיל מ-CellStation ימשיך לעבוד כרגיל
-
+1. **תהליך אחיד**: הפעלה + השכרה בפעולה אחת
+2. **חכם**: בודק אם הסים במלאי ומוסיף אוטומטית
+3. **מהיר**: אין צורך לעבור בין דפים
+4. **שלם**: כולל הדפסת הוראות בסוף התהליך
+5. **אינטואיטיבי**: ממשק דומה לדאשבורד הקיים שכבר עובד
+6. **משולב**: מנצל את כל הפונקציות הקיימות במערכת
