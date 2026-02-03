@@ -4,6 +4,7 @@ import { useRental } from '@/hooks/useRental';
 import { InventoryItem } from '@/types/rental';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
+import { SimActivationButton } from '@/components/SimActivationButton';
 import { CallHistoryBadge } from '@/components/CallHistoryBadge';
 import { NewRentalDialog } from '@/components/rentals/NewRentalDialog';
 import { PaymentConfirmationDialog } from '@/components/rentals/PaymentConfirmationDialog';
@@ -923,6 +924,18 @@ export default function Rentals() {
                                 )}
                                 הדפס הוראות חיוג{simItems.length > 1 ? ` - ${simItem.itemName}` : ''}
                               </Button>
+                            </div>
+                          )}
+                          
+                          {/* SIM Activation Button */}
+                          {inventoryItem?.simNumber && rental.status === 'active' && (
+                            <div className="flex justify-center mt-2">
+                              <SimActivationButton
+                                simNumber={inventoryItem.simNumber}
+                                rentalId={rental.id}
+                                customerId={rental.customerId || undefined}
+                                compact
+                              />
                             </div>
                           )}
                         </div>

@@ -743,6 +743,9 @@ export type Database = {
       }
       sim_cards: {
         Row: {
+          activation_completed_at: string | null
+          activation_requested_at: string | null
+          activation_status: string | null
           created_at: string | null
           expiry_date: string | null
           id: string
@@ -750,6 +753,8 @@ export type Database = {
           is_rented: boolean | null
           israeli_number: string | null
           last_synced: string | null
+          linked_customer_id: string | null
+          linked_rental_id: string | null
           local_number: string | null
           notes: string | null
           package_name: string | null
@@ -759,6 +764,9 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          activation_completed_at?: string | null
+          activation_requested_at?: string | null
+          activation_status?: string | null
           created_at?: string | null
           expiry_date?: string | null
           id?: string
@@ -766,6 +774,8 @@ export type Database = {
           is_rented?: boolean | null
           israeli_number?: string | null
           last_synced?: string | null
+          linked_customer_id?: string | null
+          linked_rental_id?: string | null
           local_number?: string | null
           notes?: string | null
           package_name?: string | null
@@ -775,6 +785,9 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          activation_completed_at?: string | null
+          activation_requested_at?: string | null
+          activation_status?: string | null
           created_at?: string | null
           expiry_date?: string | null
           id?: string
@@ -782,6 +795,8 @@ export type Database = {
           is_rented?: boolean | null
           israeli_number?: string | null
           last_synced?: string | null
+          linked_customer_id?: string | null
+          linked_rental_id?: string | null
           local_number?: string | null
           notes?: string | null
           package_name?: string | null
@@ -790,7 +805,29 @@ export type Database = {
           status?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sim_cards_linked_customer_id_fkey"
+            columns: ["linked_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sim_cards_linked_customer_id_fkey"
+            columns: ["linked_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_secure"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sim_cards_linked_rental_id_fkey"
+            columns: ["linked_rental_id"]
+            isOneToOne: false
+            referencedRelation: "rentals"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_devices: {
         Row: {

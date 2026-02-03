@@ -8,3 +8,9 @@ verify_jwt = false
 
 [functions.cellstation-sync]
 verify_jwt = false
+
+[functions.sim-activation-request]
+verify_jwt = false
+
+[functions.sim-activation-callback]
+verify_jwt = false
