@@ -127,12 +127,9 @@ export default function SimCards() {
 
     setAddingSimId(sim.id);
     try {
-      // Determine category based on number pattern
-      // Israeli numbers (44...) should be categorized as sim_european based on user's instruction
-      const category = sim.israeli_number?.startsWith('44') ? 'sim_european' : 'sim_american';
-      
+      // CellStation SIMs are always European SIMs
       await addInventoryItem({
-        category: category as any,
+        category: 'sim_european',
         name: `סים ${sim.local_number || sim.sim_number}`,
         localNumber: sim.local_number || undefined,
         israeliNumber: sim.israeli_number || undefined,
