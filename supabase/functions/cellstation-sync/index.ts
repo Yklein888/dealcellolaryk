@@ -54,21 +54,39 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Fetch data from Google Apps Script
+    // Fetch data from Google Apps Script (with redirect support)
     console.log('📡 מושך נתונים מ-Google Apps Script...');
     
     const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
       method: 'GET',
-      headers: { 'Accept': 'application/json' },
+      headers: { 
+        'Accept': 'application/json',
+        'User-Agent': 'Supabase Edge Function'
+      },
+      redirect: 'follow', // Explicitly follow redirects (default in Deno, but being explicit)
     });
+    
+    console.log(`📡 Response status: ${response.status}, URL: ${response.url}`);
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ API Error response:', errorText.substring(0, 500));
       throw new Error(`Google Apps Script error: ${response.status} - ${response.statusText}`);
     }
 
-    const data: ApiResponse = await response.json();
+    const responseText = await response.text();
+    console.log('📄 Raw response (first 500 chars):', responseText.substring(0, 500));
+    
+    let data: ApiResponse;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('❌ Failed to parse JSON:', parseError);
+      throw new Error(`Invalid JSON response from API: ${responseText.substring(0, 200)}`);
+    }
     
     if (!data.services || !Array.isArray(data.services)) {
+      console.error('❌ Response structure:', JSON.stringify(data).substring(0, 500));
       throw new Error('Invalid response format: missing services array');
     }
 
