@@ -75,22 +75,17 @@ export function useSimActivation() {
         })
         .eq('sim_number', simNumber);
 
-      // Send POST request to Google Apps Script with no-cors mode
-      const payload = {
-        action: "set_pending",
-        sim: simNumber,
-        customerName: customerName,
-        startDate: startDate,
-        endDate: endDate,
-      };
-
+      // Send POST request to Google Apps Script (matching working reference implementation)
       await fetch(GOOGLE_SCRIPT_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'text/plain;charset=utf-8',
-        },
-        body: JSON.stringify(payload),
-        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'set_pending',
+          sim: simNumber,
+          customerName,
+          startDate,
+          endDate
+        })
       });
 
       toast({
