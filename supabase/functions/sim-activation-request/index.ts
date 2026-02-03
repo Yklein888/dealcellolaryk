@@ -30,6 +30,24 @@ Deno.serve(async (req) => {
 
     console.log(`Processing activation request for SIM: ${sim_number}`);
 
+    // Fetch SIM details
+    const { data: simData } = await supabase
+      .from('sim_cards')
+      .select('sim_number, israeli_number, local_number, package_name')
+      .eq('sim_number', sim_number)
+      .single();
+
+    // Fetch customer name if customer_id provided
+    let customerName = null;
+    if (customer_id) {
+      const { data: customerData } = await supabase
+        .from('customers')
+        .select('name, phone')
+        .eq('id', customer_id)
+        .single();
+      customerName = customerData?.name || null;
+    }
+
     // Update sim_cards table with pending status
     const { error: updateError } = await supabase
       .from('sim_cards')
@@ -49,7 +67,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Send activation request to Google Apps Script
+    // Send activation request to Google Apps Script with full details
     try {
       const googleResponse = await fetch(GOOGLE_SCRIPT_URL, {
         method: 'POST',
@@ -57,8 +75,12 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           action: 'activate',
           sim_number,
+          israeli_number: simData?.israeli_number || null,
+          local_number: simData?.local_number || null,
+          package_name: simData?.package_name || null,
           rental_id: rental_id || null,
           customer_id: customer_id || null,
+          customer_name: customerName,
           requested_at: new Date().toISOString(),
         }),
         redirect: 'follow',
