@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby_K6f6OOf5STuF2xQQ5STu/exec';
+const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyxjoYYqxkjPI059oPtQZpjtHAnpFNzkzcmlROwdDkBl89ucsXX1qEh8qaoC4xHl3Sa/exec';
 
 interface ServiceItem {
   sim: string;
