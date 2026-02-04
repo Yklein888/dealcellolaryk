@@ -20,6 +20,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { categoryLabels, categoryIcons, repairStatusLabels, InventoryItem, Rental } from '@/types/rental';
 import { QuickActionDialog } from '@/components/inventory/QuickActionDialog';
+import { normalizeForSearch } from '@/lib/utils';
 
 interface SearchResult {
   type: 'customer' | 'inventory' | 'rental' | 'repair';
@@ -62,6 +63,7 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
     if (!searchTerm.trim()) return [];
     
     const term = searchTerm.toLowerCase();
+    const termNormalized = normalizeForSearch(searchTerm);
     const searchResults: SearchResult[] = [];
 
     // Status labels and variants for inventory
@@ -76,11 +78,12 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
       maintenance: 'warning' 
     };
 
-    // Search customers
+    // Search customers - with smart phone number search
     customers.forEach(customer => {
+      const phoneNormalized = normalizeForSearch(customer.phone);
       if (
         customer.name.toLowerCase().includes(term) ||
-        customer.phone.includes(term) ||
+        phoneNormalized.includes(termNormalized) ||
         customer.email?.toLowerCase().includes(term)
       ) {
         searchResults.push({
@@ -94,13 +97,17 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
       }
     });
 
-    // Search inventory with status
+    // Search inventory with status - with smart number search
     inventory.forEach(item => {
+      const localNormalized = normalizeForSearch(item.localNumber);
+      const israeliNormalized = normalizeForSearch(item.israeliNumber);
+      const simNormalized = normalizeForSearch(item.simNumber);
+      
       if (
         item.name.toLowerCase().includes(term) ||
-        item.localNumber?.includes(term) ||
-        item.israeliNumber?.includes(term) ||
-        item.simNumber?.toLowerCase().includes(term) ||
+        localNormalized.includes(termNormalized) ||
+        israeliNormalized.includes(termNormalized) ||
+        simNormalized.includes(termNormalized) ||
         item.barcode?.toLowerCase().includes(term) ||
         categoryLabels[item.category].includes(term)
       ) {
@@ -118,11 +125,16 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
       }
     });
 
-    // Search rentals
+    // Search rentals - with smart number search
     rentals.forEach(rental => {
+      const matchesItems = rental.items.some(i => {
+        const itemNameNormalized = normalizeForSearch(i.itemName);
+        return i.itemName.toLowerCase().includes(term) || itemNameNormalized.includes(termNormalized);
+      });
+      
       if (
         rental.customerName.toLowerCase().includes(term) ||
-        rental.items.some(i => i.itemName.toLowerCase().includes(term))
+        matchesItems
       ) {
         searchResults.push({
           type: 'rental',
@@ -135,11 +147,12 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
       }
     });
 
-    // Search repairs
+    // Search repairs - with smart phone number search
     repairs.forEach(repair => {
+      const phoneNormalized = normalizeForSearch(repair.customerPhone);
       if (
         repair.customerName.toLowerCase().includes(term) ||
-        repair.customerPhone.includes(term) ||
+        phoneNormalized.includes(termNormalized) ||
         repair.repairNumber.includes(term) ||
         repair.deviceType.toLowerCase().includes(term) ||
         repair.problemDescription.toLowerCase().includes(term)
