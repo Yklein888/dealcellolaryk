@@ -266,6 +266,7 @@ export function CellStationDashboard() {
   const [price, setPrice] = useState('');
   const [includeDevice, setIncludeDevice] = useState(false);
   const [isActivating, setIsActivating] = useState(false);
+  const [addingToStock, setAddingToStock] = useState<string | null>(null); // Track which SIM is being added
 
   // Calculated price state
   const [calculatedPrice, setCalculatedPrice] = useState<CalculatedPrice | null>(null);
@@ -424,6 +425,53 @@ export function CellStationDashboard() {
     }
   };
 
+  // Check if SIM is already in Supabase inventory
+  const isSimInStock = (simNumber: string): boolean => {
+    return supabaseInventory.some(i => i.simNumber === simNumber);
+  };
+
+  // Add SIM to Supabase inventory
+  const handleAddToStock = async (sim: InventoryItem) => {
+    if (isSimInStock(sim.sim)) {
+      toast({ 
+        title: 'הסים כבר במלאי', 
+        description: 'הסים כבר קיים במלאי הראשי',
+        variant: 'default' 
+      });
+      return;
+    }
+
+    setAddingToStock(sim.sim);
+
+    try {
+      await addInventoryItem({
+        category: 'sim_european' as ItemCategory,
+        name: `סים ${formatLocalNumber(sim.local_number)}`,
+        localNumber: sim.local_number || undefined,
+        israeliNumber: sim.israel_number || undefined,
+        expiryDate: parseExpiryDate(sim.expiry),
+        simNumber: sim.sim,
+        status: 'available',
+      });
+
+      await refreshSupabaseData();
+
+      toast({ 
+        title: '✅ נוסף למלאי', 
+        description: `הסים ${formatLocalNumber(sim.local_number)} נוסף למלאי הראשי` 
+      });
+    } catch (error) {
+      console.error('Error adding to stock:', error);
+      toast({ 
+        title: 'שגיאה', 
+        description: 'לא ניתן להוסיף למלאי', 
+        variant: 'destructive' 
+      });
+    } finally {
+      setAddingToStock(null);
+    }
+  };
+
   // Send activate request with Supabase sync
   const handleActivate = async () => {
     if (!selectedSim || !customerName || !startDate || !endDate) {
@@ -458,40 +506,20 @@ export function CellStationDashboard() {
         throw new Error(data.error || 'שגיאה בשליחה ל-Google Script');
       }
 
-      // Step 2: Add to Supabase inventory if not exists
+      // Step 2: Check if SIM is already in Supabase inventory
       const existingItem = supabaseInventory.find(i => i.simNumber === selectedSim.sim);
       let inventoryItemId = existingItem?.id;
 
-      if (!existingItem) {
-        try {
-          await addInventoryItem({
-            category: 'sim_european' as ItemCategory,
-            name: `סים ${selectedSim.local_number}`,
-            localNumber: selectedSim.local_number || undefined,
-            israeliNumber: selectedSim.israel_number || undefined,
-            expiryDate: parseExpiryDate(selectedSim.expiry),
-            simNumber: selectedSim.sim,
-            status: 'available',
-          });
-          // Wait a bit for the inventory to update
-          await new Promise(resolve => setTimeout(resolve, 500));
-          await refreshSupabaseData();
-          // Try to get the new item ID
-          const updatedInventory = supabaseInventory;
-          const newItem = updatedInventory.find(i => i.simNumber === selectedSim.sim);
-          inventoryItemId = newItem?.id;
-        } catch (err) {
-          console.error('Error adding to Supabase inventory:', err);
-          // Continue anyway - the rental can still be created
-        }
-      }
+      // Note: SIMs are NOT automatically added to inventory here.
+      // User must explicitly add them using the "Add to Stock" button in inventory tab
+      // or the SIM will be marked as generic in the rental
 
       // Step 3: Create rental in Supabase
       const rentalItems = [
         {
           inventoryItemId: inventoryItemId || '',
           itemCategory: 'sim_european' as ItemCategory,
-          itemName: `סים אירופאי - ${selectedSim.local_number}`,
+          itemName: `סים אירופאי - ${formatLocalNumber(selectedSim.local_number)}`,
           hasIsraeliNumber: !!selectedSim.israel_number,
           isGeneric: !inventoryItemId, // Mark as generic if no inventory ID
         }
@@ -877,8 +905,31 @@ export function CellStationDashboard() {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <div className="flex gap-1">
-                              {/* Always show print button */}
+                            <div className="flex flex-wrap gap-1">
+                              {/* Stock status indicator */}
+                              {isSimInStock(item.sim) ? (
+                                <Badge variant="outline" className="text-xs bg-success/10 text-success border-success/30">
+                                  ✓ במלאי
+                                </Badge>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleAddToStock(item)}
+                                  disabled={addingToStock === item.sim}
+                                  title="הוסף למלאי הראשי"
+                                  className="gap-1"
+                                >
+                                  {addingToStock === item.sim ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Plus className="h-3 w-3" />
+                                  )}
+                                  למלאי
+                                </Button>
+                              )}
+                              
+                              {/* Print button */}
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -900,7 +951,7 @@ export function CellStationDashboard() {
                                 title={item.status === 'inactive' ? 'הפעל סים לא פעיל' : 'הפעל סים'}
                               >
                                 <Zap className="h-3 w-3" />
-                                {item.status === 'inactive' ? 'הפעל סים' : 'הפעל'}
+                                {item.status === 'inactive' ? 'הפעל' : 'הפעל'}
                               </Button>
                             </div>
                           </TableCell>

@@ -4,7 +4,7 @@ import { useRental } from '@/hooks/useRental';
 import { InventoryItem } from '@/types/rental';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
-import { SimActivationButton } from '@/components/SimActivationButton';
+// SimActivationButton removed - activation is handled only in CellStation dashboard
 import { CallHistoryBadge } from '@/components/CallHistoryBadge';
 import { NewRentalDialog } from '@/components/rentals/NewRentalDialog';
 import { PaymentConfirmationDialog } from '@/components/rentals/PaymentConfirmationDialog';
@@ -927,17 +927,7 @@ export default function Rentals() {
                             </div>
                           )}
                           
-                          {/* SIM Activation Button */}
-                          {inventoryItem?.simNumber && rental.status === 'active' && (
-                            <div className="flex justify-center mt-2">
-                              <SimActivationButton
-                                simNumber={inventoryItem.simNumber}
-                                rentalId={rental.id}
-                                customerId={rental.customerId || undefined}
-                                compact
-                              />
-                            </div>
-                          )}
+                          {/* SIM Activation is handled only in CellStation Dashboard */}
                         </div>
                       );
                     })}
