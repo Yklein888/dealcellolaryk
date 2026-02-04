@@ -92,27 +92,32 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
       const scanner = new Html5Qrcode(SCANNER_CONTAINER_ID);
       scannerRef.current = scanner;
 
-      // Scanner configuration - optimized for barcodes
+      // Scanner configuration - optimized for 1D barcodes
       const config = {
-        fps: 15,
-        qrbox: { width: 350, height: 150 },
-        aspectRatio: 2.0,
+        fps: 20,
+        qrbox: { width: 400, height: 120 },
+        aspectRatio: 3.0,
+        disableFlip: false,
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true
+        },
         formatsToSupport: [
           Html5QrcodeSupportedFormats.CODE_128,
           Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.CODABAR,
+          Html5QrcodeSupportedFormats.ITF,
           Html5QrcodeSupportedFormats.EAN_13,
           Html5QrcodeSupportedFormats.EAN_8,
-          Html5QrcodeSupportedFormats.ITF,
           Html5QrcodeSupportedFormats.UPC_A,
           Html5QrcodeSupportedFormats.UPC_E,
         ]
       };
 
-      // Camera configuration - HIGH RESOLUTION
+      // Camera configuration - HIGH RESOLUTION with continuous focus
       const cameraConfig = {
         facingMode: "environment",
-        width: { ideal: 1920, min: 1280 },
-        height: { ideal: 1080, min: 720 }
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
       };
 
       console.log('[Html5Qrcode] Starting scanner with config:', config);
@@ -129,9 +134,9 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
           lastScannedRef.current = decodedText;
           console.log('[Html5Qrcode] Barcode detected:', decodedText);
           
-          // Vibrate for feedback
+          // Vibrate for feedback - stronger vibration
           if (navigator.vibrate) {
-            navigator.vibrate(100);
+            navigator.vibrate(200);
           }
 
           // Call onScan callback
@@ -150,7 +155,7 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
         }
       );
 
-      // Get video track for torch control
+      // Get video track for torch control and apply continuous focus
       try {
         const videoElement = containerElement.querySelector('video');
         if (videoElement && videoElement.srcObject) {
@@ -159,11 +164,23 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
           if (videoTrack) {
             videoTrackRef.current = videoTrack;
             
-            // Check torch support
+            // Check torch support and apply continuous focus
             const capabilities = videoTrack.getCapabilities?.() as any;
             if (capabilities?.torch) {
               setTorchSupported(true);
               console.log('[Html5Qrcode] Torch supported');
+            }
+            
+            // Apply continuous focus if supported
+            if (capabilities?.focusMode?.includes('continuous')) {
+              try {
+                await videoTrack.applyConstraints({
+                  advanced: [{ focusMode: 'continuous' } as any]
+                });
+                console.log('[Html5Qrcode] Continuous focus enabled');
+              } catch (focusErr) {
+                console.warn('[Html5Qrcode] Could not enable continuous focus:', focusErr);
+              }
             }
 
             const settings = videoTrack.getSettings();
