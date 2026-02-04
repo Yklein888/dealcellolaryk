@@ -165,7 +165,7 @@ function StatCard({
     <Card className={cn(
       'glass-card transition-all duration-200',
       variantStyles[variant],
-      highlight && 'ring-2 ring-warning animate-pulse'
+      highlight && 'ring-2 ring-warning shadow-lg shadow-warning/20'
     )}>
       <CardContent className="p-4 text-center">
         <Icon className={cn('h-6 w-6 mx-auto mb-2', iconStyles[variant])} />
@@ -1194,7 +1194,12 @@ export function CellStationDashboard() {
                       <SelectContent>
                         {rentals.map((r, idx) => (
                           <SelectItem key={idx} value={r.sim}>
-                            {r.customer_name} - {r.local_number} (עד {r.end_date})
+                            <div className="flex flex-col items-start">
+                              <span className="font-medium">{r.customer_name}</span>
+                              <span className="text-xs text-muted-foreground">
+                                📞 {formatPhone(r.customer_phone)} • 📱 {formatLocalNumber(r.local_number)} • עד {formatDate(r.end_date)}
+                              </span>
+                            </div>
                           </SelectItem>
                         ))}
                       </SelectContent>
