@@ -187,6 +187,32 @@ const parseExpiryDate = (expiry: string): string | undefined => {
   return undefined;
 };
 
+// Format ISO date to DD/MM/YYYY
+const formatDate = (dateString: string): string => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return dateString; // Return original if invalid
+  return date.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+};
+
+// Format phone number - add leading 0 if missing
+const formatPhone = (phone: string): string => {
+  if (!phone) return '';
+  if (phone.length === 9 && !phone.startsWith('0')) {
+    return '0' + phone;
+  }
+  return phone;
+};
+
+// Format local number - add leading 0 if missing (for 07xxx numbers)
+const formatLocalNumber = (num: string): string => {
+  if (!num) return '';
+  if (num.length === 9 && num.startsWith('7')) {
+    return '0' + num;
+  }
+  return num;
+};
+
 const getSimExpiryWarning = (sim: InventoryItem, endDate: string): string | null => {
   if (!sim.expiry || !endDate) return null;
   
@@ -745,11 +771,11 @@ export function CellStationDashboard() {
                       {filteredRentals.map((rental, idx) => (
                         <TableRow key={idx}>
                           <TableCell className="font-medium">{rental.customer_name}</TableCell>
-                          <TableCell>{rental.customer_phone}</TableCell>
-                          <TableCell className="font-mono text-sm">{rental.local_number}</TableCell>
+                          <TableCell>{formatPhone(rental.customer_phone)}</TableCell>
+                          <TableCell className="font-mono text-sm">{formatLocalNumber(rental.local_number)}</TableCell>
                           <TableCell>{rental.plan}</TableCell>
-                          <TableCell>{rental.start_date}</TableCell>
-                          <TableCell>{rental.end_date}</TableCell>
+                          <TableCell>{formatDate(rental.start_date)}</TableCell>
+                          <TableCell>{formatDate(rental.end_date)}</TableCell>
                           <TableCell className="text-center">{rental.days}</TableCell>
                           <TableCell>
                             <Badge variant={getStatusVariant(rental.status)}>
@@ -841,7 +867,7 @@ export function CellStationDashboard() {
                           )}
                         >
                           <TableCell>{item.id}</TableCell>
-                          <TableCell className="font-mono">{item.local_number}</TableCell>
+                          <TableCell className="font-mono">{formatLocalNumber(item.local_number)}</TableCell>
                           <TableCell className="font-mono">{item.israel_number}</TableCell>
                           <TableCell>{item.plan}</TableCell>
                           <TableCell>{item.expiry}</TableCell>
@@ -862,28 +888,20 @@ export function CellStationDashboard() {
                                 <Printer className="h-3 w-3" />
                               </Button>
                               
-                              {/* Activate button for active SIMs */}
-                              {item.status === 'active' && (
-                                <Button
-                                  size="sm"
-                                  variant="default"
-                                  onClick={() => {
-                                    setSelectedSim(item);
-                                    setActiveTab('activate');
-                                  }}
-                                  className="gap-1"
-                                >
-                                  <Zap className="h-3 w-3" />
-                                  הפעל
-                                </Button>
-                              )}
-                              
-                              {/* For inactive SIMs - show a disabled button with tooltip */}
-                              {item.status === 'inactive' && (
-                                <Badge variant="secondary" className="text-xs">
-                                  לא פעיל
-                                </Badge>
-                              )}
+                              {/* Activate button - works for both active and inactive SIMs */}
+                              <Button
+                                size="sm"
+                                variant={item.status === 'active' ? 'default' : 'secondary'}
+                                onClick={() => {
+                                  setSelectedSim(item);
+                                  setActiveTab('activate');
+                                }}
+                                className="gap-1"
+                                title={item.status === 'inactive' ? 'הפעל סים לא פעיל' : 'הפעל סים'}
+                              >
+                                <Zap className="h-3 w-3" />
+                                {item.status === 'inactive' ? 'הפעל סים' : 'הפעל'}
+                              </Button>
                             </div>
                           </TableCell>
                         </TableRow>
