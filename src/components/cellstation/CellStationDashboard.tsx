@@ -196,9 +196,10 @@ const formatDate = (dateString: string): string => {
 };
 
 // Format phone number - add leading 0 if missing (all phones should start with 0)
-const formatPhone = (phone: string): string => {
-  if (!phone) return '';
-  const cleaned = phone.replace(/\D/g, '');
+const formatPhone = (phone: string | number | null | undefined): string => {
+  if (phone === null || phone === undefined || phone === '') return '';
+  const str = String(phone);
+  const cleaned = str.replace(/\D/g, '');
   if (cleaned.length === 9 && !cleaned.startsWith('0')) {
     return '0' + cleaned;
   }
@@ -206,9 +207,10 @@ const formatPhone = (phone: string): string => {
 };
 
 // Format local number - add leading 0 if missing (for 07xxx numbers)
-const formatLocalNumber = (num: string): string => {
-  if (!num) return '';
-  const cleaned = num.replace(/\D/g, '');
+const formatLocalNumber = (num: string | number | null | undefined): string => {
+  if (num === null || num === undefined || num === '') return '';
+  const str = String(num);
+  const cleaned = str.replace(/\D/g, '');
   if (cleaned.startsWith('7') && cleaned.length === 9) {
     return '0' + cleaned;
   }
