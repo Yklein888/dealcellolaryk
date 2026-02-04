@@ -367,8 +367,8 @@ export function CellStationDashboard() {
   const filteredRentals = useMemo(() => rentals.filter(r =>
     !searchTerm ||
     r.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    r.local_number?.includes(searchTerm) ||
-    r.sim?.includes(searchTerm)
+    String(r.local_number || '').includes(searchTerm) ||
+    String(r.sim || '').includes(searchTerm)
   ), [rentals, searchTerm]);
 
   // Filter inventory by status and search term
@@ -385,9 +385,9 @@ export function CellStationDashboard() {
     // Filter by search term
     if (searchTerm) {
       result = result.filter(s =>
-        s.local_number?.includes(searchTerm) ||
-        s.sim?.includes(searchTerm) ||
-        s.id?.includes(searchTerm)
+        String(s.local_number || '').includes(searchTerm) ||
+        String(s.sim || '').includes(searchTerm) ||
+        String(s.id || '').includes(searchTerm)
       );
     }
     
