@@ -1,220 +1,400 @@
 
-# תוכנית: דאשבורד CellStation מלא עם הפעלת סימים ויצירת השכרות
+# תוכנית שדרוג: דאשבורד CellStation עם פיצ'רים חכמים בעדיפות גבוהה
 
 ## סקירה כללית
-יצירת דאשבורד CellStation חדש ומקיף שמאפשר:
-1. תצוגת מלאי סימים מ-CellStation עם סטטיסטיקות
-2. הפעלת סים מתוך הממשק עם בחירת לקוח
-3. יצירת השכרה אוטומטית עם הסים שהופעל
-4. הדפסת הוראות חיוג ישירות מהדאשבורד
-5. ממשק אינטואיטיבי עם לשוניות (מלאי, הפעלה חדשה, לקוחות)
+שדרוג מקיף של דאשבורד CellStation כולל 5 פיצ'רים מתקדמים:
+1. **הדפסת הוראות חיוג** - כפתור הדפסה בטבלת המלאי ובסוף תהליך ההפעלה
+2. **חישוב מחיר אוטומטי** - חישוב מפורט לפי ימי עסקים (ללא שבתות וחגים)
+3. **באנדל עם מכשיר פשוט** - אפשרות להוספת מכשיר ב-5₪ ליום עסקים
+4. **אזהרות תוקף סים** - התראה ויזואלית אם הסים יפוג במהלך ההשכרה
+5. **סנכרון דו-כיווני עם Supabase** - יצירת השכרה אוטומטית ב-Supabase במקביל לשליחה ל-Google Script
 
-## מבנה הפתרון
+## ממשק משתמש משודרג
 
-### שלב 1: יצירת קומפוננטת דאשבורד CellStation חכמה
-קובץ חדש: `src/components/cellstation/CellStationDashboard.tsx`
-
-הקומפוננטה תכלול:
-- **לשונית מלאי סימים**: תצוגת טבלה עם כל הסימים, סינון וחיפוש
-- **לשונית הפעלה חדשה**: 
-  - בחירת סים פנוי מהמלאי
-  - בחירת לקוח קיים או הוספת לקוח חדש
-  - בחירת תאריכי השכרה
-  - כפתור הפעלה שמבצע:
-    1. שליחת פקודה ל-Google Script
-    2. יצירת השכרה חדשה במערכת
-    3. הוספה למלאי אם הסים לא קיים
-- **לשונית לקוחות**: רשימת לקוחות עם אפשרות הוספה
-
-### שלב 2: עדכון דף SimCards
-עדכון `src/pages/SimCards.tsx` להשתמש בדאשבורד החדש
-
-### שלב 3: אינטגרציה עם מערכת ההשכרות
-חיבור לפונקציות קיימות:
-- `addRental` - יצירת השכרה חדשה
-- `addInventoryItem` - הוספת סים למלאי
-- `addCustomer` - הוספת לקוח חדש
-- `printCallingInstructions` - הדפסת הוראות
-
-## פירוט טכני
-
-### קומפוננטות חדשות
+### לשונית הפעלה חדשה (מעודכנת)
 
 ```text
-src/components/cellstation/
-├── CellStationDashboard.tsx      # קומפוננטה ראשית
-├── SimInventoryTab.tsx           # לשונית מלאי
-├── ActivationTab.tsx             # לשונית הפעלה
-├── CustomersTab.tsx              # לשונית לקוחות
-└── SimActivationForm.tsx         # טופס הפעלה מלא
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  ⚡ הפעלת השכרה חדשה                                                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌────────────────────────────┐  ┌────────────────────────────────────────┐ │
+│  │  📱 בחר סים פנוי:          │  │  👤 פרטי לקוח:                         │ │
+│  │  ┌────────────────────┐   │  │  שם: [_________________]               │ │
+│  │  │ 7225-XXX - Golan ▼ │   │  │  טלפון: [_____________]                │ │
+│  │  └────────────────────┘   │  └────────────────────────────────────────┘ │
+│  │                           │                                             │
+│  │  ┌────────────────────────┐  ┌────────────────────────────────────────┐ │
+│  │  │ ✅ סים נבחר:           │  │  📅 תאריכים:                           │ │
+│  │  │ ICCID: 8972509...     │  │  [שבוע] [שבועיים] [חודש] [מותאם]       │ │
+│  │  │ מקומי: 7225-XXX-XXX   │  │  התחלה: [04/02/2026]                   │ │
+│  │  │ ישראלי: 44-XXX-XXX    │  │  סיום:  [11/02/2026]                   │ │
+│  │  │ תוקף: 15/06/2026      │  │                                         │ │
+│  │  │ ⚠️ הסים יפוג ב-X ימים │  │  ⚠️ הסים פג תוקף לפני סיום ההשכרה!    │ │
+│  │  └────────────────────────┘  └────────────────────────────────────────┘ │
+│  └────────────────────────────┘                                            │
+│                                                                             │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │  📦 באנדל עם מכשיר:                                                  │  │
+│  │  ☑️ הוסף מכשיר פשוט (+5₪ ליום עסקים)                                │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │  💰 פירוט מחיר:                                                       │  │
+│  │  ┌─────────────────────────────────────────────────────────────────┐ │  │
+│  │  │ סים אירופאי (7 ימים)                              ₪200.00      │ │  │
+│  │  │ מכשיר פשוט (5 ימי עסקים × ₪5)                     ₪25.00       │ │  │
+│  │  ├─────────────────────────────────────────────────────────────────┤ │  │
+│  │  │ ימים שהוחרגו: שבת 08/02, שבת 15/02                             │ │  │
+│  │  ├─────────────────────────────────────────────────────────────────┤ │  │
+│  │  │ סה"כ לתשלום:                                      ₪225.00      │ │  │
+│  │  └─────────────────────────────────────────────────────────────────┘ │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+│                    ┌────────────────────────────────────────┐              │
+│                    │  ⚡ הפעל והשכר (שלח ל-CellStation)      │              │
+│                    └────────────────────────────────────────┘              │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### תהליך הפעלה משולב
+### דיאלוג הצלחה משופר
 
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
-│                    תהליך הפעלת סים חכם                         │
+│                    ✅ ההפעלה נשלחה בהצלחה!                       │
 ├─────────────────────────────────────────────────────────────────┤
-│  1. בחירת סים פנוי                                              │
-│     ↓                                                          │
-│  2. בחירת/הוספת לקוח                                            │
-│     ↓                                                          │
-│  3. בחירת תאריכי השכרה                                          │
-│     ↓                                                          │
-│  4. לחיצה על "הפעל והשכר"                                       │
-│     ↓                                                          │
-│  ┌──────────────────────────────────────────────────────┐      │
-│  │ פעולות אוטומטיות:                                    │      │
-│  │  a. שליחת POST ל-Google Script (set_pending)        │      │
-│  │  b. עדכון סטטוס סים ל-pending                        │      │
-│  │  c. הוספת סים למלאי (אם לא קיים)                     │      │
-│  │  d. יצירת השכרה חדשה                                 │      │
-│  │  e. הצעת הדפסת הוראות חיוג                           │      │
-│  └──────────────────────────────────────────────────────┘      │
-│     ↓                                                          │
-│  5. הודעה למשתמש: "לחץ על Bookmarklet ב-CellStation"           │
+│                                                                 │
+│   📱 SIM: 8972509020XXXX (7225-XXX-XXXX)                       │
+│   👤 לקוח: ישראל ישראלי                                         │
+│   📅 תקופה: 04/02/2026 - 11/02/2026                            │
+│   💰 מחיר: ₪225.00                                              │
+│                                                                 │
+│   ✅ נוצרה השכרה חדשה במערכת                                    │
+│   ✅ הסים נוסף למלאי הראשי                                      │
+│                                                                 │
+│   ⚠️ עכשיו לחץ על הסימנייה באתר CellStation                    │
+│      כדי להשלים את ההפעלה                                       │
+│                                                                 │
+│   ┌────────────────────┐   ┌────────────────────┐              │
+│   │  🖨️ הדפס הוראות    │   │  ← חזור לדאשבורד  │              │
+│   │     חיוג          │   │                    │              │
+│   └────────────────────┘   └────────────────────┘              │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### ממשק משתמש
+### לשונית מלאי (משודרגת)
 
-**לשונית מלאי סימים:**
-- כרטיסי סטטיסטיקה (סה"כ, פעילים, פנויים, עומדים לפוג)
-- חיפוש לפי ICCID, מספר ישראלי, מספר מקומי
-- סינון לפי סטטוס (פעיל/לא פעיל/פנוי/בהשכרה)
-- טבלה עם עמודות: SIM, מספר מקומי, מספר ישראלי, תוכנית, תוקף, סטטוס, פעולות
-- כפתורי פעולה: הפעל, הוסף למלאי, הדפס הוראות
+עמודת "פעולות" משודרגת עם:
+- כפתור **"הפעל"** - מעביר ללשונית הפעלה
+- כפתור **"🖨️"** - הדפסת הוראות חיוג ישירות
+- תג **אזהרת תוקף** - אם הסים עומד לפוג
 
-**לשונית הפעלה חדשה:**
-- בחירת סים מרשימה נפתחת (רק סימים פנויים)
-- תצוגת פרטי הסים הנבחר
-- חיפוש ובחירת לקוח מרשימה
-- כפתור הוספת לקוח חדש מהיר
-- בחירת טווח תאריכים עם לוח עברי
-- תצוגת מחיר מחושב
-- כפתור "הפעל והשכר" ראשי
+## פירוט טכני
 
-**לשונית לקוחות:**
-- רשימת לקוחות קיימים
-- חיפוש לקוחות
-- כפתור הוספת לקוח חדש
+### שינויים בקובץ CellStationDashboard.tsx
 
-### שדות נתונים
-
-**SimCard (מ-CellStation):**
-- sim_number (ICCID)
-- local_number (מספר מקומי)
-- israeli_number (מספר ישראלי)
-- package_name (תוכנית)
-- expiry_date (תוקף)
-- is_active (האם פעיל)
-- activation_status (none/pending/activated/failed)
-
-**הפעלה + השכרה:**
-- selectedSim: SimCard
-- selectedCustomerId: string
-- customerName: string
-- startDate: Date
-- endDate: Date
-- deposit?: number
-- notes?: string
-
-### פעולות API
-
-1. **שליחת הפעלה ל-Google Script:**
+#### 1. ייבוא פונקציות קיימות
 ```typescript
-POST https://script.google.com/macros/s/AKfycbw5Zv5OWnH8UI0dCzfBR37maMDRf0NwIsX8PxREugD5lSSLKC2KYx9P72c0qQkb-TpA/exec
-{
-  action: 'set_pending',
-  sim: simNumber,
-  customerName: customerName,
-  startDate: startDate,
-  endDate: endDate
-}
+// ייבוא מהמערכת הקיימת
+import { printCallingInstructions } from '@/lib/callingInstructions';
+import { 
+  calculateRentalPrice, 
+  getExcludedDaysBreakdown, 
+  EUROPEAN_BUNDLE_DEVICE_RATE 
+} from '@/lib/pricing';
+import { useRental } from '@/hooks/useRental';
 ```
 
-2. **הוספת סים למלאי (אם לא קיים):**
+#### 2. State חדשים
 ```typescript
-addInventoryItem({
-  category: 'sim_european',
-  name: `סים ${localNumber || simNumber}`,
-  localNumber,
-  israeliNumber,
-  expiryDate,
-  simNumber,
-  status: 'available'
-})
+// באנדל מכשיר
+const [includeDevice, setIncludeDevice] = useState(false);
+
+// מחיר מחושב
+const [calculatedPrice, setCalculatedPrice] = useState<{
+  total: number;
+  breakdown: Array<{ item: string; price: number; currency: string; details?: string }>;
+  businessDaysInfo?: { businessDays: number; excludedDates: string[] };
+} | null>(null);
+
+// דיאלוג הצלחה
+const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+const [lastActivation, setLastActivation] = useState<{
+  sim: InventoryItem;
+  customerName: string;
+  price: number;
+  startDate: string;
+  endDate: string;
+} | null>(null);
 ```
 
-3. **יצירת השכרה:**
+#### 3. חישוב מחיר אוטומטי
 ```typescript
-addRental({
-  customerId,
-  customerName,
-  items: [{
-    inventoryItemId,
-    itemCategory: 'sim_european',
-    itemName: `סים אירופאי - ${localNumber}`,
-    hasIsraeliNumber: false
-  }],
-  startDate,
-  endDate,
-  totalPrice,
-  currency: 'USD',
-  status: 'active'
-})
+// Effect לחישוב מחיר בזמן אמת
+useEffect(() => {
+  if (!selectedSim || !startDate || !endDate) {
+    setCalculatedPrice(null);
+    return;
+  }
+
+  const items = [
+    { category: 'sim_european' as ItemCategory, includeEuropeanDevice: includeDevice }
+  ];
+
+  const result = calculateRentalPrice(items, startDate, endDate);
+  setCalculatedPrice({
+    total: result.ilsTotal || result.total,
+    breakdown: result.breakdown,
+    businessDaysInfo: result.businessDaysInfo
+  });
+}, [selectedSim, startDate, endDate, includeDevice]);
 ```
 
-4. **הדפסת הוראות:**
+#### 4. בדיקת תוקף סים
 ```typescript
-printCallingInstructions(israeliNumber, localNumber, barcode, false, packageName, expiryDate)
+const getSimExpiryWarning = (sim: InventoryItem, endDate: string): string | null => {
+  if (!sim.expiry || !endDate) return null;
+  
+  const expiryParts = sim.expiry.split('/');
+  if (expiryParts.length !== 3) return null;
+  
+  const expiryDate = new Date(
+    parseInt(expiryParts[2]), 
+    parseInt(expiryParts[1]) - 1, 
+    parseInt(expiryParts[0])
+  );
+  const rentalEnd = new Date(endDate);
+  
+  if (expiryDate < rentalEnd) {
+    const daysUntilExpiry = Math.ceil((expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    return `הסים יפוג ב-${daysUntilExpiry} ימים - לפני סיום ההשכרה!`;
+  }
+  return null;
+};
 ```
 
-### תצוגת סטטוס הפעלה
+#### 5. פונקציית הפעלה משודרגת עם סנכרון Supabase
+```typescript
+const handleActivateAndRent = async () => {
+  if (!selectedSim || !customerName || !startDate || !endDate) {
+    toast({ title: 'שגיאה', description: 'נא למלא את כל השדות', variant: 'destructive' });
+    return;
+  }
 
-| סטטוס | אייקון | צבע | הודעה |
-|-------|--------|-----|--------|
-| none | ⚪ | אפור | לא הופעל |
-| pending | 🔄 | צהוב | ממתין להפעלה |
-| activated | ✅ | ירוק | הופעל |
-| failed | ❌ | אדום | נכשל |
+  try {
+    // שלב 1: שליחה ל-Google Script
+    await fetch(WEBAPP_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'activate',
+        sim: selectedSim.sim,
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        start_date: startDate,
+        end_date: endDate,
+        price: calculatedPrice?.total || price
+      })
+    });
 
-### דיאלוג אישור לאחר הפעלה
+    // שלב 2: הוספה למלאי Supabase (אם לא קיים)
+    const existingItem = inventory.find(i => i.simNumber === selectedSim.sim);
+    let inventoryItemId = existingItem?.id;
 
-לאחר הפעלה מוצלחת:
+    if (!existingItem) {
+      await addInventoryItem({
+        category: 'sim_european',
+        name: `סים ${selectedSim.local_number}`,
+        localNumber: selectedSim.local_number,
+        israeliNumber: selectedSim.israel_number,
+        expiryDate: parseExpiryDate(selectedSim.expiry),
+        simNumber: selectedSim.sim,
+        status: 'available'
+      });
+      // קבל את ה-ID של הפריט החדש
+      const newItem = inventory.find(i => i.simNumber === selectedSim.sim);
+      inventoryItemId = newItem?.id;
+    }
+
+    // שלב 3: יצירת השכרה ב-Supabase
+    const rentalItems = [
+      {
+        inventoryItemId: inventoryItemId || '',
+        itemCategory: 'sim_european' as ItemCategory,
+        itemName: `סים אירופאי - ${selectedSim.local_number}`,
+        hasIsraeliNumber: !!selectedSim.israel_number,
+        isGeneric: false
+      }
+    ];
+
+    // הוספת מכשיר לבאנדל
+    if (includeDevice) {
+      rentalItems.push({
+        inventoryItemId: '',
+        itemCategory: 'device_simple' as ItemCategory,
+        itemName: 'מכשיר פשוט (באנדל אירופאי)',
+        hasIsraeliNumber: false,
+        isGeneric: true // מכשיר פשוט לא דורש פריט מלאי
+      });
+    }
+
+    await addRental({
+      customerId: '', // יימצא לפי שם הלקוח
+      customerName,
+      items: rentalItems,
+      startDate,
+      endDate,
+      totalPrice: calculatedPrice?.total || parseFloat(price) || 0,
+      currency: 'ILS',
+      status: 'active',
+      notes: `הופעל מ-CellStation Dashboard | טלפון: ${customerPhone}`
+    });
+
+    // שלב 4: הצגת דיאלוג הצלחה
+    setLastActivation({
+      sim: selectedSim,
+      customerName,
+      price: calculatedPrice?.total || 0,
+      startDate,
+      endDate
+    });
+    setShowSuccessDialog(true);
+
+    // איפוס הטופס
+    resetForm();
+
+  } catch (error: any) {
+    toast({
+      title: 'שגיאה',
+      description: error.message || 'נכשל בהפעלה',
+      variant: 'destructive'
+    });
+  }
+};
 ```
-┌─────────────────────────────────────────────┐
-│           ✅ ההפעלה נשלחה בהצלחה!           │
-├─────────────────────────────────────────────┤
-│  SIM: 8972509020123456789                   │
-│  לקוח: ישראל ישראלי                         │
-│  תאריכים: 03/02/2026 - 10/02/2026          │
-│                                             │
-│  ⚠️ לחץ על Bookmarklet באתר CellStation    │
-│     כדי להשלים את ההפעלה                    │
-│                                             │
-│  ┌─────────────┐  ┌──────────────────┐     │
-│  │ 🖨️ הדפס     │  │ ← חזור לדאשבורד │     │
-│  │   הוראות   │  │                  │     │
-│  └─────────────┘  └──────────────────┘     │
-└─────────────────────────────────────────────┘
+
+#### 6. כפתור הדפסת הוראות
+```typescript
+const handlePrintInstructions = async (sim: InventoryItem) => {
+  try {
+    await printCallingInstructions(
+      sim.israel_number,
+      sim.local_number,
+      `SIM-${sim.sim.slice(-8)}`, // ברקוד
+      false, // סים אירופאי
+      sim.plan,
+      sim.expiry
+    );
+    toast({ title: 'הודפס בהצלחה', description: 'ההוראות נשלחו למדפסת' });
+  } catch (error) {
+    toast({ title: 'שגיאה בהדפסה', variant: 'destructive' });
+  }
+};
 ```
 
-## קבצים שייווצרו/יעודכנו
+### רכיבי UI חדשים
+
+#### תצוגת פירוט מחיר
+```typescript
+{calculatedPrice && (
+  <Card className="bg-primary/10 border-primary/30">
+    <CardContent className="p-4">
+      <h4 className="font-semibold mb-2 flex items-center gap-2">
+        <Calculator className="h-4 w-4" />
+        פירוט מחיר
+      </h4>
+      {calculatedPrice.breakdown.map((item, idx) => (
+        <div key={idx} className="flex justify-between text-sm">
+          <span>{item.item}</span>
+          <span>{item.currency}{item.price.toFixed(2)}</span>
+        </div>
+      ))}
+      {calculatedPrice.businessDaysInfo && (
+        <div className="text-xs text-muted-foreground mt-2 border-t pt-2">
+          ימים שהוחרגו: {calculatedPrice.businessDaysInfo.excludedDates.slice(0, 3).join(', ')}
+          {calculatedPrice.businessDaysInfo.excludedDates.length > 3 && '...'}
+        </div>
+      )}
+      <div className="border-t pt-2 mt-2 flex justify-between font-bold">
+        <span>סה"כ</span>
+        <span>₪{calculatedPrice.total.toFixed(2)}</span>
+      </div>
+    </CardContent>
+  </Card>
+)}
+```
+
+#### אזהרת תוקף סים
+```typescript
+{selectedSim && endDate && getSimExpiryWarning(selectedSim, endDate) && (
+  <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning/30 rounded-lg text-warning">
+    <AlertTriangle className="h-5 w-5" />
+    <span className="text-sm font-medium">
+      {getSimExpiryWarning(selectedSim, endDate)}
+    </span>
+  </div>
+)}
+```
+
+## קבצים שיעודכנו
 
 | קובץ | פעולה | תיאור |
 |------|-------|--------|
-| `src/components/cellstation/CellStationDashboard.tsx` | חדש | קומפוננטה ראשית |
-| `src/components/cellstation/SimInventoryTab.tsx` | חדש | לשונית מלאי |
-| `src/components/cellstation/ActivationTab.tsx` | חדש | לשונית הפעלה |
-| `src/components/cellstation/SimActivationForm.tsx` | חדש | טופס הפעלה מלא |
-| `src/pages/SimCards.tsx` | עדכון | שימוש בדאשבורד החדש |
+| `src/components/cellstation/CellStationDashboard.tsx` | עדכון מקיף | הוספת כל הפיצ'רים החכמים |
+
+## תלויות בפונקציות קיימות
+
+הדאשבורד המשודרג ישתמש בפונקציות שכבר קיימות במערכת:
+
+| פונקציה | מיקום | שימוש |
+|---------|-------|-------|
+| `printCallingInstructions` | `src/lib/callingInstructions.ts` | הדפסת PDF עם הוראות חיוג |
+| `calculateRentalPrice` | `src/lib/pricing.ts` | חישוב מחיר לפי ימי עסקים |
+| `getExcludedDaysBreakdown` | `src/lib/pricing.ts` | פירוט ימים שהוחרגו |
+| `addRental` | `src/hooks/useRental.tsx` | יצירת השכרה ב-Supabase |
+| `addInventoryItem` | `src/hooks/useRental.tsx` | הוספת סים למלאי |
+
+## זרימת תהליך משודרגת
+
+```text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         תהליך "הפעל והשכר" משודרג                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   1. בחירת סים פנוי מרשימת CellStation                                      │
+│      ↓                                                                      │
+│   2. מילוי פרטי לקוח (עם בדיקה אם קיים ב-Supabase)                         │
+│      ↓                                                                      │
+│   3. בחירת תאריכים (עם אזהרה אם הסים יפוג)                                  │
+│      ↓                                                                      │
+│   4. בחירה אם להוסיף מכשיר פשוט לבאנדל                                      │
+│      ↓                                                                      │
+│   5. צפייה במחיר מחושב אוטומטית                                             │
+│      ↓                                                                      │
+│   6. לחיצה על "הפעל והשכר"                                                  │
+│      ↓                                                                      │
+│   ┌───────────────────────────────────────────────────────────────────┐    │
+│   │                       פעולות במקביל                               │    │
+│   │  ┌─────────────────────┐  ┌─────────────────────────────────────┐ │    │
+│   │  │ Google Script       │  │ Supabase                            │ │    │
+│   │  │ - action: activate  │  │ - הוספה למלאי (אם חדש)              │ │    │
+│   │  │ - ממתין לבוקמרקלט   │  │ - יצירת השכרה + פריטים              │ │    │
+│   │  └─────────────────────┘  │ - עדכון סטטוס לrented               │ │    │
+│   │                           └─────────────────────────────────────┘ │    │
+│   └───────────────────────────────────────────────────────────────────┘    │
+│      ↓                                                                      │
+│   7. דיאלוג הצלחה עם אפשרות הדפסת הוראות                                   │
+│      ↓                                                                      │
+│   8. המשתמש לוחץ על בוקמרקלט ב-CellStation להשלמת ההפעלה                   │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
 
 ## יתרונות הפתרון
 
-1. **תהליך אחיד**: הפעלה + השכרה בפעולה אחת
-2. **חכם**: בודק אם הסים במלאי ומוסיף אוטומטית
-3. **מהיר**: אין צורך לעבור בין דפים
-4. **שלם**: כולל הדפסת הוראות בסוף התהליך
-5. **אינטואיטיבי**: ממשק דומה לדאשבורד הקיים שכבר עובד
-6. **משולב**: מנצל את כל הפונקציות הקיימות במערכת
+1. **סנכרון מלא** - ההשכרה נוצרת גם ב-CellStation וגם ב-Supabase
+2. **חישוב מדויק** - מחיר מחושב אוטומטית לפי ימי עסקים בלבד
+3. **מניעת טעויות** - אזהרה ברורה כשהסים עומד לפוג
+4. **תהליך מהיר** - הדפסת הוראות בלחיצה אחת
+5. **גמישות** - אפשרות להוסיף מכשיר לבאנדל בקלות
+6. **שימוש בקוד קיים** - ניצול הפונקציות הקיימות במערכת
