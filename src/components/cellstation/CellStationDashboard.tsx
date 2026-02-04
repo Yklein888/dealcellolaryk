@@ -30,6 +30,17 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
   RefreshCw,
   Package,
   Smartphone,
@@ -47,8 +58,11 @@ import {
   Printer,
   Calculator,
   Plus,
+  Info,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, normalizeForSearch } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useRental } from '@/hooks/useRental';
@@ -58,7 +72,7 @@ import {
   getExcludedDaysBreakdown, 
   EUROPEAN_BUNDLE_DEVICE_RATE 
 } from '@/lib/pricing';
-import { ItemCategory } from '@/types/rental';
+import { ItemCategory, Rental as SupabaseRental } from '@/types/rental';
 
 // ============================================
 // Cell Station Dashboard v5.0
@@ -247,6 +261,7 @@ export function CellStationDashboard() {
     addRental, 
     addInventoryItem, 
     inventory: supabaseInventory,
+    rentals: supabaseRentals,
     customers: supabaseCustomers,
     refreshData: refreshSupabaseData 
   } = useRental();
@@ -292,6 +307,69 @@ export function CellStationDashboard() {
   // Replace form state
   const [selectedRental, setSelectedRental] = useState<Rental | null>(null);
   const [newSim, setNewSim] = useState('');
+
+  // Expanded rental details state
+  const [expandedRentalIds, setExpandedRentalIds] = useState<Set<string>>(new Set());
+
+  // Toggle expanded rental details
+  const toggleRentalExpanded = (rentalId: string) => {
+    setExpandedRentalIds(prev => {
+      const next = new Set(prev);
+      if (next.has(rentalId)) {
+        next.delete(rentalId);
+      } else {
+        next.add(rentalId);
+      }
+      return next;
+    });
+  };
+
+  // === Get main system rental info for a SIM ===
+  const getMainSystemRentalInfo = (localNumber: string | null, simNumber: string | null): {
+    status: 'not_found' | 'available' | 'rented' | 'overdue';
+    rental?: SupabaseRental;
+    customerName?: string;
+    endDate?: string;
+  } => {
+    if (!localNumber && !simNumber) return { status: 'not_found' };
+    
+    const normalizedLocal = normalizeForSearch(localNumber);
+    const normalizedSim = normalizeForSearch(simNumber);
+    
+    // Find matching inventory item in Supabase
+    const matchingItem = supabaseInventory.find(item => {
+      const itemLocalNorm = normalizeForSearch(item.localNumber);
+      const itemSimNorm = normalizeForSearch(item.simNumber);
+      return (normalizedLocal && itemLocalNorm === normalizedLocal) ||
+             (normalizedSim && itemSimNorm === normalizedSim);
+    });
+
+    if (!matchingItem) return { status: 'not_found' };
+    
+    if (matchingItem.status === 'available') return { status: 'available' };
+    
+    if (matchingItem.status === 'rented') {
+      // Find the active rental
+      const activeRental = supabaseRentals.find(r => 
+        r.status !== 'returned' &&
+        r.items.some(item => item.inventoryItemId === matchingItem.id)
+      );
+      
+      if (activeRental) {
+        const isOverdue = activeRental.status === 'overdue' || 
+          new Date(activeRental.endDate) < new Date();
+        
+        return {
+          status: isOverdue ? 'overdue' : 'rented',
+          rental: activeRental,
+          customerName: activeRental.customerName,
+          endDate: activeRental.endDate
+        };
+      }
+    }
+    
+    return { status: 'not_found' };
+  };
 
   // === Calculate price effect ===
   useEffect(() => {
@@ -363,15 +441,28 @@ export function CellStationDashboard() {
     setEndDate(end);
   };
 
-  // Filter rentals
-  const filteredRentals = useMemo(() => rentals.filter(r =>
-    !searchTerm ||
-    r.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    String(r.local_number || '').includes(searchTerm) ||
-    String(r.sim || '').includes(searchTerm)
-  ), [rentals, searchTerm]);
+  // Filter rentals with smart search (ignores dashes)
+  const filteredRentals = useMemo(() => {
+    if (!searchTerm) return rentals;
+    
+    const searchNormalized = normalizeForSearch(searchTerm);
+    const searchLower = searchTerm.toLowerCase();
+    
+    return rentals.filter(r => {
+      const localNormalized = normalizeForSearch(r.local_number);
+      const phoneNormalized = normalizeForSearch(r.customer_phone);
+      const simNormalized = normalizeForSearch(r.sim);
+      
+      return (
+        r.customer_name?.toLowerCase().includes(searchLower) ||
+        localNormalized.includes(searchNormalized) ||
+        phoneNormalized.includes(searchNormalized) ||
+        simNormalized.includes(searchNormalized)
+      );
+    });
+  }, [rentals, searchTerm]);
 
-  // Filter inventory by status and search term
+  // Filter inventory by status and search term with smart search
   const filteredInventory = useMemo(() => {
     let result = inventory;
     
@@ -382,13 +473,20 @@ export function CellStationDashboard() {
       result = result.filter(s => s.status === 'inactive');
     }
     
-    // Filter by search term
+    // Filter by search term with smart search
     if (searchTerm) {
-      result = result.filter(s =>
-        String(s.local_number || '').includes(searchTerm) ||
-        String(s.sim || '').includes(searchTerm) ||
-        String(s.id || '').includes(searchTerm)
-      );
+      const searchNormalized = normalizeForSearch(searchTerm);
+      result = result.filter(s => {
+        const localNormalized = normalizeForSearch(s.local_number);
+        const simNormalized = normalizeForSearch(s.sim);
+        const idNormalized = normalizeForSearch(s.id);
+        
+        return (
+          localNormalized.includes(searchNormalized) ||
+          simNormalized.includes(searchNormalized) ||
+          idNormalized.includes(searchNormalized)
+        );
+      });
     }
     
     return result;
@@ -768,14 +866,19 @@ export function CellStationDashboard() {
         <TabsContent value="rentals">
           <Card className="glass-card">
             <CardContent className="pt-6">
-              <div className="relative mb-4">
-                <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="🔍 חיפוש לפי שם לקוח או מספר..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pr-10"
-                />
+              <div className="mb-4">
+                <div className="relative">
+                  <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="🔍 חיפוש חכם - עם או בלי מקפים..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pr-10"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  💡 החיפוש מזהה מספרים בכל פורמט (עם/בלי מקפים)
+                </p>
               </div>
 
               {loading ? (
@@ -791,50 +894,178 @@ export function CellStationDashboard() {
                   <Table className="w-full text-right" dir="rtl">
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="text-right w-8"></TableHead>
                         <TableHead className="text-right">לקוח</TableHead>
                         <TableHead className="text-right">טלפון</TableHead>
                         <TableHead className="text-right">מספר מקומי</TableHead>
                         <TableHead className="text-right">תוכנית</TableHead>
-                        <TableHead className="text-right">התחלה</TableHead>
                         <TableHead className="text-right">סיום</TableHead>
-                        <TableHead className="text-right">ימים</TableHead>
-                        <TableHead className="text-right">סטטוס</TableHead>
+                        <TableHead className="text-right">סטטוס CellStation</TableHead>
+                        <TableHead className="text-right">סטטוס מערכת</TableHead>
                         <TableHead className="text-right">פעולות</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredRentals.map((rental, idx) => (
-                        <TableRow key={idx}>
-                          <TableCell className="font-medium">{rental.customer_name}</TableCell>
-                          <TableCell>{formatPhone(rental.customer_phone)}</TableCell>
-                          <TableCell className="font-mono text-sm">{formatLocalNumber(rental.local_number)}</TableCell>
-                          <TableCell>{rental.plan}</TableCell>
-                          <TableCell>{formatDate(rental.start_date)}</TableCell>
-                          <TableCell>{formatDate(rental.end_date)}</TableCell>
-                          <TableCell className="text-center">{rental.days}</TableCell>
-                          <TableCell>
-                            <Badge variant={getStatusVariant(rental.status)}>
-                              {rental.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-1">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => {
-                                  setSelectedRental(rental);
-                                  setActiveTab('replace');
-                                }}
-                                className="gap-1"
-                              >
-                                <ArrowLeftRight className="h-3 w-3" />
-                                החלפה
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {filteredRentals.map((rental, idx) => {
+                        const rentalId = rental.rental_id || `${idx}`;
+                        const isExpanded = expandedRentalIds.has(rentalId);
+                        const mainSystemInfo = getMainSystemRentalInfo(rental.local_number, rental.sim);
+                        
+                        return (
+                          <React.Fragment key={idx}>
+                            <TableRow className="hover:bg-muted/30">
+                              <TableCell className="p-1">
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 w-8 p-0"
+                                        onClick={() => toggleRentalExpanded(rentalId)}
+                                      >
+                                        {isExpanded ? (
+                                          <ChevronUp className="h-4 w-4" />
+                                        ) : (
+                                          <Info className="h-4 w-4 text-muted-foreground" />
+                                        )}
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>מידע נוסף</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </TableCell>
+                              <TableCell className="font-medium">{rental.customer_name}</TableCell>
+                              <TableCell>{formatPhone(rental.customer_phone)}</TableCell>
+                              <TableCell className="font-mono text-sm">{formatLocalNumber(rental.local_number)}</TableCell>
+                              <TableCell>{rental.plan}</TableCell>
+                              <TableCell>{formatDate(rental.end_date)}</TableCell>
+                              <TableCell>
+                                <Badge variant={getStatusVariant(rental.status)}>
+                                  {rental.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                {mainSystemInfo.status === 'not_found' && (
+                                  <Badge variant="outline" className="text-muted-foreground">
+                                    לא במערכת
+                                  </Badge>
+                                )}
+                                {mainSystemInfo.status === 'available' && (
+                                  <Badge variant="success" className="gap-1">
+                                    <CheckCircle className="h-3 w-3" />
+                                    זמין
+                                  </Badge>
+                                )}
+                                {mainSystemInfo.status === 'rented' && (
+                                  <Badge className="bg-primary/20 text-primary border-primary/30 gap-1">
+                                    📱 מושכר
+                                  </Badge>
+                                )}
+                                {mainSystemInfo.status === 'overdue' && (
+                                  <Badge variant="destructive" className="gap-1">
+                                    <AlertTriangle className="h-3 w-3" />
+                                    באיחור!
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    setSelectedRental(rental);
+                                    setActiveTab('replace');
+                                  }}
+                                  className="gap-1"
+                                >
+                                  <ArrowLeftRight className="h-3 w-3" />
+                                  החלפה
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                            
+                            {/* Expanded Details Row */}
+                            {isExpanded && (
+                              <TableRow className="bg-muted/20 hover:bg-muted/30">
+                                <TableCell colSpan={9} className="p-0">
+                                  <div className="p-4 space-y-3 border-r-4 border-primary/30">
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                      <div>
+                                        <span className="text-muted-foreground block">👤 לקוח</span>
+                                        <span className="font-medium">{rental.customer_name}</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-muted-foreground block">📞 טלפון</span>
+                                        <span className="font-mono">{formatPhone(rental.customer_phone)}</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-muted-foreground block">📅 תאריך התחלה</span>
+                                        <span>{formatDate(rental.start_date)}</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-muted-foreground block">📅 תאריך סיום</span>
+                                        <span>{formatDate(rental.end_date)}</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-muted-foreground block">📱 מספר סים (ICCID)</span>
+                                        <span className="font-mono text-xs">{rental.sim}</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-muted-foreground block">🌍 מספר מקומי</span>
+                                        <span className="font-mono">{formatLocalNumber(rental.local_number)}</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-muted-foreground block">🇮🇱 מספר ישראלי</span>
+                                        <span className="font-mono">{rental.israel_number || 'אין'}</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-muted-foreground block">📋 ימים</span>
+                                        <span>{rental.days}</span>
+                                      </div>
+                                    </div>
+                                    
+                                    {/* Main System Info */}
+                                    {mainSystemInfo.status !== 'not_found' && mainSystemInfo.rental && (
+                                      <div className={cn(
+                                        "p-3 rounded-lg border",
+                                        mainSystemInfo.status === 'overdue' 
+                                          ? "bg-destructive/10 border-destructive/30" 
+                                          : "bg-primary/10 border-primary/30"
+                                      )}>
+                                        <div className="flex items-center gap-2 mb-2">
+                                          {mainSystemInfo.status === 'overdue' ? (
+                                            <AlertTriangle className="h-4 w-4 text-destructive" />
+                                          ) : (
+                                            <Package className="h-4 w-4 text-primary" />
+                                          )}
+                                          <span className="font-medium">
+                                            {mainSystemInfo.status === 'overdue' 
+                                              ? '⚠️ באיחור במערכת ההשכרות!' 
+                                              : '📱 מושכר במערכת ההשכרות'}
+                                          </span>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2 text-sm">
+                                          <div>
+                                            <span className="text-muted-foreground">לקוח במערכת: </span>
+                                            <span className="font-medium">{mainSystemInfo.customerName}</span>
+                                          </div>
+                                          <div>
+                                            <span className="text-muted-foreground">תאריך החזרה: </span>
+                                            <span className="font-medium">{mainSystemInfo.endDate ? formatDate(mainSystemInfo.endDate) : '-'}</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
@@ -889,81 +1120,136 @@ export function CellStationDashboard() {
                         <TableHead className="text-right">מספר ישראלי</TableHead>
                         <TableHead className="text-right">תוכנית</TableHead>
                         <TableHead className="text-right">תוקף</TableHead>
-                        <TableHead className="text-right">סטטוס</TableHead>
+                        <TableHead className="text-right">סטטוס CellStation</TableHead>
+                        <TableHead className="text-right">סטטוס מערכת</TableHead>
                         <TableHead className="text-right">פעולות</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredInventory.map((item, idx) => (
-                        <TableRow
-                          key={idx}
-                          className={cn(
-                            item.status === 'active' ? 'bg-success/5' : 'bg-destructive/5'
-                          )}
-                        >
-                          <TableCell>{item.id}</TableCell>
-                          <TableCell className="font-mono">{formatLocalNumber(item.local_number)}</TableCell>
-                          <TableCell className="font-mono">{item.israel_number}</TableCell>
-                          <TableCell>{item.plan}</TableCell>
-                          <TableCell>{item.expiry}</TableCell>
-                          <TableCell>
-                            <Badge variant={item.status === 'active' ? 'success' : 'destructive'}>
-                              {item.status === 'active' ? '🟢 פעיל' : '🔴 לא פעיל'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-wrap gap-1">
-                              {/* Stock status indicator */}
-                              {isSimInStock(item.sim) ? (
-                                <Badge variant="outline" className="text-xs bg-success/10 text-success border-success/30">
-                                  ✓ במלאי
+                      {filteredInventory.map((item, idx) => {
+                        const mainSystemInfo = getMainSystemRentalInfo(item.local_number, item.sim);
+                        
+                        return (
+                          <TableRow
+                            key={idx}
+                            className={cn(
+                              item.status === 'active' ? 'bg-success/5' : 'bg-destructive/5',
+                              mainSystemInfo.status === 'overdue' && 'ring-1 ring-destructive/50'
+                            )}
+                          >
+                            <TableCell>{item.id}</TableCell>
+                            <TableCell className="font-mono">{formatLocalNumber(item.local_number)}</TableCell>
+                            <TableCell className="font-mono">{item.israel_number}</TableCell>
+                            <TableCell>{item.plan}</TableCell>
+                            <TableCell>{item.expiry}</TableCell>
+                            <TableCell>
+                              <Badge variant={item.status === 'active' ? 'success' : 'destructive'}>
+                                {item.status === 'active' ? '🟢 פעיל' : '🔴 לא פעיל'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {mainSystemInfo.status === 'not_found' && (
+                                <Badge variant="outline" className="text-muted-foreground text-xs">
+                                  לא במערכת
                                 </Badge>
-                              ) : (
+                              )}
+                              {mainSystemInfo.status === 'available' && (
+                                <Badge variant="success" className="gap-1 text-xs">
+                                  <CheckCircle className="h-3 w-3" />
+                                  זמין
+                                </Badge>
+                              )}
+                              {mainSystemInfo.status === 'rented' && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger>
+                                      <Badge className="bg-primary/20 text-primary border-primary/30 gap-1 text-xs cursor-help">
+                                        📱 מושכר
+                                      </Badge>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <div className="text-sm">
+                                        <div>לקוח: {mainSystemInfo.customerName}</div>
+                                        <div>עד: {mainSystemInfo.endDate ? formatDate(mainSystemInfo.endDate) : '-'}</div>
+                                      </div>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
+                              {mainSystemInfo.status === 'overdue' && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger>
+                                      <Badge variant="destructive" className="gap-1 text-xs cursor-help">
+                                        <AlertTriangle className="h-3 w-3" />
+                                        באיחור!
+                                      </Badge>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <div className="text-sm">
+                                        <div className="font-bold text-destructive">⚠️ באיחור במערכת!</div>
+                                        <div>לקוח: {mainSystemInfo.customerName}</div>
+                                        <div>היה אמור להחזיר: {mainSystemInfo.endDate ? formatDate(mainSystemInfo.endDate) : '-'}</div>
+                                      </div>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-1">
+                                {/* Stock status indicator */}
+                                {isSimInStock(item.sim) ? (
+                                  <Badge variant="outline" className="text-xs bg-success/10 text-success border-success/30">
+                                    ✓ במלאי
+                                  </Badge>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleAddToStock(item)}
+                                    disabled={addingToStock === item.sim}
+                                    title="הוסף למלאי הראשי"
+                                    className="gap-1"
+                                  >
+                                    {addingToStock === item.sim ? (
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                      <Plus className="h-3 w-3" />
+                                    )}
+                                    למלאי
+                                  </Button>
+                                )}
+                                
+                                {/* Print button */}
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => handleAddToStock(item)}
-                                  disabled={addingToStock === item.sim}
-                                  title="הוסף למלאי הראשי"
-                                  className="gap-1"
+                                  onClick={() => handlePrintInstructions(item)}
+                                  title="הדפס הוראות חיוג"
                                 >
-                                  {addingToStock === item.sim ? (
-                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                  ) : (
-                                    <Plus className="h-3 w-3" />
-                                  )}
-                                  למלאי
+                                  <Printer className="h-3 w-3" />
                                 </Button>
-                              )}
-                              
-                              {/* Print button */}
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handlePrintInstructions(item)}
-                                title="הדפס הוראות חיוג"
-                              >
-                                <Printer className="h-3 w-3" />
-                              </Button>
-                              
-                              {/* Activate button - works for both active and inactive SIMs */}
-                              <Button
-                                size="sm"
-                                variant={item.status === 'active' ? 'default' : 'secondary'}
-                                onClick={() => {
-                                  setSelectedSim(item);
-                                  setActiveTab('activate');
-                                }}
-                                className="gap-1"
-                                title={item.status === 'inactive' ? 'הפעל סים לא פעיל' : 'הפעל סים'}
-                              >
-                                <Zap className="h-3 w-3" />
-                                {item.status === 'inactive' ? 'הפעל' : 'הפעל'}
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                                
+                                {/* Activate button - works for both active and inactive SIMs */}
+                                <Button
+                                  size="sm"
+                                  variant={item.status === 'active' ? 'default' : 'secondary'}
+                                  onClick={() => {
+                                    setSelectedSim(item);
+                                    setActiveTab('activate');
+                                  }}
+                                  className="gap-1"
+                                  title={item.status === 'inactive' ? 'הפעל סים לא פעיל' : 'הפעל סים'}
+                                >
+                                  <Zap className="h-3 w-3" />
+                                  {item.status === 'inactive' ? 'הפעל' : 'הפעל'}
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
