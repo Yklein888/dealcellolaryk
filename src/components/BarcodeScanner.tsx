@@ -101,6 +101,15 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
         experimentalFeatures: {
           useBarCodeDetectorIfSupported: true
         },
+        // Force high-resolution camera stream (html5-qrcode supports this via config.videoConstraints)
+        // IMPORTANT: keep min 1280x720 as requested
+        videoConstraints: {
+          facingMode: "environment",
+          width: { ideal: 1920, min: 1280 },
+          height: { ideal: 1080, min: 720 },
+          // Non-standard but supported by some devices
+          advanced: [{ focusMode: "continuous" } as any],
+        } as any,
         formatsToSupport: [
           Html5QrcodeSupportedFormats.CODE_128,
           Html5QrcodeSupportedFormats.CODE_39,
@@ -152,6 +161,16 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
         }
       );
 
+      // Best-effort: re-apply constraints after start (some Android devices ignore initial ones)
+      try {
+        await scanner.applyVideoConstraints({
+          width: { ideal: 1920, min: 1280 },
+          height: { ideal: 1080, min: 720 },
+        } as any);
+      } catch (err) {
+        console.warn('[Html5Qrcode] Could not apply video constraints after start:', err);
+      }
+
       // Get video track for torch control and apply continuous focus
       try {
         const videoElement = containerElement.querySelector('video');
@@ -187,6 +206,14 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
               frameRate: settings.frameRate,
               facingMode: settings.facingMode,
             });
+
+            // If the negotiated resolution is still too low, warn (helps debugging)
+            if ((settings.width && settings.width < 1280) || (settings.height && settings.height < 720)) {
+              toast({
+                title: 'אזהרה: רזולוציה נמוכה',
+                description: `המצלמה עלתה ברזולוציה ${settings.width ?? '?'}x${settings.height ?? '?'} – ייתכן שסריקת ברקוד תהיה פחות מדויקת`,
+              });
+            }
           }
         }
       } catch (err) {
@@ -349,7 +376,7 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
             כוון את הברקוד לתוך המסגרת
           </p>
           <p className="text-white/50 text-xs mt-1">
-            רזולוציה גבוהה • 15 FPS • CODE-128, EAN-13, ITF
+            רזולוציה גבוהה • 20 FPS • CODE-128, EAN-13, ITF
           </p>
         </div>
       </DialogContent>
