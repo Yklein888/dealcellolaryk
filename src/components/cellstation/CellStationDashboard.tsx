@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Table,
   TableBody,
@@ -22,6 +23,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import {
   RefreshCw,
   Package,
   Smartphone,
@@ -36,14 +44,25 @@ import {
   Clock,
   ArrowLeftRight,
   Loader2,
+  Printer,
+  Calculator,
+  Plus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useRental } from '@/hooks/useRental';
+import { printCallingInstructions } from '@/lib/callingInstructions';
+import { 
+  calculateRentalPrice, 
+  getExcludedDaysBreakdown, 
+  EUROPEAN_BUNDLE_DEVICE_RATE 
+} from '@/lib/pricing';
+import { ItemCategory } from '@/types/rental';
 
 // ============================================
-// Cell Station Dashboard v4.0
-// סנכרון + הפעלות + החלפות סים
+// Cell Station Dashboard v5.0
+// סנכרון + הפעלות + החלפות + חישוב מחירים
 // ============================================
 
 const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzKhHEQeldMrsNjL8RZMigkPvIKJDRSWD0WoDYpyGPAmGxBYFxDi_9EiUldFjnZ6TIE/exec';
@@ -100,6 +119,18 @@ interface PendingAction {
   new_sim?: string;
 }
 
+interface CalculatedPrice {
+  total: number;
+  breakdown: Array<{ item: string; price: number; currency: string; details?: string }>;
+  businessDaysInfo?: { 
+    businessDays: number; 
+    excludedDates: string[];
+    totalDays: number;
+    saturdays: number;
+    holidays: number;
+  };
+}
+
 // === Stat Card Component ===
 function StatCard({ 
   title, 
@@ -145,9 +176,47 @@ function StatCard({
   );
 }
 
+// === Helper Functions ===
+const parseExpiryDate = (expiry: string): string | undefined => {
+  if (!expiry) return undefined;
+  const parts = expiry.split('/');
+  if (parts.length === 3) {
+    const [day, month, year] = parts;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+  return undefined;
+};
+
+const getSimExpiryWarning = (sim: InventoryItem, endDate: string): string | null => {
+  if (!sim.expiry || !endDate) return null;
+  
+  const parts = sim.expiry.split('/');
+  if (parts.length !== 3) return null;
+  
+  const expiryDate = new Date(
+    parseInt(parts[2]), 
+    parseInt(parts[1]) - 1, 
+    parseInt(parts[0])
+  );
+  const rentalEnd = new Date(endDate);
+  
+  if (expiryDate < rentalEnd) {
+    const daysUntilExpiry = Math.ceil((expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    return `⚠️ הסים יפוג ב-${daysUntilExpiry} ימים - לפני סיום ההשכרה!`;
+  }
+  return null;
+};
+
 // === Main Component ===
 export function CellStationDashboard() {
   const { toast } = useToast();
+  const { 
+    addRental, 
+    addInventoryItem, 
+    inventory: supabaseInventory,
+    customers: supabaseCustomers,
+    refreshData: refreshSupabaseData 
+  } = useRental();
 
   // State
   const [rentals, setRentals] = useState<Rental[]>([]);
@@ -168,10 +237,50 @@ export function CellStationDashboard() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [price, setPrice] = useState('');
+  const [includeDevice, setIncludeDevice] = useState(false);
+  const [isActivating, setIsActivating] = useState(false);
+
+  // Calculated price state
+  const [calculatedPrice, setCalculatedPrice] = useState<CalculatedPrice | null>(null);
+
+  // Success dialog state
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [lastActivation, setLastActivation] = useState<{
+    sim: InventoryItem;
+    customerName: string;
+    customerPhone: string;
+    price: number;
+    startDate: string;
+    endDate: string;
+  } | null>(null);
 
   // Replace form state
   const [selectedRental, setSelectedRental] = useState<Rental | null>(null);
   const [newSim, setNewSim] = useState('');
+
+  // === Calculate price effect ===
+  useEffect(() => {
+    if (!selectedSim || !startDate || !endDate) {
+      setCalculatedPrice(null);
+      return;
+    }
+
+    try {
+      const items: Array<{ category: ItemCategory; includeEuropeanDevice?: boolean }> = [
+        { category: 'sim_european' as ItemCategory, includeEuropeanDevice: includeDevice }
+      ];
+
+      const result = calculateRentalPrice(items, startDate, endDate);
+      setCalculatedPrice({
+        total: result.ilsTotal || result.total,
+        breakdown: result.breakdown,
+        businessDaysInfo: result.businessDaysInfo
+      });
+    } catch (err) {
+      console.error('Error calculating price:', err);
+      setCalculatedPrice(null);
+    }
+  }, [selectedSim, startDate, endDate, includeDevice]);
 
   // Fetch data
   const fetchData = async () => {
@@ -210,6 +319,15 @@ export function CellStationDashboard() {
     fetchCustomers();
   }, []);
 
+  // Quick date helpers
+  const setQuickDate = (days: number) => {
+    const today = new Date();
+    const start = format(today, 'yyyy-MM-dd');
+    const end = format(addDays(today, days - 1), 'yyyy-MM-dd');
+    setStartDate(start);
+    setEndDate(end);
+  };
+
   // Filter rentals
   const filteredRentals = useMemo(() => rentals.filter(r =>
     !searchTerm ||
@@ -234,7 +352,37 @@ export function CellStationDashboard() {
     return 'success';
   };
 
-  // Send activate request
+  // Reset form
+  const resetForm = () => {
+    setSelectedSim(null);
+    setCustomerName('');
+    setCustomerPhone('');
+    setStartDate('');
+    setEndDate('');
+    setPrice('');
+    setIncludeDevice(false);
+    setCalculatedPrice(null);
+  };
+
+  // Print instructions helper
+  const handlePrintInstructions = async (sim: InventoryItem) => {
+    try {
+      await printCallingInstructions(
+        sim.israel_number,
+        sim.local_number,
+        `SIM-${sim.sim.slice(-8)}`,
+        false, // סים אירופאי
+        sim.plan,
+        sim.expiry
+      );
+      toast({ title: '🖨️ הודפס בהצלחה', description: 'ההוראות נשלחו למדפסת' });
+    } catch (error) {
+      console.error('Print error:', error);
+      toast({ title: 'שגיאה בהדפסה', variant: 'destructive' });
+    }
+  };
+
+  // Send activate request with Supabase sync
   const handleActivate = async () => {
     if (!selectedSim || !customerName || !startDate || !endDate) {
       toast({
@@ -245,7 +393,10 @@ export function CellStationDashboard() {
       return;
     }
 
+    setIsActivating(true);
+
     try {
+      // Step 1: Send to Google Script
       const res = await fetch(WEBAPP_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -256,37 +407,111 @@ export function CellStationDashboard() {
           customer_phone: customerPhone,
           start_date: startDate,
           end_date: endDate,
-          price: price,
+          price: calculatedPrice?.total || parseFloat(price) || 0,
         }),
       });
       const data = await res.json();
 
-      if (data.success) {
-        toast({
-          title: '✅ הפעלה נשמרה!',
-          description: `SIM: ${selectedSim.local_number} | לקוח: ${customerName}`,
-        });
+      if (!data.success) {
+        throw new Error(data.error || 'שגיאה בשליחה ל-Google Script');
+      }
 
-        // Reset form
-        setSelectedSim(null);
-        setCustomerName('');
-        setCustomerPhone('');
-        setStartDate('');
-        setEndDate('');
-        setPrice('');
-        fetchData();
-      } else {
+      // Step 2: Add to Supabase inventory if not exists
+      const existingItem = supabaseInventory.find(i => i.simNumber === selectedSim.sim);
+      let inventoryItemId = existingItem?.id;
+
+      if (!existingItem) {
+        try {
+          await addInventoryItem({
+            category: 'sim_european' as ItemCategory,
+            name: `סים ${selectedSim.local_number}`,
+            localNumber: selectedSim.local_number || undefined,
+            israeliNumber: selectedSim.israel_number || undefined,
+            expiryDate: parseExpiryDate(selectedSim.expiry),
+            simNumber: selectedSim.sim,
+            status: 'available',
+          });
+          // Wait a bit for the inventory to update
+          await new Promise(resolve => setTimeout(resolve, 500));
+          await refreshSupabaseData();
+          // Try to get the new item ID
+          const updatedInventory = supabaseInventory;
+          const newItem = updatedInventory.find(i => i.simNumber === selectedSim.sim);
+          inventoryItemId = newItem?.id;
+        } catch (err) {
+          console.error('Error adding to Supabase inventory:', err);
+          // Continue anyway - the rental can still be created
+        }
+      }
+
+      // Step 3: Create rental in Supabase
+      const rentalItems = [
+        {
+          inventoryItemId: inventoryItemId || '',
+          itemCategory: 'sim_european' as ItemCategory,
+          itemName: `סים אירופאי - ${selectedSim.local_number}`,
+          hasIsraeliNumber: !!selectedSim.israel_number,
+          isGeneric: !inventoryItemId, // Mark as generic if no inventory ID
+        }
+      ];
+
+      // Add device to bundle if selected
+      if (includeDevice) {
+        rentalItems.push({
+          inventoryItemId: '',
+          itemCategory: 'device_simple' as ItemCategory,
+          itemName: 'מכשיר פשוט (באנדל אירופאי)',
+          hasIsraeliNumber: false,
+          isGeneric: true,
+        });
+      }
+
+      try {
+        await addRental({
+          customerId: '',
+          customerName,
+          items: rentalItems,
+          startDate,
+          endDate,
+          totalPrice: calculatedPrice?.total || parseFloat(price) || 0,
+          currency: 'ILS',
+          status: 'active',
+          notes: `הופעל מ-CellStation | טלפון: ${customerPhone}`,
+        });
+      } catch (err) {
+        console.error('Error creating Supabase rental:', err);
+        // Show warning but don't fail completely
         toast({
-          title: 'שגיאה',
-          description: data.error || 'לא ידוע',
+          title: 'אזהרה',
+          description: 'ההפעלה נשלחה אך נכשלה בשמירה למערכת המקומית',
           variant: 'destructive',
         });
       }
-    } catch (err) {
+
+      // Step 4: Show success dialog
+      setLastActivation({
+        sim: selectedSim,
+        customerName,
+        customerPhone,
+        price: calculatedPrice?.total || parseFloat(price) || 0,
+        startDate,
+        endDate,
+      });
+      setShowSuccessDialog(true);
+
+      // Reset form and refresh
+      resetForm();
+      fetchData();
+      refreshSupabaseData();
+
+    } catch (err: any) {
       toast({
-        title: 'שגיאה בשליחה',
+        title: 'שגיאה',
+        description: err.message || 'נכשל בהפעלה',
         variant: 'destructive',
       });
+    } finally {
+      setIsActivating(false);
     }
   };
 
@@ -329,7 +554,6 @@ export function CellStationDashboard() {
           description: `סים ישן: ${selectedRental.local_number} → סים חדש: ${newSim.slice(-6)}`,
         });
 
-        // Reset form
         setSelectedRental(null);
         setNewSim('');
         fetchData();
@@ -365,6 +589,9 @@ export function CellStationDashboard() {
     } catch (e) {}
   };
 
+  // Expiry warning for selected SIM
+  const expiryWarning = selectedSim && endDate ? getSimExpiryWarning(selectedSim, endDate) : null;
+
   return (
     <div className="space-y-6" dir="rtl">
       {/* Header */}
@@ -375,7 +602,7 @@ export function CellStationDashboard() {
             Cell Station
           </h1>
           <p className="text-muted-foreground">
-            ניהול סימים והשכרות
+            ניהול סימים והשכרות עם סנכרון Supabase
           </p>
         </div>
         <Button
@@ -514,18 +741,20 @@ export function CellStationDashboard() {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => {
-                                setSelectedRental(rental);
-                                setActiveTab('replace');
-                              }}
-                              className="gap-1"
-                            >
-                              <ArrowLeftRight className="h-3 w-3" />
-                              החלפה
-                            </Button>
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  setSelectedRental(rental);
+                                  setActiveTab('replace');
+                                }}
+                                className="gap-1"
+                              >
+                                <ArrowLeftRight className="h-3 w-3" />
+                                החלפה
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -588,20 +817,32 @@ export function CellStationDashboard() {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            {item.status === 'active' && (
-                              <Button
-                                size="sm"
-                                variant="default"
-                                onClick={() => {
-                                  setSelectedSim(item);
-                                  setActiveTab('activate');
-                                }}
-                                className="gap-1"
-                              >
-                                <Zap className="h-3 w-3" />
-                                הפעל
-                              </Button>
-                            )}
+                            <div className="flex gap-1">
+                              {item.status === 'active' && (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="default"
+                                    onClick={() => {
+                                      setSelectedSim(item);
+                                      setActiveTab('activate');
+                                    }}
+                                    className="gap-1"
+                                  >
+                                    <Zap className="h-3 w-3" />
+                                    הפעל
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handlePrintInstructions(item)}
+                                    className="gap-1"
+                                  >
+                                    <Printer className="h-3 w-3" />
+                                  </Button>
+                                </>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -627,7 +868,7 @@ export function CellStationDashboard() {
                 {/* SIM Selection */}
                 <div className="space-y-4">
                   <div>
-                    <label className="block font-medium mb-2">בחר סים פנוי:</label>
+                    <label className="block font-medium mb-2">📱 בחר סים פנוי:</label>
                     <Select
                       value={selectedSim?.sim || ''}
                       onValueChange={(value) => {
@@ -652,17 +893,27 @@ export function CellStationDashboard() {
                     <Card className="bg-success/10 border-success/30">
                       <CardContent className="p-4 text-sm space-y-1">
                         <div><strong>ID:</strong> {selectedSim.id}</div>
-                        <div><strong>SIM:</strong> {selectedSim.sim}</div>
-                        <div><strong>מספר ישראלי:</strong> {selectedSim.israel_number}</div>
+                        <div><strong>ICCID:</strong> {selectedSim.sim}</div>
+                        <div><strong>🇮🇱 מספר ישראלי:</strong> {selectedSim.israel_number || 'אין'}</div>
+                        <div><strong>📞 מספר מקומי:</strong> {selectedSim.local_number}</div>
+                        <div><strong>📅 תוקף:</strong> {selectedSim.expiry}</div>
                       </CardContent>
                     </Card>
+                  )}
+
+                  {/* Expiry Warning */}
+                  {expiryWarning && (
+                    <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning/30 rounded-lg text-warning">
+                      <AlertTriangle className="h-5 w-5 flex-shrink-0" />
+                      <span className="text-sm font-medium">{expiryWarning}</span>
+                    </div>
                   )}
                 </div>
 
                 {/* Customer Details */}
                 <div className="space-y-4">
                   <div>
-                    <label className="block font-medium mb-1">שם לקוח:</label>
+                    <label className="block font-medium mb-1">👤 שם לקוח:</label>
                     <Input
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
@@ -675,11 +926,16 @@ export function CellStationDashboard() {
                           {c.phone}
                         </option>
                       ))}
+                      {supabaseCustomers.map((c, i) => (
+                        <option key={`sb-${i}`} value={c.name}>
+                          {c.phone}
+                        </option>
+                      ))}
                     </datalist>
                   </div>
 
                   <div>
-                    <label className="block font-medium mb-1">טלפון לקוח:</label>
+                    <label className="block font-medium mb-1">📞 טלפון לקוח:</label>
                     <Input
                       type="tel"
                       value={customerPhone}
@@ -688,43 +944,103 @@ export function CellStationDashboard() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block font-medium mb-1">תאריך התחלה:</label>
-                      <Input
-                        type="date"
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                      />
+                  {/* Quick Date Buttons */}
+                  <div>
+                    <label className="block font-medium mb-2">📅 תקופה:</label>
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      <Button size="sm" variant="outline" onClick={() => setQuickDate(7)}>
+                        שבוע
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setQuickDate(14)}>
+                        שבועיים
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setQuickDate(30)}>
+                        חודש
+                      </Button>
                     </div>
-                    <div>
-                      <label className="block font-medium mb-1">תאריך סיום:</label>
-                      <Input
-                        type="date"
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                      />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm mb-1">התחלה:</label>
+                        <Input
+                          type="date"
+                          value={startDate}
+                          onChange={(e) => setStartDate(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm mb-1">סיום:</label>
+                        <Input
+                          type="date"
+                          value={endDate}
+                          onChange={(e) => setEndDate(e.target.value)}
+                        />
+                      </div>
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block font-medium mb-1">מחיר (אופציונלי):</label>
-                    <Input
-                      type="number"
-                      value={price}
-                      onChange={(e) => setPrice(e.target.value)}
-                      placeholder="0"
+                  {/* Device Bundle Option */}
+                  <div className="flex items-center space-x-2 space-x-reverse p-3 bg-primary/5 rounded-lg border border-primary/20">
+                    <Checkbox
+                      id="include-device"
+                      checked={includeDevice}
+                      onCheckedChange={(checked) => setIncludeDevice(checked === true)}
                     />
+                    <label
+                      htmlFor="include-device"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    >
+                      📦 הוסף מכשיר פשוט (+{EUROPEAN_BUNDLE_DEVICE_RATE}₪ ליום עסקים)
+                    </label>
                   </div>
+
+                  {/* Price Display */}
+                  {calculatedPrice && (
+                    <Card className="bg-primary/10 border-primary/30">
+                      <CardContent className="p-4">
+                        <h4 className="font-semibold mb-3 flex items-center gap-2">
+                          <Calculator className="h-4 w-4" />
+                          💰 פירוט מחיר
+                        </h4>
+                        <div className="space-y-2">
+                          {calculatedPrice.breakdown.map((item, idx) => (
+                            <div key={idx} className="flex justify-between text-sm">
+                              <span>{item.item}</span>
+                              <span className="font-mono">{item.currency}{item.price.toFixed(2)}</span>
+                            </div>
+                          ))}
+                        </div>
+                        {calculatedPrice.businessDaysInfo && (
+                          <div className="text-xs text-muted-foreground mt-3 pt-2 border-t border-primary/20">
+                            <div>סה"כ ימים: {calculatedPrice.businessDaysInfo.totalDays}</div>
+                            <div>ימי עסקים: {calculatedPrice.businessDaysInfo.businessDays}</div>
+                            {calculatedPrice.businessDaysInfo.excludedDates.length > 0 && (
+                              <div className="mt-1">
+                                הוחרגו: {calculatedPrice.businessDaysInfo.excludedDates.slice(0, 3).join(', ')}
+                                {calculatedPrice.businessDaysInfo.excludedDates.length > 3 && '...'}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        <div className="border-t border-primary/30 pt-3 mt-3 flex justify-between font-bold text-lg">
+                          <span>סה"כ לתשלום:</span>
+                          <span className="text-primary">₪{calculatedPrice.total.toFixed(2)}</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
 
                   <Button
                     onClick={handleActivate}
-                    disabled={!selectedSim || !customerName || !startDate || !endDate}
+                    disabled={!selectedSim || !customerName || !startDate || !endDate || isActivating}
                     className="w-full gap-2"
                     size="lg"
                   >
-                    <Zap className="h-4 w-4" />
-                    שלח להפעלה
+                    {isActivating ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Zap className="h-4 w-4" />
+                    )}
+                    {isActivating ? 'שולח...' : '⚡ הפעל והשכר'}
                   </Button>
                 </div>
               </div>
@@ -824,6 +1140,76 @@ export function CellStationDashboard() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Success Dialog */}
+      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-success">
+              <CheckCircle className="h-6 w-6" />
+              ההפעלה נשלחה בהצלחה!
+            </DialogTitle>
+            <DialogDescription>
+              הפעולה נשמרה ומחכה לביצוע בסימנייה
+            </DialogDescription>
+          </DialogHeader>
+          
+          {lastActivation && (
+            <div className="space-y-4">
+              <Card className="bg-muted/50">
+                <CardContent className="p-4 space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span>📱 SIM:</span>
+                    <span className="font-mono">{lastActivation.sim.local_number}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>👤 לקוח:</span>
+                    <span>{lastActivation.customerName}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>📅 תקופה:</span>
+                    <span>{lastActivation.startDate} - {lastActivation.endDate}</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-primary">
+                    <span>💰 מחיר:</span>
+                    <span>₪{lastActivation.price.toFixed(2)}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="flex items-center gap-2 p-3 bg-success/10 border border-success/30 rounded-lg text-sm">
+                <CheckCircle className="h-4 w-4 text-success flex-shrink-0" />
+                <span>נוצרה השכרה חדשה במערכת Supabase</span>
+              </div>
+
+              <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning/30 rounded-lg text-sm">
+                <Clock className="h-4 w-4 text-warning flex-shrink-0" />
+                <span>עכשיו לחץ על הסימנייה באתר CellStation להשלמת ההפעלה</span>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="default"
+                  className="flex-1 gap-2"
+                  onClick={() => {
+                    handlePrintInstructions(lastActivation.sim);
+                  }}
+                >
+                  <Printer className="h-4 w-4" />
+                  🖨️ הדפס הוראות
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setShowSuccessDialog(false)}
+                >
+                  ← חזור לדאשבורד
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
