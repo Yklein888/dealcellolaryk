@@ -227,6 +227,7 @@ export function CellStationDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('rentals');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
 
@@ -336,13 +337,28 @@ export function CellStationDashboard() {
     r.sim?.includes(searchTerm)
   ), [rentals, searchTerm]);
 
-  // Filter inventory
-  const filteredInventory = useMemo(() => inventory.filter(s =>
-    !searchTerm ||
-    s.local_number?.includes(searchTerm) ||
-    s.sim?.includes(searchTerm) ||
-    s.id?.includes(searchTerm)
-  ), [inventory, searchTerm]);
+  // Filter inventory by status and search term
+  const filteredInventory = useMemo(() => {
+    let result = inventory;
+    
+    // Filter by status
+    if (statusFilter === 'active') {
+      result = result.filter(s => s.status === 'active');
+    } else if (statusFilter === 'inactive') {
+      result = result.filter(s => s.status === 'inactive');
+    }
+    
+    // Filter by search term
+    if (searchTerm) {
+      result = result.filter(s =>
+        s.local_number?.includes(searchTerm) ||
+        s.sim?.includes(searchTerm) ||
+        s.id?.includes(searchTerm)
+      );
+    }
+    
+    return result;
+  }, [inventory, searchTerm, statusFilter]);
 
   // Get status variant
   const getStatusVariant = (status: string): 'default' | 'destructive' | 'warning' | 'success' => {
@@ -770,14 +786,32 @@ export function CellStationDashboard() {
         <TabsContent value="inventory">
           <Card className="glass-card">
             <CardContent className="pt-6">
-              <div className="relative mb-4">
-                <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="🔍 חיפוש לפי מספר..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pr-10"
-                />
+              {/* Search and Filter Row */}
+              <div className="flex flex-col sm:flex-row gap-4 mb-4">
+                <div className="relative flex-1">
+                  <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="🔍 חיפוש לפי מספר..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pr-10"
+                  />
+                </div>
+                
+                {/* Status Filter */}
+                <Select
+                  value={statusFilter}
+                  onValueChange={(value: 'all' | 'active' | 'inactive') => setStatusFilter(value)}
+                >
+                  <SelectTrigger className="w-full sm:w-[180px]">
+                    <SelectValue placeholder="סינון לפי סטטוס" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">📋 הכל ({inventory.length})</SelectItem>
+                    <SelectItem value="active">🟢 פעילים ({inventory.filter(s => s.status === 'active').length})</SelectItem>
+                    <SelectItem value="inactive">🔴 לא פעילים ({inventory.filter(s => s.status === 'inactive').length})</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {loading ? (
@@ -818,29 +852,37 @@ export function CellStationDashboard() {
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-1">
+                              {/* Always show print button */}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handlePrintInstructions(item)}
+                                title="הדפס הוראות חיוג"
+                              >
+                                <Printer className="h-3 w-3" />
+                              </Button>
+                              
+                              {/* Activate button for active SIMs */}
                               {item.status === 'active' && (
-                                <>
-                                  <Button
-                                    size="sm"
-                                    variant="default"
-                                    onClick={() => {
-                                      setSelectedSim(item);
-                                      setActiveTab('activate');
-                                    }}
-                                    className="gap-1"
-                                  >
-                                    <Zap className="h-3 w-3" />
-                                    הפעל
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handlePrintInstructions(item)}
-                                    className="gap-1"
-                                  >
-                                    <Printer className="h-3 w-3" />
-                                  </Button>
-                                </>
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  onClick={() => {
+                                    setSelectedSim(item);
+                                    setActiveTab('activate');
+                                  }}
+                                  className="gap-1"
+                                >
+                                  <Zap className="h-3 w-3" />
+                                  הפעל
+                                </Button>
+                              )}
+                              
+                              {/* For inactive SIMs - show a disabled button with tooltip */}
+                              {item.status === 'inactive' && (
+                                <Badge variant="secondary" className="text-xs">
+                                  לא פעיל
+                                </Badge>
                               )}
                             </div>
                           </TableCell>
