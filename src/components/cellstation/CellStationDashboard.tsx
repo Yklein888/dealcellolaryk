@@ -195,22 +195,27 @@ const formatDate = (dateString: string): string => {
   return date.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' });
 };
 
-// Format phone number - add leading 0 if missing
+// Format phone number - add leading 0 if missing (all phones should start with 0)
 const formatPhone = (phone: string): string => {
   if (!phone) return '';
-  if (phone.length === 9 && !phone.startsWith('0')) {
-    return '0' + phone;
+  const cleaned = phone.replace(/\D/g, '');
+  if (cleaned.length === 9 && !cleaned.startsWith('0')) {
+    return '0' + cleaned;
   }
-  return phone;
+  return cleaned.startsWith('0') ? cleaned : '0' + cleaned;
 };
 
 // Format local number - add leading 0 if missing (for 07xxx numbers)
 const formatLocalNumber = (num: string): string => {
   if (!num) return '';
-  if (num.length === 9 && num.startsWith('7')) {
-    return '0' + num;
+  const cleaned = num.replace(/\D/g, '');
+  if (cleaned.startsWith('7') && cleaned.length === 9) {
+    return '0' + cleaned;
   }
-  return num;
+  if (cleaned.startsWith('07')) {
+    return cleaned;
+  }
+  return '0' + cleaned;
 };
 
 const getSimExpiryWarning = (sim: InventoryItem, endDate: string): string | null => {
@@ -781,7 +786,7 @@ export function CellStationDashboard() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <Table>
+                  <Table className="w-full text-right" dir="rtl">
                     <TableHeader>
                       <TableRow>
                         <TableHead className="text-right">לקוח</TableHead>
@@ -874,7 +879,7 @@ export function CellStationDashboard() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <Table>
+                  <Table className="w-full text-right" dir="rtl">
                     <TableHeader>
                       <TableRow>
                         <TableHead className="text-right">ID</TableHead>
