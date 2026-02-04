@@ -96,18 +96,18 @@ export function SimInventoryTab({
     return result;
   }, [simCards, searchQuery, filterStatus, sortField, inventory]);
 
-  const getExpiryColor = (expiryDate: string | null, isActive?: boolean): string => {
-    if (isActive === false) return 'text-destructive bg-destructive/10';
-    if (!expiryDate) return '';
+  const getExpiryInfo = (expiryDate: string | null, isActive?: boolean): { color: string; badge?: string } => {
+    if (isActive === false) return { color: 'text-destructive bg-destructive/10', badge: '⛔ לא פעיל' };
+    if (!expiryDate) return { color: '' };
     
     const today = new Date();
     const expiry = parseISO(expiryDate);
     const daysUntilExpiry = differenceInDays(expiry, today);
     
-    if (daysUntilExpiry < 0) return 'text-destructive bg-destructive/10';
-    if (daysUntilExpiry <= 7) return 'text-destructive bg-destructive/10';
-    if (daysUntilExpiry <= 30) return 'text-warning bg-warning/10';
-    return '';
+    if (daysUntilExpiry < 0) return { color: 'text-destructive bg-destructive/10', badge: '⛔ פג תוקף' };
+    if (daysUntilExpiry <= 7) return { color: 'text-destructive bg-destructive/10', badge: `⚠️ ${daysUntilExpiry} ימים` };
+    if (daysUntilExpiry <= 30) return { color: 'text-warning bg-warning/10', badge: `⏰ ${daysUntilExpiry} ימים` };
+    return { color: '' };
   };
 
   const handleAddToInventory = async (sim: SimCard) => {
@@ -250,9 +250,10 @@ export function SimInventoryTab({
                   const isInInventory = isSimInInventory(sim.sim_number);
                   const isAdding = addingSimId === sim.id;
                   const isPrinting = printingSimId === sim.id;
+                  const expiryInfo = getExpiryInfo(sim.expiry_date, sim.is_active);
                   
                   return (
-                    <TableRow key={sim.id} className={getExpiryColor(sim.expiry_date, sim.is_active)}>
+                    <TableRow key={sim.id} className={expiryInfo.color}>
                       <TableCell className="font-medium whitespace-nowrap">
                         {sim.israeli_number || '-'}
                       </TableCell>
