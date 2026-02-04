@@ -113,12 +113,9 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
         ]
       };
 
-      // Camera configuration - HIGH RESOLUTION with continuous focus
-      const cameraConfig = {
-        facingMode: "environment",
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
-      };
+      // Camera configuration - html5-qrcode requires exactly 1 key
+      // Use facingMode only, resolution is controlled via aspectRatio in config
+      const cameraConfig = { facingMode: "environment" };
 
       console.log('[Html5Qrcode] Starting scanner with config:', config);
 
