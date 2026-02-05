@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -29,6 +30,32 @@ interface UserPermission {
 export function usePermissions() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+
+  // Real-time subscription for permission changes
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('user_permissions_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_permissions',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          // Invalidate and refetch permissions when changes occur
+          queryClient.invalidateQueries({ queryKey: ['my-permissions', user.id] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, queryClient]);
 
   // Get current user's permissions
   const { data: myPermissions = [], isLoading: isLoadingMyPermissions } = useQuery({
