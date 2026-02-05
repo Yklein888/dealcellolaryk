@@ -8,8 +8,9 @@ import { POSPaymentDialog } from '@/components/pos/POSPaymentDialog';
 import { POSProcessingOverlay } from '@/components/pos/POSProcessingOverlay';
 import { POSConfirmationDialog } from '@/components/pos/POSConfirmationDialog';
 import { PaymentMethod } from '@/types/pos';
+import { ProtectedByPermission } from '@/components/ProtectedByPermission';
 
-export default function POS() {
+function POSContent() {
   const { products, isLoading, categories } = usePOSProducts();
   const {
     cart,
@@ -120,5 +121,13 @@ export default function POS() {
         onNewSale={handleNewSale}
       />
     </div>
+  );
+}
+
+export default function POS() {
+  return (
+    <ProtectedByPermission permission="view_pos">
+      <POSContent />
+    </ProtectedByPermission>
   );
 }

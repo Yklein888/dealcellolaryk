@@ -23,6 +23,7 @@ import { Search, Filter, CreditCard, CheckCircle, XCircle, Clock, RefreshCw } fr
 import { format, parseISO } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { formatPrice } from '@/lib/pricing';
+import { ProtectedByPermission } from '@/components/ProtectedByPermission';
 
 interface PaymentTransaction {
   id: string;
@@ -58,7 +59,7 @@ const statusColors: Record<string, string> = {
   declined: 'bg-destructive/10 text-destructive border-destructive/20',
 };
 
-export default function PaymentHistory() {
+function PaymentHistoryContent() {
   const [transactions, setTransactions] = useState<PaymentTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -272,5 +273,13 @@ export default function PaymentHistory() {
         </Table>
       </div>
     </div>
+  );
+}
+
+export default function PaymentHistory() {
+  return (
+    <ProtectedByPermission permission="view_payments">
+      <PaymentHistoryContent />
+    </ProtectedByPermission>
   );
 }

@@ -23,6 +23,7 @@ import { Search, Printer, Download, FileText, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
+import { ProtectedByPermission } from '@/components/ProtectedByPermission';
 
 interface Invoice {
   id: string;
@@ -41,7 +42,7 @@ interface Invoice {
   created_at: string;
 }
 
-export default function Invoices() {
+function InvoicesContent() {
   const { toast } = useToast();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -460,5 +461,13 @@ ${invoice.description || 'חיוב'}
         </Card>
       )}
     </div>
+  );
+}
+
+export default function Invoices() {
+  return (
+    <ProtectedByPermission permission="view_invoices">
+      <InvoicesContent />
+    </ProtectedByPermission>
   );
 }
