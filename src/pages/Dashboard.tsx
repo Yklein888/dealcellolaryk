@@ -39,21 +39,21 @@ export default function Dashboard() {
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [selectedInventoryItem, setSelectedInventoryItem] = useState<InventoryItem | null>(null);
   const [isQuickActionDialogOpen, setIsQuickActionDialogOpen] = useState(false);
+  const [scannedSearchTerm, setScannedSearchTerm] = useState<string>('');
   const { isSubscribed, notifyRentalDue, isSupported } = usePushNotifications();
   const { toast } = useToast();
 
   // Handle barcode scan result
   const handleBarcodeScan = (barcode: string) => {
+    // First, try to find an exact barcode match
     const item = inventory.find(i => i.barcode === barcode);
     if (item) {
       setSelectedInventoryItem(item);
       setIsQuickActionDialogOpen(true);
     } else {
-      toast({
-        title: 'לא נמצא',
-        description: `לא נמצא מוצר עם ברקוד: ${barcode}`,
-        variant: 'destructive',
-      });
+      // If no exact barcode match, open global search with the scanned value
+      setScannedSearchTerm(barcode);
+      setIsSearchOpen(true);
     }
   };
 
@@ -181,7 +181,14 @@ export default function Dashboard() {
       </div>
 
       {/* Modals */}
-      <GlobalSearch isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+      <GlobalSearch 
+        isOpen={isSearchOpen} 
+        onClose={() => {
+          setIsSearchOpen(false);
+          setScannedSearchTerm('');
+        }}
+        initialSearchTerm={scannedSearchTerm}
+      />
       <QuickActions isOpen={isQuickActionsOpen} onClose={() => setIsQuickActionsOpen(false)} />
       <PriceCalculator isOpen={isCalculatorOpen} onClose={() => setIsCalculatorOpen(false)} />
       <BarcodeScanner 

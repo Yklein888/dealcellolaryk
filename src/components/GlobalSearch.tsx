@@ -40,9 +40,10 @@ interface SearchResult {
 interface GlobalSearchProps {
   isOpen: boolean;
   onClose: () => void;
+  initialSearchTerm?: string;
 }
 
-export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
+export function GlobalSearch({ isOpen, onClose, initialSearchTerm = '' }: GlobalSearchProps) {
   const { customers, inventory, rentals, repairs } = useRental();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
@@ -52,12 +53,16 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
 
   useEffect(() => {
     if (isOpen && inputRef.current) {
+      // Set initial search term if provided (e.g., from barcode scan)
+      if (initialSearchTerm) {
+        setSearchTerm(initialSearchTerm);
+      }
       setTimeout(() => inputRef.current?.focus(), 100);
     }
     if (!isOpen) {
       setSearchTerm('');
     }
-  }, [isOpen]);
+  }, [isOpen, initialSearchTerm]);
 
   const results = useMemo<SearchResult[]>(() => {
     if (!searchTerm.trim()) return [];
