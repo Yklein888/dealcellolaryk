@@ -14,11 +14,19 @@ import {
   Phone,
   Calendar,
   ScanBarcode,
-  Printer
+  Printer,
+  User,
+  ShoppingCart,
+  ArrowRight,
+  AlertCircle
 } from 'lucide-react';
 import { InventoryItem, categoryLabels, categoryIcons } from '@/types/rental';
 import { useNavigate } from 'react-router-dom';
 import { BarcodeDisplay } from '@/components/BarcodeDisplay';
+import { useRental } from '@/hooks/useRental';
+import { useMemo } from 'react';
+import { format, parseISO } from 'date-fns';
+import { he } from 'date-fns/locale';
 
 interface QuickActionDialogProps {
   isOpen: boolean;
@@ -36,6 +44,23 @@ export function QuickActionDialog({
   onAddToRental 
 }: QuickActionDialogProps) {
   const navigate = useNavigate();
+  const { rentals, customers } = useRental();
+
+  // Find the active rental for this item if it's rented
+  const activeRental = useMemo(() => {
+    if (!item || item.status !== 'rented') return null;
+    
+    return rentals.find(rental => 
+      rental.status === 'active' && 
+      rental.items.some(ri => ri.inventoryItemId === item.id)
+    );
+  }, [item, rentals]);
+
+  // Find the customer associated with the rental
+  const rentalCustomer = useMemo(() => {
+    if (!activeRental) return null;
+    return customers.find(c => c.id === activeRental.customerId);
+  }, [activeRental, customers]);
 
   if (!item) return null;
 
@@ -55,6 +80,25 @@ export function QuickActionDialog({
 
   const handleGoToInventory = () => {
     navigate('/inventory');
+    onClose();
+  };
+
+  const handleGoToRental = () => {
+    if (activeRental) {
+      navigate('/rentals', { state: { highlightRentalId: activeRental.id } });
+    } else {
+      navigate('/rentals');
+    }
+    onClose();
+  };
+
+  const handleGoToCustomer = () => {
+    if (rentalCustomer) {
+      navigate('/customers', { state: { highlightCustomerId: rentalCustomer.id } });
+    } else if (activeRental) {
+      // If no customer found but we have the rental, still navigate with customer name
+      navigate('/customers', { state: { searchTerm: activeRental.customerName } });
+    }
     onClose();
   };
 
@@ -210,6 +254,43 @@ export function QuickActionDialog({
                 )}
               </div>
             )}
+
+            {/* Rental Info - if item is rented */}
+            {item.status === 'rented' && activeRental && (
+              <div className="mt-3 p-3 rounded-lg bg-primary/10 border border-primary/20 space-y-2">
+                <div className="flex items-center gap-2 text-primary font-medium">
+                  <ShoppingCart className="h-4 w-4" />
+                  <span>מושכר כעת</span>
+                </div>
+                <div className="grid grid-cols-1 gap-1.5 text-sm">
+                  <div className="flex items-center gap-1.5">
+                    <User className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="font-medium">{activeRental.customerName}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                    <Calendar className="h-3.5 w-3.5" />
+                    <span>
+                      {format(parseISO(activeRental.startDate), 'dd/MM/yyyy', { locale: he })} 
+                      {' '}-{' '}
+                      {format(parseISO(activeRental.endDate), 'dd/MM/yyyy', { locale: he })}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Maintenance notice */}
+            {item.status === 'maintenance' && (
+              <div className="mt-3 p-3 rounded-lg bg-warning/10 border border-warning/20">
+                <div className="flex items-center gap-2 text-warning font-medium">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>הפריט בתחזוקה</span>
+                </div>
+                {item.notes && (
+                  <p className="mt-1 text-sm text-muted-foreground">{item.notes}</p>
+                )}
+              </div>
+            )}
             
             {/* Barcode */}
             {item.barcode && (
@@ -219,8 +300,26 @@ export function QuickActionDialog({
             )}
           </div>
           
-          {/* Action Buttons */}
+          {/* Action Buttons - Status-based */}
           <div className="space-y-2">
+            {/* If RENTED - Show rental-related actions first */}
+            {item.status === 'rented' && activeRental && (
+              <>
+                <Button onClick={handleGoToRental} className="w-full" variant="glow">
+                  <ShoppingCart className="h-4 w-4 ml-2" />
+                  צפה בהשכרה
+                  <ArrowRight className="h-4 w-4 mr-auto" />
+                </Button>
+                
+                <Button onClick={handleGoToCustomer} variant="outline" className="w-full">
+                  <User className="h-4 w-4 ml-2" />
+                  עבור ללקוח: {activeRental.customerName}
+                  <ArrowRight className="h-4 w-4 mr-auto" />
+                </Button>
+              </>
+            )}
+
+            {/* If AVAILABLE - Show rental creation first */}
             {item.status === 'available' && onAddToRental && (
               <Button onClick={handleAddToRental} className="w-full" variant="glow">
                 <Plus className="h-4 w-4 ml-2" />
@@ -228,6 +327,7 @@ export function QuickActionDialog({
               </Button>
             )}
 
+            {/* Print label for SIMs */}
             {isSim && item.barcode && (
               <Button onClick={printSimLabel} variant="outline" className="w-full">
                 <Printer className="h-4 w-4 ml-2" />
@@ -235,6 +335,7 @@ export function QuickActionDialog({
               </Button>
             )}
             
+            {/* Edit - always available */}
             {onEdit && (
               <Button onClick={handleEdit} variant="outline" className="w-full">
                 <Pencil className="h-4 w-4 ml-2" />
@@ -242,6 +343,7 @@ export function QuickActionDialog({
               </Button>
             )}
             
+            {/* Go to inventory - always available */}
             <Button onClick={handleGoToInventory} variant="outline" className="w-full">
               <ExternalLink className="h-4 w-4 ml-2" />
               עבור לדף מלאי
