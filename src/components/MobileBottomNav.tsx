@@ -6,7 +6,8 @@ import {
   Package, 
   Users,
   MoreHorizontal,
-  Store
+  Store,
+  Signal
 } from 'lucide-react';
 import { useState } from 'react';
 import {
@@ -31,6 +32,7 @@ const mainNavItems = [
 
 const moreNavItems = [
   { path: '/inventory', label: 'מלאי', icon: Package, permission: 'view_inventory' as const },
+  { path: '/sim-cards', label: 'סימים CellStation', icon: Signal, permission: 'view_inventory' as const },
   { path: '/repairs', label: 'תיקונים', icon: Wrench, permission: 'view_repairs' as const },
   { path: '/payments', label: 'תשלומים', icon: CreditCard, permission: 'view_payments' as const },
   { path: '/invoices', label: 'חשבוניות', icon: FileText, permission: 'view_invoices' as const },
