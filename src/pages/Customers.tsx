@@ -395,6 +395,15 @@ export default function Customers() {
                     <span className="text-foreground truncate">{customer.address}</span>
                   </div>
                 )}
+                {customer.hasPaymentToken && (
+                  <div className="flex items-center gap-2 text-sm bg-success/10 px-2 py-1 rounded-md">
+                    <CreditCard className="h-4 w-4 text-success shrink-0" />
+                    <span className="text-success font-medium">
+                      **** {customer.paymentTokenLast4}
+                      {customer.paymentTokenExpiry && ` (${customer.paymentTokenExpiry})`}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-2 pt-2 sm:pt-3 border-t border-border">

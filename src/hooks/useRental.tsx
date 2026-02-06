@@ -11,6 +11,15 @@ import {
 import { addDays, isAfter, isBefore, parseISO } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 
+interface RentalItemUpdate {
+  inventoryItemId: string;
+  itemCategory: ItemCategory;
+  itemName: string;
+  pricePerDay?: number;
+  hasIsraeliNumber?: boolean;
+  isGeneric?: boolean;
+}
+
 interface RentalContextType {
   customers: Customer[];
   inventory: InventoryItem[];
@@ -21,11 +30,13 @@ interface RentalContextType {
   addCustomer: (customer: Omit<Customer, 'id' | 'createdAt'>) => Promise<void>;
   updateCustomer: (id: string, customer: Partial<Customer>) => Promise<void>;
   deleteCustomer: (id: string) => Promise<void>;
+  clearCustomerPaymentToken: (id: string) => Promise<void>;
   addInventoryItem: (item: Omit<InventoryItem, 'id'>) => Promise<void>;
   updateInventoryItem: (id: string, item: Partial<InventoryItem>) => Promise<void>;
   deleteInventoryItem: (id: string) => Promise<void>;
   addRental: (rental: Omit<Rental, 'id' | 'createdAt'>) => Promise<void>;
   updateRental: (id: string, rental: Partial<Rental>) => Promise<void>;
+  updateRentalItems: (rentalId: string, newItems: RentalItemUpdate[], newTotalPrice: number) => Promise<void>;
   returnRental: (id: string) => Promise<void>;
   deleteRental: (id: string) => Promise<void>;
   addRepair: (repair: Omit<Repair, 'id'>) => Promise<void>;
@@ -547,6 +558,30 @@ export function RentalProvider({ children }: { children: ReactNode }) {
     saveCustomers(customers.filter(c => c.id !== id));
   };
 
+  const clearCustomerPaymentToken = async (id: string) => {
+    const { error } = await supabase
+      .from('customers')
+      .update({
+        payment_token: null,
+        payment_token_last4: null,
+        payment_token_expiry: null,
+        payment_token_updated_at: null,
+      })
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error clearing payment token:', error);
+      throw error;
+    }
+
+    saveCustomers(customers.map(c => c.id === id ? { 
+      ...c, 
+      hasPaymentToken: false,
+      paymentTokenLast4: undefined,
+      paymentTokenExpiry: undefined,
+    } : c));
+  };
+
   const addInventoryItem = async (item: Omit<InventoryItem, 'id'>) => {
     const { data, error } = await supabase
       .from('inventory')
@@ -741,6 +776,102 @@ export function RentalProvider({ children }: { children: ReactNode }) {
     saveRentals(rentals.map(r => r.id === id ? { ...r, ...rental } : r));
   };
 
+  // Update rental items - add/remove items from an existing rental
+  const updateRentalItems = async (rentalId: string, newItems: RentalItemUpdate[], newTotalPrice: number) => {
+    const existingRental = rentals.find(r => r.id === rentalId);
+    if (!existingRental) throw new Error('השכרה לא נמצאה');
+
+    // Get current items from the rental
+    const currentItemIds = existingRental.items
+      .filter(item => !item.isGeneric && item.inventoryItemId)
+      .map(item => item.inventoryItemId);
+
+    // Get new item IDs
+    const newItemIds = newItems
+      .filter(item => !item.isGeneric && item.inventoryItemId)
+      .map(item => item.inventoryItemId);
+
+    // Items to release (in current but not in new)
+    const itemsToRelease = currentItemIds.filter(id => !newItemIds.includes(id));
+    
+    // Items to mark as rented (in new but not in current)
+    const itemsToRent = newItemIds.filter(id => !currentItemIds.includes(id));
+
+    // Verify new items are available
+    if (itemsToRent.length > 0) {
+      const { data: availableCheck, error: checkError } = await supabase
+        .from('inventory')
+        .select('id, status, name')
+        .in('id', itemsToRent);
+      
+      if (checkError) throw new Error('שגיאה בבדיקת זמינות המלאי');
+      
+      const unavailable = availableCheck?.filter(item => item.status !== 'available');
+      if (unavailable && unavailable.length > 0) {
+        const names = unavailable.map(i => i.name).join(', ');
+        throw new Error(`הפריטים הבאים כבר לא זמינים: ${names}`);
+      }
+    }
+
+    // Step 1: Delete existing rental items
+    const { error: deleteError } = await supabase
+      .from('rental_items')
+      .delete()
+      .eq('rental_id', rentalId);
+    
+    if (deleteError) throw deleteError;
+
+    // Step 2: Insert new rental items
+    if (newItems.length > 0) {
+      const { error: insertError } = await supabase
+        .from('rental_items')
+        .insert(
+          newItems.map(item => ({
+            rental_id: rentalId,
+            inventory_item_id: item.isGeneric ? null : item.inventoryItemId,
+            item_category: item.itemCategory as any,
+            item_name: item.itemName,
+            price_per_day: item.pricePerDay || null,
+            has_israeli_number: item.hasIsraeliNumber || false,
+            is_generic: item.isGeneric || false,
+          }))
+        );
+      
+      if (insertError) throw insertError;
+    }
+
+    // Step 3: Update rental total price
+    const { error: updateError } = await supabase
+      .from('rentals')
+      .update({ total_price: newTotalPrice, updated_at: new Date().toISOString() })
+      .eq('id', rentalId);
+    
+    if (updateError) throw updateError;
+
+    // Step 4: Release old inventory items
+    if (itemsToRelease.length > 0) {
+      const { error: releaseError } = await supabase
+        .from('inventory')
+        .update({ status: 'available' })
+        .in('id', itemsToRelease);
+      
+      if (releaseError) throw releaseError;
+    }
+
+    // Step 5: Mark new items as rented
+    if (itemsToRent.length > 0) {
+      const { error: rentError } = await supabase
+        .from('inventory')
+        .update({ status: 'rented' })
+        .in('id', itemsToRent);
+      
+      if (rentError) throw rentError;
+    }
+
+    // Refresh all data to ensure consistency
+    await fetchData();
+  };
+
   const returnRental = async (id: string) => {
     const rental = rentals.find(r => r.id === id);
     if (rental) {
@@ -910,11 +1041,13 @@ export function RentalProvider({ children }: { children: ReactNode }) {
       addCustomer,
       updateCustomer,
       deleteCustomer,
+      clearCustomerPaymentToken,
       addInventoryItem,
       updateInventoryItem,
       deleteInventoryItem,
       addRental,
       updateRental,
+      updateRentalItems,
       returnRental,
       deleteRental,
       addRepair,
