@@ -7,6 +7,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 // SimActivationButton removed - activation is handled only in CellStation dashboard
 import { CallHistoryBadge } from '@/components/CallHistoryBadge';
 import { NewRentalDialog } from '@/components/rentals/NewRentalDialog';
+import { EditRentalDialog } from '@/components/rentals/EditRentalDialog';
 import { PaymentConfirmationDialog } from '@/components/rentals/PaymentConfirmationDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -83,16 +84,6 @@ export default function Rentals() {
   const [preSelectedItem, setPreSelectedItem] = useState<InventoryItem | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingRental, setEditingRental] = useState<Rental | null>(null);
-  const [editFormData, setEditFormData] = useState({
-    startDate: '',
-    endDate: '',
-    deposit: '',
-    notes: '',
-    status: 'active' as Rental['status'],
-    overdueDailyRate: '',
-    overdueGraceDays: '0',
-    autoChargeEnabled: false,
-  });
 
   const [callingRentalId, setCallingRentalId] = useState<string | null>(null);
   const [downloadingInstructions, setDownloadingInstructions] = useState<string | null>(null);
@@ -478,57 +469,7 @@ export default function Rentals() {
   // Open edit dialog
   const openEditDialog = (rental: Rental) => {
     setEditingRental(rental);
-    setEditFormData({
-      startDate: rental.startDate,
-      endDate: rental.endDate,
-      deposit: rental.deposit?.toString() || '',
-      notes: rental.notes || '',
-      status: rental.status,
-      overdueDailyRate: rental.overdueDailyRate?.toString() || '',
-      overdueGraceDays: (rental.overdueGraceDays ?? 0).toString(),
-      autoChargeEnabled: rental.autoChargeEnabled ?? false,
-    });
     setIsEditDialogOpen(true);
-  };
-
-  // Handle edit rental
-  const handleEditRental = async () => {
-    if (!editingRental) return;
-
-    try {
-      const { error } = await supabase
-        .from('rentals')
-        .update({
-          start_date: editFormData.startDate,
-          end_date: editFormData.endDate,
-          deposit: editFormData.deposit ? parseFloat(editFormData.deposit) : null,
-          notes: editFormData.notes || null,
-          status: editFormData.status,
-          overdue_daily_rate: editFormData.overdueDailyRate ? parseFloat(editFormData.overdueDailyRate) : null,
-          overdue_grace_days: parseInt(editFormData.overdueGraceDays) || 0,
-          auto_charge_enabled: editFormData.autoChargeEnabled,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', editingRental.id);
-
-      if (error) throw error;
-
-      toast({
-        title: 'השכרה עודכנה',
-        description: 'פרטי ההשכרה עודכנו בהצלחה',
-      });
-      setIsEditDialogOpen(false);
-      setEditingRental(null);
-      // Refresh data
-      window.location.reload();
-    } catch (error) {
-      console.error('Error updating rental:', error);
-      toast({
-        title: 'שגיאה',
-        description: 'לא ניתן לעדכן את ההשכרה',
-        variant: 'destructive',
-      });
-    }
   };
 
   // Open extend dialog
@@ -998,122 +939,11 @@ export default function Rentals() {
       )}
 
       {/* Edit Rental Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>עריכת השכרה</DialogTitle>
-            <DialogDescription>
-              {editingRental && `עריכת השכרה של ${editingRental.customerName}`}
-            </DialogDescription>
-          </DialogHeader>
-          {editingRental && (
-            <div className="space-y-4 mt-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                <div className="space-y-2">
-                  <Label>תאריך התחלה</Label>
-                  <Input
-                    type="date"
-                    value={editFormData.startDate}
-                    onChange={(e) => setEditFormData({ ...editFormData, startDate: e.target.value })}
-                    className="min-h-[44px]"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>תאריך סיום</Label>
-                  <Input
-                    type="date"
-                    value={editFormData.endDate}
-                    onChange={(e) => setEditFormData({ ...editFormData, endDate: e.target.value })}
-                    className="min-h-[44px]"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>סטטוס</Label>
-                <Select value={editFormData.status} onValueChange={(value: Rental['status']) => setEditFormData({ ...editFormData, status: value })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">פעיל</SelectItem>
-                    <SelectItem value="overdue">באיחור</SelectItem>
-                    <SelectItem value="returned">הוחזר</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>פיקדון</Label>
-                <Input
-                  type="number"
-                  value={editFormData.deposit}
-                  onChange={(e) => setEditFormData({ ...editFormData, deposit: e.target.value })}
-                  placeholder="סכום הפיקדון"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>הערות</Label>
-                <Input
-                  value={editFormData.notes}
-                  onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
-                  placeholder="הערות נוספות"
-                />
-              </div>
-
-              {/* Overdue Charging Section */}
-              <div className="border-t pt-4 mt-4">
-                <h4 className="font-medium text-sm mb-3">חיוב אוטומטי על איחור</h4>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                  <div className="space-y-2">
-                    <Label>סכום ליום איחור (₪)</Label>
-                    <Input
-                      type="number"
-                      value={editFormData.overdueDailyRate}
-                      onChange={(e) => setEditFormData({ ...editFormData, overdueDailyRate: e.target.value })}
-                      placeholder="למשל: 50"
-                      className="min-h-[44px]"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>ימי חסד</Label>
-                    <Input
-                      type="number"
-                      value={editFormData.overdueGraceDays}
-                      onChange={(e) => setEditFormData({ ...editFormData, overdueGraceDays: e.target.value })}
-                      placeholder="0"
-                      min="0"
-                      className="min-h-[44px]"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 mt-3">
-                  <Checkbox
-                    id="autoChargeEnabled"
-                    checked={editFormData.autoChargeEnabled}
-                    onCheckedChange={(checked) => setEditFormData({ ...editFormData, autoChargeEnabled: checked === true })}
-                  />
-                  <Label htmlFor="autoChargeEnabled" className="text-sm cursor-pointer">
-                    חייב אוטומטית (רק ללקוחות עם כרטיס שמור)
-                  </Label>
-                </div>
-              </div>
-
-              <div className="flex gap-2 pt-4">
-                <Button onClick={handleEditRental} className="flex-1">
-                  שמור שינויים
-                </Button>
-                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                  ביטול
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <EditRentalDialog
+        isOpen={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        rental={editingRental}
+      />
 
       {/* Payment Dialog */}
       <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
