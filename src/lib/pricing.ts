@@ -56,6 +56,15 @@ export function countBusinessDays(startDate: Date, endDate: Date): number {
   return days.filter(day => !isSaturday(day) && !isHoliday(day)).length;
 }
 
+// Get the next day (for device_simple and modem billing that starts from tomorrow)
+function getNextDay(date: Date): Date {
+  const nextDay = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+  return nextDay;
+}
+
+// Categories that should start billing from the next day
+const NEXT_DAY_BILLING_CATEGORIES = ['device_simple', 'modem'];
+
 // Get breakdown of excluded days for transparency
 export function getExcludedDaysBreakdown(startDate: Date, endDate: Date): { 
   totalDays: number;
@@ -115,8 +124,23 @@ export function calculateDevicePriceWithHolidays(
   category: ItemCategory,
   startDate: Date,
   endDate: Date
-): { price: number; businessDays: number; breakdown: ReturnType<typeof getExcludedDaysBreakdown> } {
-  const breakdown = getExcludedDaysBreakdown(startDate, endDate);
+): { price: number; businessDays: number; breakdown: ReturnType<typeof getExcludedDaysBreakdown>; billingStartsNextDay: boolean } {
+  // For device_simple and modem, billing starts from the next day
+  const billingStartsNextDay = NEXT_DAY_BILLING_CATEGORIES.includes(category);
+  const effectiveStartDate = billingStartsNextDay ? getNextDay(startDate) : startDate;
+  
+  // If effective start date is after end date, no charge
+  if (effectiveStartDate > endDate) {
+    const breakdown = getExcludedDaysBreakdown(startDate, endDate);
+    return { 
+      price: 0, 
+      businessDays: 0,
+      breakdown: { ...breakdown, businessDays: 0 },
+      billingStartsNextDay
+    };
+  }
+  
+  const breakdown = getExcludedDaysBreakdown(effectiveStartDate, endDate);
   const businessDays = breakdown.businessDays;
   
   // Daily rates for devices
@@ -131,7 +155,8 @@ export function calculateDevicePriceWithHolidays(
   return { 
     price: businessDays * rate, 
     businessDays,
-    breakdown
+    breakdown,
+    billingStartsNextDay
   };
 }
 
@@ -141,8 +166,17 @@ export function calculateDevicePrice(
   startDate: Date,
   endDate: Date
 ): number {
+  // For device_simple and modem, billing starts from the next day
+  const billingStartsNextDay = NEXT_DAY_BILLING_CATEGORIES.includes(category);
+  const effectiveStartDate = billingStartsNextDay ? getNextDay(startDate) : startDate;
+  
+  // If effective start date is after end date, no charge
+  if (effectiveStartDate > endDate) {
+    return 0;
+  }
+  
   // Use business days (excluding Saturdays AND holidays) for device pricing
-  const businessDays = countBusinessDays(startDate, endDate);
+  const businessDays = countBusinessDays(effectiveStartDate, endDate);
   
   // Daily rates for devices
   const dailyRates: Record<string, number> = {
@@ -161,8 +195,24 @@ export function calculateDevicePriceDetailed(
   category: ItemCategory,
   startDate: Date,
   endDate: Date
-): { price: number; businessDays: number; dailyRate: number; breakdown: ReturnType<typeof getExcludedDaysBreakdown> } {
-  const breakdown = getExcludedDaysBreakdown(startDate, endDate);
+): { price: number; businessDays: number; dailyRate: number; breakdown: ReturnType<typeof getExcludedDaysBreakdown>; billingStartsNextDay: boolean } {
+  // For device_simple and modem, billing starts from the next day
+  const billingStartsNextDay = NEXT_DAY_BILLING_CATEGORIES.includes(category);
+  const effectiveStartDate = billingStartsNextDay ? getNextDay(startDate) : startDate;
+  
+  // If effective start date is after end date, no charge
+  if (effectiveStartDate > endDate) {
+    const breakdown = getExcludedDaysBreakdown(startDate, endDate);
+    return {
+      price: 0,
+      businessDays: 0,
+      dailyRate: 0,
+      breakdown: { ...breakdown, businessDays: 0 },
+      billingStartsNextDay
+    };
+  }
+  
+  const breakdown = getExcludedDaysBreakdown(effectiveStartDate, endDate);
   
   const dailyRates: Record<string, number> = {
     device_simple: 10,
@@ -177,6 +227,7 @@ export function calculateDevicePriceDetailed(
     businessDays: breakdown.businessDays,
     dailyRate: rate,
     breakdown,
+    billingStartsNextDay
   };
 }
 
@@ -235,7 +286,7 @@ export function calculateRentalPrice(
           item: 'מכשיר פשוט', 
           price: simpleDeviceInfo.price, 
           currency: '₪',
-          details: `${simpleDeviceInfo.businessDays} ימי עסקים × ₪${simpleDeviceInfo.dailyRate}`
+          details: `${simpleDeviceInfo.businessDays} ימי עסקים × ₪${simpleDeviceInfo.dailyRate}${simpleDeviceInfo.billingStartsNextDay ? ' (חיוב מהיום הבא)' : ''}`
         });
         break;
         
@@ -257,7 +308,7 @@ export function calculateRentalPrice(
           item: 'מודם', 
           price: modemInfo.price, 
           currency: '₪',
-          details: `${modemInfo.businessDays} ימי עסקים × ₪${modemInfo.dailyRate}`
+          details: `${modemInfo.businessDays} ימי עסקים × ₪${modemInfo.dailyRate}${modemInfo.billingStartsNextDay ? ' (חיוב מהיום הבא)' : ''}`
         });
         break;
         
