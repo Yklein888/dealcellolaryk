@@ -47,8 +47,6 @@ import { he } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzKhHEQeldMrsNjL8RZMigkPvIKJDRSWD0WoDYpyGPAmGxBYFxDi_9EiUldFjnZ6TIE/exec";
-
 // Note templates
 const NOTE_TEMPLATES = [
   { label: '🌟 VIP', value: 'לקוח VIP - עדיפות בשירות' },
@@ -351,18 +349,21 @@ export function ActivationTab({
     setIsProcessing(true);
 
     try {
-      // Step 1: Send activation request to Google Script
-      await fetch(GOOGLE_SCRIPT_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'set_pending',
-          sim: selectedSim.sim_number,
-          customerName: customer.name,
-          startDate: format(startDate, 'yyyy-MM-dd'),
-          endDate: format(endDate, 'yyyy-MM-dd'),
-        })
+      // Step 1: Send activation request via Edge Function (bypasses CORS)
+      const { error: activationError } = await supabase.functions.invoke('sim-activation-request', {
+        body: {
+          sim_number: selectedSim.sim_number,
+          customer_id: customer.id,
+          customer_name: customer.name,
+          start_date: format(startDate, 'yyyy-MM-dd'),
+          end_date: format(endDate, 'yyyy-MM-dd'),
+        }
       });
+      
+      if (activationError) {
+        console.error('Activation request error:', activationError);
+        throw new Error('Failed to send activation request');
+      }
 
       // Step 2: Add SIM to inventory if not already there
       let inventoryItemId: string | undefined;
