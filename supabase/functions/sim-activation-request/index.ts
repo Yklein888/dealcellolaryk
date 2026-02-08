@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 }
 
 const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzKhHEQeldMrsNjL8RZMigkPvIKJDRSWD0WoDYpyGPAmGxBYFxDi_9EiUldFjnZ6TIE/exec";
@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    const { sim_number, rental_id, customer_id } = await req.json();
+    const { sim_number, rental_id, customer_id, customer_name, start_date, end_date } = await req.json();
 
     if (!sim_number) {
       return new Response(
@@ -37,12 +37,12 @@ Deno.serve(async (req) => {
       .eq('sim_number', sim_number)
       .single();
 
-    // Fetch customer name if customer_id provided
-    let customerName = null;
-    if (customer_id) {
+    // Use provided customer_name or fetch from database
+    let customerName = customer_name || null;
+    if (!customerName && customer_id) {
       const { data: customerData } = await supabase
         .from('customers')
-        .select('name, phone')
+        .select('name')
         .eq('id', customer_id)
         .single();
       customerName = customerData?.name || null;
@@ -67,22 +67,22 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Send activation request to Google Apps Script with full details
+    // Send activation request to Google Apps Script with set_pending action
     try {
+      const googlePayload = {
+        action: 'set_pending',
+        sim: sim_number,
+        customerName: customerName || '',
+        startDate: start_date || '',
+        endDate: end_date || '',
+      };
+
+      console.log('Sending to Google Script:', JSON.stringify(googlePayload));
+
       const googleResponse = await fetch(GOOGLE_SCRIPT_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'activate',
-          sim_number,
-          israeli_number: simData?.israeli_number || null,
-          local_number: simData?.local_number || null,
-          package_name: simData?.package_name || null,
-          rental_id: rental_id || null,
-          customer_id: customer_id || null,
-          customer_name: customerName,
-          requested_at: new Date().toISOString(),
-        }),
+        body: JSON.stringify(googlePayload),
         redirect: 'follow',
       });
 

@@ -13,7 +13,7 @@ export interface SimActivationData {
   linkedCustomerId: string | null;
 }
 
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzKhHEQeldMrsNjL8RZMigkPvIKJDRSWD0WoDYpyGPAmGxBYFxDi_9EiUldFjnZ6TIE/exec";
+
 
 export function useSimActivation() {
   const { toast } = useToast();
@@ -64,29 +64,21 @@ export function useSimActivation() {
         }
       }
 
-      // Update local database status first
-      await supabase
-        .from('sim_cards')
-        .update({
-          activation_status: 'pending',
-          activation_requested_at: new Date().toISOString(),
-          linked_rental_id: rentalId || null,
-          linked_customer_id: customerId || null,
-        })
-        .eq('sim_number', simNumber);
-
-      // Send POST request to Google Apps Script (matching working reference implementation)
-      await fetch(GOOGLE_SCRIPT_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'set_pending',
-          sim: simNumber,
-          customerName,
-          startDate,
-          endDate
-        })
+      // Send activation request via Edge Function (bypasses CORS)
+      const { error } = await supabase.functions.invoke('sim-activation-request', {
+        body: {
+          sim_number: simNumber,
+          rental_id: rentalId,
+          customer_id: customerId,
+          customer_name: customerName,
+          start_date: startDate,
+          end_date: endDate,
+        }
       });
+
+      if (error) {
+        throw new Error(error.message || 'Failed to send activation request');
+      }
 
       toast({
         title: 'הפקודה נשלחה!',
