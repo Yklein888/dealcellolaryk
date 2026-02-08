@@ -43,6 +43,7 @@ import { ActiveRentalsTab } from './ActiveRentalsTab';
 import { AvailableSimsTab } from './AvailableSimsTab';
 import { ExpiredSimsTab } from './ExpiredSimsTab';
 import { ActivationTab } from './ActivationTab';
+import { AllSimsTab } from './AllSimsTab';
 
 // ============================================
 // Cell Station Dashboard v6.0
@@ -453,7 +454,7 @@ export function CellStationDashboard() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
+        <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
           <TabsTrigger value="active-rentals" className="gap-2">
             <Package className="h-4 w-4" />
             השכרות פעילות
@@ -461,6 +462,10 @@ export function CellStationDashboard() {
           <TabsTrigger value="available" className="gap-2">
             <CheckCircle className="h-4 w-4" />
             זמינים ({stats.available})
+          </TabsTrigger>
+          <TabsTrigger value="all-sims" className="gap-2">
+            <Smartphone className="h-4 w-4" />
+            כל הסימים
           </TabsTrigger>
           <TabsTrigger value="expired" className="gap-2">
             <XCircle className="h-4 w-4" />
@@ -492,6 +497,16 @@ export function CellStationDashboard() {
             isLoading={isLoadingSims}
             onActivate={handleActivate}
             onAddToInventory={handleAddToInventory}
+          />
+        </TabsContent>
+
+        {/* All SIMs Tab */}
+        <TabsContent value="all-sims">
+          <AllSimsTab
+            simCards={simCards}
+            supabaseRentals={supabaseRentals}
+            supabaseInventory={supabaseInventory}
+            isLoading={isLoadingSims}
           />
         </TabsContent>
 

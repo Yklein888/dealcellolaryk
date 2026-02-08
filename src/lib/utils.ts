@@ -13,5 +13,19 @@ export function cn(...inputs: ClassValue[]) {
  */
 export function normalizeForSearch(value: string | number | null | undefined): string {
   if (value === null || value === undefined) return '';
-  return String(value).replace(/[-\s]/g, '').toLowerCase();
+  let str = String(value).replace(/[-\s]/g, '').toLowerCase();
+  
+  // Normalize Israeli numbers - remove leading zero for consistent matching
+  // 0722587082 -> 722587082, 722587082 -> 722587082
+  if (str.startsWith('0722') || str.startsWith('0752')) {
+    str = str.substring(1); // Remove leading 0
+  }
+  
+  // Normalize UK numbers - remove 44 prefix for matching
+  // 447429xxx -> 7429xxx
+  if (str.startsWith('44') && str.length > 10) {
+    str = str.substring(2);
+  }
+  
+  return str;
 }

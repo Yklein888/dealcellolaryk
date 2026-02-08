@@ -50,12 +50,12 @@ export function AvailableSimsTab({
   const [addingSimId, setAddingSimId] = useState<string | null>(null);
 
   // Get main system status for a SIM
-  // IMPORTANT: CellStation/sim_cards field mapping:
-  // - sim_cards.local_number = UK number (447429xxx)
+  // IMPORTANT: After sync fix, sim_cards now correctly has:
   // - sim_cards.israeli_number = Israeli number (722587xxx)
+  // - sim_cards.local_number = UK number (447429xxx)
   // In Supabase inventory:
-  // - localNumber = UK number (447429xxx)
-  // - israeliNumber = Israeli number (722587xxx)
+  // - localNumber = UK number (447429xxx) - but stored with formats like 0722587xxx
+  // - israeliNumber = Israeli number (722587xxx) - but stored with formats like 0722587xxx
   const getMainSystemStatus = (sim: SimCard): {
     status: 'not_found' | 'available' | 'rented' | 'overdue';
     isInInventory: boolean;
@@ -67,15 +67,22 @@ export function AvailableSimsTab({
     const localNorm = normalizeForSearch(sim.local_number); // UK (447429xxx)
     const israeliNorm = normalizeForSearch(sim.israeli_number); // Israeli (722587xxx)
     
+    // Try to find matching inventory item with normalized comparison
     const matchingItem = supabaseInventory.find(item => {
       const itemSimNorm = normalizeForSearch(item.simNumber);
-      const itemLocalNorm = normalizeForSearch(item.localNumber); // UK
-      const itemIsraeliNorm = normalizeForSearch(item.israeliNumber); // Israeli
+      const itemLocalNorm = normalizeForSearch(item.localNumber);
+      const itemIsraeliNorm = normalizeForSearch(item.israeliNumber);
       
       // Match by sim_number first (most reliable), then by phone numbers
-      return (simNorm && itemSimNorm === simNorm) ||
-             (localNorm && itemLocalNorm === localNorm) ||
-             (israeliNorm && itemIsraeliNorm === israeliNorm);
+      // Use includes for partial matching since formats vary
+      if (simNorm && itemSimNorm && itemSimNorm === simNorm) return true;
+      if (israeliNorm && itemIsraeliNorm && itemIsraeliNorm === israeliNorm) return true;
+      if (localNorm && itemLocalNorm && itemLocalNorm === localNorm) return true;
+      
+      // Also check cross-matching (Israeli number in localNumber field due to old data)
+      if (israeliNorm && itemLocalNorm && itemLocalNorm === israeliNorm) return true;
+      
+      return false;
     });
 
     if (!matchingItem) return { status: 'not_found', isInInventory: false };
