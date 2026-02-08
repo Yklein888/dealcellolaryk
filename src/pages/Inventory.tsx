@@ -57,7 +57,11 @@ export default function Inventory() {
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [syncPreview, setSyncPreview] = useState<{ toAdd: SimCard[]; existing: number } | null>(null);
+  const [syncPreview, setSyncPreview] = useState<{ 
+    toAdd: SimCard[]; 
+    toUpdate: Array<{ sim: SimCard; inventoryItem: InventoryItem; changes: string[] }>; 
+    existing: number 
+  } | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
   // Read URL params on mount
@@ -199,6 +203,17 @@ export default function Inventory() {
   const isSim = (category: ItemCategory) => 
     category === 'sim_american' || category === 'sim_european';
 
+  // Format phone number with leading zero
+  const formatPhoneWithLeadingZero = (phone: string | null | undefined): string | undefined => {
+    if (!phone) return undefined;
+    let cleaned = String(phone).replace(/[-\s]/g, '');
+    // Add leading zero if missing for Israeli numbers (722, 752, 77, etc.)
+    if (/^7\d{8,9}$/.test(cleaned)) {
+      cleaned = '0' + cleaned;
+    }
+    return cleaned;
+  };
+
   // Load sync preview from CellStation
   const loadSyncPreview = async () => {
     setIsLoadingPreview(true);
@@ -216,22 +231,57 @@ export default function Inventory() {
 
       if (error) throw error;
 
-      // Get current inventory ICCID list
-      const inventoryIccids = new Set(
-        inventory
-          .filter(item => item.simNumber)
-          .map(item => item.simNumber!.toLowerCase())
-      );
+      // Build inventory lookup by ICCID (sim_number)
+      const inventoryByIccid = new Map<string, InventoryItem>();
+      inventory
+        .filter(item => item.simNumber)
+        .forEach(item => {
+          inventoryByIccid.set(item.simNumber!.toLowerCase(), item);
+        });
 
-      // Filter SIMs not already in inventory (match by ICCID only)
-      const toAdd = (simCards || []).filter(sim => {
-        if (!sim.sim_number) return false;
-        return !inventoryIccids.has(sim.sim_number.toLowerCase());
-      });
+      // Separate SIMs into toAdd (new) and toUpdate (existing with changes)
+      const toAdd: typeof simCards = [];
+      const toUpdate: Array<{
+        sim: typeof simCards[0];
+        inventoryItem: InventoryItem;
+        changes: string[];
+      }> = [];
 
-      const existing = (simCards || []).length - toAdd.length;
+      for (const sim of simCards || []) {
+        if (!sim.sim_number) continue;
+        
+        const existingItem = inventoryByIccid.get(sim.sim_number.toLowerCase());
+        
+        if (!existingItem) {
+          // New SIM - add to inventory
+          toAdd.push(sim);
+        } else {
+          // Existing SIM - check if needs update
+          const changes: string[] = [];
+          
+          const newIsraeli = formatPhoneWithLeadingZero(sim.israeli_number);
+          const newLocal = formatPhoneWithLeadingZero(sim.local_number);
+          const newExpiry = sim.expiry_date || undefined;
+          
+          if (newIsraeli && newIsraeli !== existingItem.israeliNumber) {
+            changes.push(`מספר ישראלי: ${existingItem.israeliNumber || '-'} → ${newIsraeli}`);
+          }
+          if (newLocal && newLocal !== existingItem.localNumber) {
+            changes.push(`מספר מקומי: ${existingItem.localNumber || '-'} → ${newLocal}`);
+          }
+          if (newExpiry && newExpiry !== existingItem.expiryDate) {
+            changes.push(`תוקף: ${existingItem.expiryDate || '-'} → ${newExpiry}`);
+          }
+          
+          if (changes.length > 0) {
+            toUpdate.push({ sim, inventoryItem: existingItem, changes });
+          }
+        }
+      }
 
-      setSyncPreview({ toAdd, existing });
+      const existing = (simCards || []).length - toAdd.length - toUpdate.length;
+
+      setSyncPreview({ toAdd, toUpdate, existing });
     } catch (error: any) {
       console.error('Error loading sync preview:', error);
       toast({
@@ -245,22 +295,27 @@ export default function Inventory() {
     }
   };
 
-  // Execute sync - add all new SIMs to inventory
+  // Execute sync - add new SIMs and update existing ones
   const executeSync = async () => {
-    if (!syncPreview?.toAdd.length) return;
+    if (!syncPreview) return;
+    
+    const hasWork = (syncPreview.toAdd?.length || 0) + (syncPreview.toUpdate?.length || 0) > 0;
+    if (!hasWork) return;
 
     setIsSyncing(true);
     let added = 0;
+    let updated = 0;
     let errors = 0;
 
     try {
-      for (const sim of syncPreview.toAdd) {
+      // Add new SIMs
+      for (const sim of syncPreview.toAdd || []) {
         try {
           await addInventoryItem({
             category: 'sim_european' as ItemCategory,
-            name: `סים ${sim.israeli_number || sim.local_number || sim.sim_number}`,
-            localNumber: sim.local_number || undefined,
-            israeliNumber: sim.israeli_number || undefined,
+            name: `סים ${formatPhoneWithLeadingZero(sim.israeli_number) || formatPhoneWithLeadingZero(sim.local_number) || sim.sim_number}`,
+            localNumber: formatPhoneWithLeadingZero(sim.local_number),
+            israeliNumber: formatPhoneWithLeadingZero(sim.israeli_number),
             expiryDate: sim.expiry_date || undefined,
             simNumber: sim.sim_number || undefined,
             status: 'available',
@@ -273,9 +328,31 @@ export default function Inventory() {
         }
       }
 
+      // Update existing SIMs
+      for (const { sim, inventoryItem } of syncPreview.toUpdate || []) {
+        try {
+          const { error: updateError } = await supabase
+            .from('inventory')
+            .update({
+              israeli_number: formatPhoneWithLeadingZero(sim.israeli_number),
+              local_number: formatPhoneWithLeadingZero(sim.local_number),
+              expiry_date: sim.expiry_date || null,
+              name: `סים ${formatPhoneWithLeadingZero(sim.israeli_number) || formatPhoneWithLeadingZero(sim.local_number) || sim.sim_number}`,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', inventoryItem.id);
+          
+          if (updateError) throw updateError;
+          updated++;
+        } catch (e) {
+          console.error('Error updating SIM:', e);
+          errors++;
+        }
+      }
+
       toast({
         title: 'סנכרון הושלם',
-        description: `נוספו ${added} סימים למלאי${errors > 0 ? `, ${errors} שגיאות` : ''}`,
+        description: `נוספו ${added}, עודכנו ${updated}${errors > 0 ? `, ${errors} שגיאות` : ''}`,
       });
 
       // Refresh data
@@ -558,7 +635,7 @@ export default function Inventory() {
             ) : syncPreview ? (
               <div className="space-y-4">
                 <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                  <span className="text-muted-foreground">סימים כבר קיימים במלאי:</span>
+                  <span className="text-muted-foreground">סימים ללא שינויים:</span>
                   <span className="font-semibold">{syncPreview.existing}</span>
                 </div>
                 
@@ -567,34 +644,71 @@ export default function Inventory() {
                   <span className="font-semibold text-success">{syncPreview.toAdd.length}</span>
                 </div>
 
+                <div className="flex items-center justify-between p-3 bg-warning/10 border border-warning/20 rounded-lg">
+                  <span className="text-warning">סימים קיימים לעדכון:</span>
+                  <span className="font-semibold text-warning">{syncPreview.toUpdate?.length || 0}</span>
+                </div>
+
+                {/* New SIMs to add */}
                 {syncPreview.toAdd.length > 0 && (
-                  <div className="max-h-64 overflow-y-auto border rounded-lg">
-                    <div className="divide-y">
-                      {syncPreview.toAdd.slice(0, 20).map((sim) => (
-                        <div key={sim.id} className="p-2 text-sm flex justify-between items-center gap-2">
-                          <div className="flex items-center gap-2">
-                            <span className={`w-2 h-2 rounded-full ${sim.is_active ? 'bg-success' : 'bg-destructive'}`} />
-                            <span className="font-mono text-xs">{sim.sim_number?.slice(-8) || '-'}</span>
+                  <div>
+                    <h4 className="text-sm font-medium mb-2 text-success">חדשים להוספה:</h4>
+                    <div className="max-h-40 overflow-y-auto border rounded-lg">
+                      <div className="divide-y">
+                        {syncPreview.toAdd.slice(0, 10).map((sim) => (
+                          <div key={sim.id} className="p-2 text-sm flex justify-between items-center gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className={`w-2 h-2 rounded-full ${sim.is_active ? 'bg-success' : 'bg-destructive'}`} />
+                              <span className="font-mono text-xs">{sim.sim_number?.slice(-8) || '-'}</span>
+                            </div>
+                            <div className="text-right">
+                              <div>0{sim.israeli_number?.replace(/^0/, '') || sim.local_number?.replace(/^0/, '') || '-'}</div>
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <div>{sim.israeli_number || '-'}</div>
-                            <div className="text-xs text-muted-foreground">{sim.local_number || '-'}</div>
+                        ))}
+                        {syncPreview.toAdd.length > 10 && (
+                          <div className="p-2 text-sm text-muted-foreground text-center">
+                            ועוד {syncPreview.toAdd.length - 10} סימים...
                           </div>
-                        </div>
-                      ))}
-                      {syncPreview.toAdd.length > 20 && (
-                        <div className="p-2 text-sm text-muted-foreground text-center">
-                          ועוד {syncPreview.toAdd.length - 20} סימים...
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
 
-                {syncPreview.toAdd.length === 0 && (
+                {/* Existing SIMs to update */}
+                {(syncPreview.toUpdate?.length || 0) > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium mb-2 text-warning">סימים לעדכון:</h4>
+                    <div className="max-h-40 overflow-y-auto border rounded-lg">
+                      <div className="divide-y">
+                        {syncPreview.toUpdate?.slice(0, 10).map(({ sim, changes }) => (
+                          <div key={sim.id} className="p-2 text-sm">
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="font-mono text-xs">{sim.sim_number?.slice(-8) || '-'}</span>
+                              <span className="text-muted-foreground">
+                                0{sim.israeli_number?.replace(/^0/, '') || '-'}
+                              </span>
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {changes.join(' | ')}
+                            </div>
+                          </div>
+                        ))}
+                        {(syncPreview.toUpdate?.length || 0) > 10 && (
+                          <div className="p-2 text-sm text-muted-foreground text-center">
+                            ועוד {(syncPreview.toUpdate?.length || 0) - 10} סימים...
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {syncPreview.toAdd.length === 0 && (syncPreview.toUpdate?.length || 0) === 0 && (
                   <div className="text-center py-4 text-muted-foreground">
                     <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p>כל הסימים כבר קיימים במלאי</p>
+                    <p>כל הסימים מעודכנים</p>
                   </div>
                 )}
               </div>
@@ -611,7 +725,7 @@ export default function Inventory() {
             </Button>
             <Button
               onClick={executeSync}
-              disabled={isSyncing || isLoadingPreview || !syncPreview?.toAdd.length}
+              disabled={isSyncing || isLoadingPreview || (syncPreview?.toAdd.length === 0 && (syncPreview?.toUpdate?.length || 0) === 0)}
             >
               {isSyncing ? (
                 <>
@@ -620,8 +734,8 @@ export default function Inventory() {
                 </>
               ) : (
                 <>
-                  <Plus className="h-4 w-4 ml-2" />
-                  הוסף {syncPreview?.toAdd.length || 0} סימים
+                  <RefreshCw className="h-4 w-4 ml-2" />
+                  סנכרן {(syncPreview?.toAdd.length || 0) + (syncPreview?.toUpdate?.length || 0)} סימים
                 </>
               )}
             </Button>
