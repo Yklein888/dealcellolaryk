@@ -276,10 +276,8 @@ export default function Inventory() {
           const newLocal = formatPhoneWithLeadingZero(sim.local_number);
           const newExpiry = sim.expiry_date || undefined;
           
-          // Check name change (based on package type)
-          const newSimType = getSimTypeName(sim.package_name);
-          const phoneDisplay = newIsraeli || newLocal || sim.sim_number;
-          const expectedName = `${newSimType} ${phoneDisplay}`;
+          // Check name change (based on package type) - name is just the type, no phone number
+          const expectedName = getSimTypeName(sim.package_name);
           if (existingItem.name !== expectedName) {
             changes.push(`שם: ${existingItem.name} → ${expectedName}`);
           }
@@ -333,10 +331,9 @@ export default function Inventory() {
       for (const sim of syncPreview.toAdd || []) {
         try {
           const simType = getSimTypeName(sim.package_name);
-          const phoneDisplay = formatPhoneWithLeadingZero(sim.israeli_number) || formatPhoneWithLeadingZero(sim.local_number) || sim.sim_number;
           await addInventoryItem({
             category: 'sim_european' as ItemCategory,
-            name: `${simType} ${phoneDisplay}`,
+            name: simType,
             localNumber: formatPhoneWithLeadingZero(sim.local_number),
             israeliNumber: formatPhoneWithLeadingZero(sim.israeli_number),
             expiryDate: sim.expiry_date || undefined,
@@ -355,14 +352,13 @@ export default function Inventory() {
       for (const { sim, inventoryItem } of syncPreview.toUpdate || []) {
         try {
           const simType = getSimTypeName(sim.package_name);
-          const phoneDisplay = formatPhoneWithLeadingZero(sim.israeli_number) || formatPhoneWithLeadingZero(sim.local_number) || sim.sim_number;
           const { error: updateError } = await supabase
             .from('inventory')
             .update({
               israeli_number: formatPhoneWithLeadingZero(sim.israeli_number),
               local_number: formatPhoneWithLeadingZero(sim.local_number),
               expiry_date: sim.expiry_date || null,
-              name: `${simType} ${phoneDisplay}`,
+              name: simType,
               updated_at: new Date().toISOString(),
             })
             .eq('id', inventoryItem.id);
