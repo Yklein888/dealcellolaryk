@@ -376,7 +376,7 @@ serve(async (req) => {
   }
 
   try {
-    const { israeliNumber, localNumber, barcode, isAmericanSim, packageName, expiryDate } = await req.json();
+    const { israeliNumber, localNumber, barcode, isAmericanSim, packageName, expiryDate, simNumber } = await req.json();
     
     const formattedIsraeli = formatPhoneNumber(israeliNumber);
     const formattedLocal = formatPhoneNumber(localNumber);
@@ -393,6 +393,7 @@ serve(async (req) => {
     console.log("Is American SIM:", isAmericanSim);
     console.log("Package Name:", packageName);
     console.log("Expiry Date:", expiryDate);
+    console.log("SIM Number:", simNumber);
 
     // Fetch PDF template from Storage (use different template for American SIM if available)
     const templateName = isAmericanSim 
@@ -585,13 +586,33 @@ serve(async (req) => {
         console.log("Barcode added at:", barcodeX, barcodeY);
         
         // === ADD PACKAGE INFO next to barcode (for European SIM) ===
-        if (!isAmericanSim && (packageName || expiryDate)) {
+        if (!isAmericanSim && (packageName || expiryDate || simNumber)) {
           const packageInfoX = barcodeX + barcodeWidth + 20; // Right side of barcode
           const packageInfoY = barcodeY + barcodeHeight - 10;
           const packageFontSize = 9;
           const packageValueSize = 11;
           
           let infoY = packageInfoY;
+          
+          // SIM Number (ICCID)
+          if (simNumber) {
+            page.drawText("SIM:", {
+              x: packageInfoX,
+              y: infoY,
+              size: packageFontSize,
+              font,
+              color: rgb(0.3, 0.3, 0.3),
+            });
+            infoY -= 12;
+            page.drawText(simNumber, {
+              x: packageInfoX,
+              y: infoY,
+              size: packageValueSize,
+              font: boldFont,
+              color: rgb(0, 0, 0),
+            });
+            infoY -= 16;
+          }
           
           // Package name
           if (packageName) {
