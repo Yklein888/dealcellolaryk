@@ -594,9 +594,12 @@ serve(async (req) => {
           
           let infoY = packageInfoY;
           
-          // SIM Number (ICCID) - just the number, label optional since it's long
+          // SIM Number - strip leading zeros
           if (simNumber) {
-            page.drawText("ICCID:", {
+            // Remove all leading zeros from the SIM number
+            const strippedSimNumber = simNumber.replace(/^0+/, '') || simNumber;
+            
+            page.drawText("SIM:", {
               x: packageInfoX,
               y: infoY,
               size: packageFontSize,
@@ -604,7 +607,7 @@ serve(async (req) => {
               color: rgb(0.3, 0.3, 0.3),
             });
             infoY -= 11;
-            page.drawText(simNumber, {
+            page.drawText(strippedSimNumber, {
               x: packageInfoX,
               y: infoY,
               size: packageValueSize,
@@ -614,39 +617,47 @@ serve(async (req) => {
             infoY -= 14;
           }
           
-          // Package name - use English equivalent or sanitize Hebrew
+          // Package name - E for data, CALLS for voice
           if (packageName) {
-            // Map Hebrew package names to English
-            const packageNameMap: Record<string, string> = {
-              'דיבור': 'Voice Only',
-              'גלישה': 'Data',
-              'דיבור וגלישה': 'Voice + Data',
-              'גלישה ודיבור': 'Voice + Data',
-            };
-            const englishPackageName = packageNameMap[packageName] || 
-              (packageName.match(/^[a-zA-Z0-9\s\-\.]+$/) ? packageName : 'Package');
+            const lowerPackage = packageName.toLowerCase();
+            let planCode = '';
             
-            page.drawText("Plan:", {
-              x: packageInfoX,
-              y: infoY,
-              size: packageFontSize,
-              font,
-              color: rgb(0.3, 0.3, 0.3),
-            });
-            infoY -= 11;
-            page.drawText(englishPackageName, {
-              x: packageInfoX,
-              y: infoY,
-              size: packageValueSize,
-              font: boldFont,
-              color: rgb(0, 0, 0),
-            });
-            infoY -= 14;
+            // Check for data/גלישה
+            if (lowerPackage.includes('גלישה') || lowerPackage.includes('data') || lowerPackage.includes('internet')) {
+              planCode = 'E';
+            }
+            // Check for voice/דיבור/שיחות
+            else if (lowerPackage.includes('דיבור') || lowerPackage.includes('שיחות') || lowerPackage.includes('voice') || lowerPackage.includes('call')) {
+              planCode = 'CALLS';
+            }
+            // If both or unknown, try to determine
+            else if (packageName.match(/^[a-zA-Z0-9\s\-\.]+$/)) {
+              planCode = packageName; // Use as-is if it's English
+            }
+            
+            if (planCode) {
+              page.drawText("Plan:", {
+                x: packageInfoX,
+                y: infoY,
+                size: packageFontSize,
+                font,
+                color: rgb(0.3, 0.3, 0.3),
+              });
+              infoY -= 11;
+              page.drawText(planCode, {
+                x: packageInfoX,
+                y: infoY,
+                size: packageValueSize,
+                font: boldFont,
+                color: rgb(0, 0, 0),
+              });
+              infoY -= 14;
+            }
           }
           
           // Expiry date
           if (expiryDate) {
-            page.drawText("Expires:", {
+            page.drawText("Exp:", {
               x: packageInfoX,
               y: infoY,
               size: packageFontSize,
