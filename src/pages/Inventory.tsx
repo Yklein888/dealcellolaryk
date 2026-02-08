@@ -11,6 +11,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import {
   Select,
@@ -24,7 +26,8 @@ import {
   Search, 
   Package,
   Upload,
-  Printer as PrinterIcon
+  Printer as PrinterIcon,
+  RefreshCw
 } from 'lucide-react';
 import { BarcodeDisplay } from '@/components/BarcodeDisplay';
 import { 
@@ -37,9 +40,11 @@ import { useToast } from '@/hooks/use-toast';
 import { ImportDialog } from '@/components/inventory/ImportDialog';
 import { InventoryCategorySection } from '@/components/inventory/InventoryCategorySection';
 import { BarcodePrintDialog } from '@/components/inventory/BarcodePrintDialog';
+import { useCellstationSync, SimCard } from '@/hooks/useCellstationSync';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Inventory() {
-  const { inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem } = useRental();
+  const { inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem, refreshData } = useRental();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
@@ -50,6 +55,10 @@ export default function Inventory() {
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncPreview, setSyncPreview] = useState<{ toAdd: SimCard[]; existing: number } | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
   // Read URL params on mount
   useEffect(() => {
@@ -190,13 +199,118 @@ export default function Inventory() {
   const isSim = (category: ItemCategory) => 
     category === 'sim_american' || category === 'sim_european';
 
+  // Load sync preview from CellStation
+  const loadSyncPreview = async () => {
+    setIsLoadingPreview(true);
+    try {
+      // First sync with CellStation to get latest data
+      const { error: syncError } = await supabase.functions.invoke('cellstation-sync');
+      if (syncError) throw syncError;
+
+      // Fetch updated sim_cards
+      const { data: simCards, error } = await supabase
+        .from('sim_cards')
+        .select('*')
+        .eq('is_active', true)
+        .order('expiry_date', { ascending: true });
+
+      if (error) throw error;
+
+      // Get current inventory ICCID list
+      const inventoryIccids = new Set(
+        inventory
+          .filter(item => item.simNumber)
+          .map(item => item.simNumber!.toLowerCase())
+      );
+
+      // Filter SIMs not already in inventory (match by ICCID only)
+      const toAdd = (simCards || []).filter(sim => {
+        if (!sim.sim_number) return false;
+        return !inventoryIccids.has(sim.sim_number.toLowerCase());
+      });
+
+      const existing = (simCards || []).length - toAdd.length;
+
+      setSyncPreview({ toAdd, existing });
+    } catch (error: any) {
+      console.error('Error loading sync preview:', error);
+      toast({
+        title: 'שגיאה בטעינת נתונים',
+        description: error.message || 'לא ניתן היה לטעון את נתוני הסימים',
+        variant: 'destructive',
+      });
+      setIsSyncDialogOpen(false);
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  };
+
+  // Execute sync - add all new SIMs to inventory
+  const executeSync = async () => {
+    if (!syncPreview?.toAdd.length) return;
+
+    setIsSyncing(true);
+    let added = 0;
+    let errors = 0;
+
+    try {
+      for (const sim of syncPreview.toAdd) {
+        try {
+          await addInventoryItem({
+            category: 'sim_european' as ItemCategory,
+            name: `סים ${sim.israeli_number || sim.local_number || sim.sim_number}`,
+            localNumber: sim.local_number || undefined,
+            israeliNumber: sim.israeli_number || undefined,
+            expiryDate: sim.expiry_date || undefined,
+            simNumber: sim.sim_number || undefined,
+            status: 'available',
+            notes: sim.package_name ? `חבילה: ${sim.package_name}` : undefined,
+          });
+          added++;
+        } catch (e) {
+          console.error('Error adding SIM:', e);
+          errors++;
+        }
+      }
+
+      toast({
+        title: 'סנכרון הושלם',
+        description: `נוספו ${added} סימים למלאי${errors > 0 ? `, ${errors} שגיאות` : ''}`,
+      });
+
+      // Refresh data
+      await refreshData();
+      setIsSyncDialogOpen(false);
+      setSyncPreview(null);
+    } catch (error: any) {
+      console.error('Sync error:', error);
+      toast({
+        title: 'שגיאה בסנכרון',
+        description: error.message || 'לא ניתן היה להשלים את הסנכרון',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleOpenSyncDialog = () => {
+    setIsSyncDialogOpen(true);
+    setSyncPreview(null);
+    loadSyncPreview();
+  };
+
   return (
     <div className="animate-fade-in">
       <PageHeader 
         title="ניהול מלאי" 
         description="הוספה, עריכה ומעקב אחר פריטים במלאי"
       >
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" size="lg" onClick={handleOpenSyncDialog}>
+            <RefreshCw className="h-5 w-5" />
+            סנכרון מלאי
+          </Button>
           <Button variant="outline" size="lg" onClick={() => setIsPrintDialogOpen(true)}>
             <PrinterIcon className="h-5 w-5" />
             הדפס ברקודים
@@ -424,6 +538,90 @@ export default function Inventory() {
         onClose={() => setIsPrintDialogOpen(false)}
         items={inventory}
       />
+
+      {/* Sync Dialog */}
+      <Dialog open={isSyncDialogOpen} onOpenChange={setIsSyncDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>סנכרון מלאי מ-CellStation</DialogTitle>
+            <DialogDescription>
+              סנכרון סימים פעילים מאתר הספק והוספתם למלאי
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            {isLoadingPreview ? (
+              <div className="flex flex-col items-center justify-center py-8">
+                <RefreshCw className="h-8 w-8 animate-spin text-primary mb-3" />
+                <p className="text-muted-foreground">טוען נתונים מ-CellStation...</p>
+              </div>
+            ) : syncPreview ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <span className="text-muted-foreground">סימים כבר קיימים במלאי:</span>
+                  <span className="font-semibold">{syncPreview.existing}</span>
+                </div>
+                
+                <div className="flex items-center justify-between p-3 bg-success/10 border border-success/20 rounded-lg">
+                  <span className="text-success">סימים חדשים להוספה:</span>
+                  <span className="font-semibold text-success">{syncPreview.toAdd.length}</span>
+                </div>
+
+                {syncPreview.toAdd.length > 0 && (
+                  <div className="max-h-48 overflow-y-auto border rounded-lg">
+                    <div className="divide-y">
+                      {syncPreview.toAdd.slice(0, 10).map((sim) => (
+                        <div key={sim.id} className="p-2 text-sm flex justify-between">
+                          <span className="font-mono text-xs">{sim.sim_number?.slice(-8) || '-'}</span>
+                          <span>{sim.israeli_number || sim.local_number || '-'}</span>
+                        </div>
+                      ))}
+                      {syncPreview.toAdd.length > 10 && (
+                        <div className="p-2 text-sm text-muted-foreground text-center">
+                          ועוד {syncPreview.toAdd.length - 10} סימים...
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {syncPreview.toAdd.length === 0 && (
+                  <div className="text-center py-4 text-muted-foreground">
+                    <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p>כל הסימים כבר קיימים במלאי</p>
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsSyncDialogOpen(false)}
+              disabled={isSyncing}
+            >
+              ביטול
+            </Button>
+            <Button
+              onClick={executeSync}
+              disabled={isSyncing || isLoadingPreview || !syncPreview?.toAdd.length}
+            >
+              {isSyncing ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin ml-2" />
+                  מסנכרן...
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4 ml-2" />
+                  הוסף {syncPreview?.toAdd.length || 0} סימים
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Filters */}
       <div className="flex flex-col gap-3 sm:gap-4 mb-4 sm:mb-6">
