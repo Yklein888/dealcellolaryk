@@ -214,6 +214,19 @@ export default function Inventory() {
     return cleaned;
   };
 
+  // Determine SIM type based on package name
+  const getSimTypeName = (packageName: string | null | undefined): string => {
+    if (!packageName) return 'סים';
+    const lower = packageName.toLowerCase();
+    if (lower.includes('גלישה') || lower.includes('גיגה') || lower.includes('data') || lower.includes('gb')) {
+      return 'סים גלישה';
+    }
+    if (lower.includes('דיבור') || lower.includes('שיחות') || lower.includes('calls') || lower.includes('voice')) {
+      return 'סים שיחות';
+    }
+    return 'סים';
+  };
+
   // Load sync preview from CellStation
   const loadSyncPreview = async () => {
     setIsLoadingPreview(true);
@@ -311,9 +324,11 @@ export default function Inventory() {
       // Add new SIMs
       for (const sim of syncPreview.toAdd || []) {
         try {
+          const simType = getSimTypeName(sim.package_name);
+          const phoneDisplay = formatPhoneWithLeadingZero(sim.israeli_number) || formatPhoneWithLeadingZero(sim.local_number) || sim.sim_number;
           await addInventoryItem({
             category: 'sim_european' as ItemCategory,
-            name: `סים ${formatPhoneWithLeadingZero(sim.israeli_number) || formatPhoneWithLeadingZero(sim.local_number) || sim.sim_number}`,
+            name: `${simType} ${phoneDisplay}`,
             localNumber: formatPhoneWithLeadingZero(sim.local_number),
             israeliNumber: formatPhoneWithLeadingZero(sim.israeli_number),
             expiryDate: sim.expiry_date || undefined,
@@ -331,13 +346,15 @@ export default function Inventory() {
       // Update existing SIMs
       for (const { sim, inventoryItem } of syncPreview.toUpdate || []) {
         try {
+          const simType = getSimTypeName(sim.package_name);
+          const phoneDisplay = formatPhoneWithLeadingZero(sim.israeli_number) || formatPhoneWithLeadingZero(sim.local_number) || sim.sim_number;
           const { error: updateError } = await supabase
             .from('inventory')
             .update({
               israeli_number: formatPhoneWithLeadingZero(sim.israeli_number),
               local_number: formatPhoneWithLeadingZero(sim.local_number),
               expiry_date: sim.expiry_date || null,
-              name: `סים ${formatPhoneWithLeadingZero(sim.israeli_number) || formatPhoneWithLeadingZero(sim.local_number) || sim.sim_number}`,
+              name: `${simType} ${phoneDisplay}`,
               updated_at: new Date().toISOString(),
             })
             .eq('id', inventoryItem.id);
