@@ -21,6 +21,21 @@ function parseExpiryDate(expiry: string): string | null {
   return null;
 }
 
+// Normalize number for consistent matching
+function normalizeNumber(value: string | null | undefined): string {
+  if (!value) return '';
+  let str = String(value).replace(/[-\s]/g, '').toLowerCase();
+  // Remove leading zero from Israeli numbers
+  if (str.startsWith('0722') || str.startsWith('0752')) {
+    str = str.substring(1);
+  }
+  // Remove 44 prefix from UK numbers
+  if (str.startsWith('44') && str.length > 10) {
+    str = str.substring(2);
+  }
+  return str;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -42,32 +57,38 @@ Deno.serve(async (req) => {
 
     const data = await response.json();
     const services = data.services || [];
+    const rentals = data.rentals || [];
 
-    console.log(`✅ התקבלו ${services.length} סימים`);
+    console.log(`✅ התקבלו ${services.length} סימים מ-services ו-${rentals.length} השכרות מ-rentals`);
 
     let updated = 0;
     let inserted = 0;
+    const processedSims = new Set<string>();
 
+    // Process services (available SIMs)
     for (const item of services) {
       const simNumber = String(item.sim || '').trim();
       if (!simNumber) continue;
+      processedSims.add(simNumber);
 
-      // Check if exists
+      // Check if exists by sim_number
       const { data: existing } = await supabase
         .from('sim_cards')
         .select('id')
         .eq('sim_number', simNumber)
         .maybeSingle();
 
+      // IMPORTANT: Field mapping from Google Script is SWAPPED
+      // item.local_number = Israeli number (722587xxx)
+      // item.israel_number = UK number (447429xxx)
       const simData = {
         sim_number: simNumber,
-        // Swapped: israel_number from source contains local numbers (7225...)
-        // and local_number from source contains Israeli numbers (44...)
-        local_number: item.israel_number ? String(item.israel_number).trim() : null,
         israeli_number: item.local_number ? String(item.local_number).trim() : null,
+        local_number: item.israel_number ? String(item.israel_number).trim() : null,
         package_name: item.plan ? String(item.plan).trim() : null,
         expiry_date: parseExpiryDate(String(item.expiry || '')),
         is_active: String(item.status || '').toLowerCase() === 'active',
+        is_rented: false, // In services = available
         last_synced: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -81,14 +102,50 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`🎉 סנכרון הושלם: ${updated} עודכנו, ${inserted} נוספו`);
+    // Process rentals (rented SIMs)
+    for (const rental of rentals) {
+      const simNumber = String(rental.sim || '').trim();
+      if (!simNumber || processedSims.has(simNumber)) continue;
+      processedSims.add(simNumber);
+
+      const { data: existing } = await supabase
+        .from('sim_cards')
+        .select('id')
+        .eq('sim_number', simNumber)
+        .maybeSingle();
+
+      // IMPORTANT: Same swapped mapping for rentals
+      // rental.local_number = Israeli number
+      // rental.israel_number = UK number
+      const simData = {
+        sim_number: simNumber,
+        israeli_number: rental.local_number ? String(rental.local_number).trim() : null,
+        local_number: rental.israel_number ? String(rental.israel_number).trim() : null,
+        package_name: rental.plan ? String(rental.plan).trim() : null,
+        expiry_date: null, // Rentals don't have expiry in the same format
+        is_active: true,
+        is_rented: true, // In rentals = currently rented
+        last_synced: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      if (existing) {
+        await supabase.from('sim_cards').update(simData).eq('id', existing.id);
+        updated++;
+      } else {
+        await supabase.from('sim_cards').insert({ ...simData, created_at: new Date().toISOString() });
+        inserted++;
+      }
+    }
+
+    console.log(`🎉 סנכרון הושלם: ${updated} עודכנו, ${inserted} נוספו (סה"כ ${processedSims.size} סימים)`);
 
     return new Response(
       JSON.stringify({
         success: true,
         updated,
         inserted,
-        total: services.length,
+        total: processedSims.size,
         message: `${updated} סימים עודכנו, ${inserted} סימים נוספו`,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

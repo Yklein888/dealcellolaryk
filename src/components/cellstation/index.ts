@@ -5,3 +5,4 @@ export { CustomersTab } from './CustomersTab';
 export { ActiveRentalsTab } from './ActiveRentalsTab';
 export { AvailableSimsTab } from './AvailableSimsTab';
 export { ExpiredSimsTab } from './ExpiredSimsTab';
+export { AllSimsTab } from './AllSimsTab';

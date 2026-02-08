@@ -112,12 +112,13 @@ export function ActiveRentalsTab({
   };
 
   // Get main system rental info for a SIM
-  // IMPORTANT: CellStation field mapping is SWAPPED:
+  // IMPORTANT: CellStation field mapping from Google Script:
   // - CellStation local_number = Israeli number (722587xxx)
   // - CellStation israel_number = UK/local number (447429xxx)
-  // While in Supabase inventory:
-  // - localNumber = UK number (447429xxx)
-  // - israeliNumber = Israeli number (722587xxx)
+  // While in Supabase inventory (after import):
+  // - localNumber = can be Israeli or UK depending on how it was added
+  // - israeliNumber = Israeli number
+  // - simNumber = ICCID
   const getMainSystemInfo = (
     csLocalNumber: string | null, // CellStation's local_number = Israeli number
     csIsraelNumber: string | null, // CellStation's israel_number = UK number
@@ -131,29 +132,35 @@ export function ActiveRentalsTab({
   } => {
     if (!csLocalNumber && !csIsraelNumber && !simNumber) return { status: 'not_found' };
 
-    // Normalize all search values
+    // Normalize all search values - this now handles leading zeros and UK prefix
     const israeliNumNorm = normalizeForSearch(csLocalNumber); // Israeli (722587xxx)
-    const localNumNorm = normalizeForSearch(csIsraelNumber); // UK (447429xxx)
+    const localNumNorm = normalizeForSearch(csIsraelNumber); // UK (447429xxx -> 7429xxx)
     const simNorm = normalizeForSearch(simNumber);
 
-    // Find matching inventory item with correct field mapping.
-    // NOTE: prefer ICCID match, but fall back to phone numbers.
+    // Find matching inventory item with improved matching logic
     const matchingItem = supabaseInventory.find(item => {
-      const itemLocalNorm = normalizeForSearch(item.localNumber); // UK in inventory
-      const itemIsraeliNorm = normalizeForSearch(item.israeliNumber); // Israeli in inventory
+      const itemLocalNorm = normalizeForSearch(item.localNumber);
+      const itemIsraeliNorm = normalizeForSearch(item.israeliNumber);
       const itemSimNorm = normalizeForSearch(item.simNumber);
 
-      return (
-        (simNorm && itemSimNorm === simNorm) ||
-        (israeliNumNorm && itemIsraeliNorm === israeliNumNorm) ||
-        (localNumNorm && itemLocalNorm === localNumNorm)
-      );
+      // Priority 1: Match by ICCID (most reliable)
+      if (simNorm && itemSimNorm && itemSimNorm === simNorm) return true;
+      
+      // Priority 2: Match by Israeli number
+      if (israeliNumNorm && itemIsraeliNorm && itemIsraeliNorm === israeliNumNorm) return true;
+      
+      // Priority 3: Match Israeli number against localNumber field (old data format)
+      if (israeliNumNorm && itemLocalNorm && itemLocalNorm === israeliNumNorm) return true;
+      
+      // Priority 4: Match by UK number
+      if (localNumNorm && itemLocalNorm && itemLocalNorm === localNumNorm) return true;
+
+      return false;
     });
 
     if (!matchingItem) return { status: 'not_found' };
 
-    // Always cross-check active rentals even if the inventory status is "available",
-    // because inventory status can be stale / not yet synced.
+    // Always cross-check active rentals even if the inventory status is "available"
     const activeRental = supabaseRentals.find(r =>
       r.status !== 'returned' &&
       r.items.some(item => item.inventoryItemId === matchingItem.id)
@@ -172,7 +179,6 @@ export function ActiveRentalsTab({
     }
 
     // If CellStation shows an active rental but the main system has no linked active rental
-    // and inventory is marked available → highlight mismatch.
     if (matchingItem.status === 'available' && !isCellStationEnded) {
       return { status: 'unsynced' };
     }
