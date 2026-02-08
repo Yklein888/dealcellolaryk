@@ -64,23 +64,33 @@ export function AvailableSimsTab({
     endDate?: string;
   } => {
     const simNorm = normalizeForSearch(sim.sim_number);
-    const localNorm = normalizeForSearch(sim.local_number); // UK (447429xxx)
-    const israeliNorm = normalizeForSearch(sim.israeli_number); // Israeli (722587xxx)
     
-    // Try to find matching inventory item with normalized comparison
+    // IMPORTANT: Always match by ICCID (sim_number) first - it's the unique identifier
+    // Only fallback to phone numbers if ICCID is missing (legacy data)
     const matchingItem = supabaseInventory.find(item => {
       const itemSimNorm = normalizeForSearch(item.simNumber);
-      const itemLocalNorm = normalizeForSearch(item.localNumber);
-      const itemIsraeliNorm = normalizeForSearch(item.israeliNumber);
       
-      // Match by sim_number first (most reliable), then by phone numbers
-      // Use includes for partial matching since formats vary
-      if (simNorm && itemSimNorm && itemSimNorm === simNorm) return true;
-      if (israeliNorm && itemIsraeliNorm && itemIsraeliNorm === israeliNorm) return true;
-      if (localNorm && itemLocalNorm && itemLocalNorm === localNorm) return true;
+      // Priority 1: Match by ICCID - this is the most reliable unique identifier
+      if (simNorm && itemSimNorm && itemSimNorm === simNorm) {
+        return true;
+      }
       
-      // Also check cross-matching (Israeli number in localNumber field due to old data)
-      if (israeliNorm && itemLocalNorm && itemLocalNorm === israeliNorm) return true;
+      // Priority 2: If ICCID is not available, match by phone numbers (legacy fallback only)
+      if (!simNorm || !itemSimNorm) {
+        const localNorm = normalizeForSearch(sim.local_number);
+        const israeliNorm = normalizeForSearch(sim.israeli_number);
+        const itemLocalNorm = normalizeForSearch(item.localNumber);
+        const itemIsraeliNorm = normalizeForSearch(item.israeliNumber);
+        
+        // Match Israeli number (primary phone field)
+        if (israeliNorm && itemIsraeliNorm && itemIsraeliNorm === israeliNorm) return true;
+        
+        // Match local/UK number
+        if (localNorm && itemLocalNorm && itemLocalNorm === localNorm) return true;
+        
+        // Cross-matching for old data (Israeli in localNumber field)
+        if (israeliNorm && itemLocalNorm && itemLocalNorm === israeliNorm) return true;
+      }
       
       return false;
     });
