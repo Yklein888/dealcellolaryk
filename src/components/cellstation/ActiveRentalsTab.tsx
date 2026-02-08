@@ -112,22 +112,41 @@ export function ActiveRentalsTab({
   };
 
   // Get main system rental info for a SIM
-  const getMainSystemInfo = (localNumber: string | null, simNumber: string | null): {
+  // IMPORTANT: CellStation field mapping is SWAPPED:
+  // - CellStation local_number = Israeli number (722587xxx)
+  // - CellStation israel_number = UK/local number (447429xxx)
+  // While in Supabase inventory:
+  // - localNumber = UK number (447429xxx)
+  // - israeliNumber = Israeli number (722587xxx)
+  const getMainSystemInfo = (
+    csLocalNumber: string | null, // CellStation's local_number = Israeli number
+    csIsraelNumber: string | null, // CellStation's israel_number = UK number
+    simNumber: string | null
+  ): {
     status: 'not_found' | 'available' | 'rented' | 'overdue' | 'returned';
     rental?: SupabaseRental;
     customerName?: string;
     endDate?: string;
   } => {
-    if (!localNumber && !simNumber) return { status: 'not_found' };
+    if (!csLocalNumber && !csIsraelNumber && !simNumber) return { status: 'not_found' };
     
-    const normalizedLocal = normalizeForSearch(localNumber);
-    const normalizedSim = normalizeForSearch(simNumber);
+    // Normalize all search values
+    const israeliNumNorm = normalizeForSearch(csLocalNumber); // Israeli (722587xxx)
+    const localNumNorm = normalizeForSearch(csIsraelNumber); // UK (447429xxx)
+    const simNorm = normalizeForSearch(simNumber);
     
+    // Find matching inventory item with correct field mapping
     const matchingItem = supabaseInventory.find(item => {
-      const itemLocalNorm = normalizeForSearch(item.localNumber);
+      const itemLocalNorm = normalizeForSearch(item.localNumber); // UK in inventory
+      const itemIsraeliNorm = normalizeForSearch(item.israeliNumber); // Israeli in inventory
       const itemSimNorm = normalizeForSearch(item.simNumber);
-      return (normalizedLocal && itemLocalNorm === normalizedLocal) ||
-             (normalizedSim && itemSimNorm === normalizedSim);
+      
+      // Match: CS israeli (local_number) → inventory israeliNumber
+      // Match: CS UK (israel_number) → inventory localNumber
+      // Match: sim_number → simNumber
+      return (simNorm && itemSimNorm === simNorm) ||
+             (israeliNumNorm && itemIsraeliNorm === israeliNumNorm) ||
+             (localNumNorm && itemLocalNorm === localNumNorm);
     });
 
     if (!matchingItem) return { status: 'not_found' };
@@ -228,7 +247,15 @@ export function ActiveRentalsTab({
                 {filteredRentals.map((rental, idx) => {
                   const rentalId = rental.rental_id || `${idx}`;
                   const isExpanded = expandedRentalIds.has(rentalId);
-                  const mainSystemInfo = getMainSystemInfo(rental.local_number, rental.sim);
+                  // Pass all three identifiers for proper matching:
+                  // rental.local_number = Israeli (722587xxx)
+                  // rental.israel_number = UK (447429xxx)
+                  // rental.sim = ICCID
+                  const mainSystemInfo = getMainSystemInfo(
+                    rental.local_number,
+                    rental.israel_number,
+                    rental.sim
+                  );
                   const needsReplacement = mainSystemInfo.status === 'overdue';
                   
                   return (
