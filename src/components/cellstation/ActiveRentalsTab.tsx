@@ -121,57 +121,62 @@ export function ActiveRentalsTab({
   const getMainSystemInfo = (
     csLocalNumber: string | null, // CellStation's local_number = Israeli number
     csIsraelNumber: string | null, // CellStation's israel_number = UK number
-    simNumber: string | null
+    simNumber: string | null,
+    isCellStationEnded?: boolean
   ): {
-    status: 'not_found' | 'available' | 'rented' | 'overdue' | 'returned';
+    status: 'not_found' | 'available' | 'rented' | 'overdue' | 'unsynced';
     rental?: SupabaseRental;
     customerName?: string;
     endDate?: string;
   } => {
     if (!csLocalNumber && !csIsraelNumber && !simNumber) return { status: 'not_found' };
-    
+
     // Normalize all search values
     const israeliNumNorm = normalizeForSearch(csLocalNumber); // Israeli (722587xxx)
     const localNumNorm = normalizeForSearch(csIsraelNumber); // UK (447429xxx)
     const simNorm = normalizeForSearch(simNumber);
-    
-    // Find matching inventory item with correct field mapping
+
+    // Find matching inventory item with correct field mapping.
+    // NOTE: prefer ICCID match, but fall back to phone numbers.
     const matchingItem = supabaseInventory.find(item => {
       const itemLocalNorm = normalizeForSearch(item.localNumber); // UK in inventory
       const itemIsraeliNorm = normalizeForSearch(item.israeliNumber); // Israeli in inventory
       const itemSimNorm = normalizeForSearch(item.simNumber);
-      
-      // Match: CS israeli (local_number) → inventory israeliNumber
-      // Match: CS UK (israel_number) → inventory localNumber
-      // Match: sim_number → simNumber
-      return (simNorm && itemSimNorm === simNorm) ||
-             (israeliNumNorm && itemIsraeliNorm === israeliNumNorm) ||
-             (localNumNorm && itemLocalNorm === localNumNorm);
+
+      return (
+        (simNorm && itemSimNorm === simNorm) ||
+        (israeliNumNorm && itemIsraeliNorm === israeliNumNorm) ||
+        (localNumNorm && itemLocalNorm === localNumNorm)
+      );
     });
 
     if (!matchingItem) return { status: 'not_found' };
-    
-    if (matchingItem.status === 'available') return { status: 'returned' };
-    
-    if (matchingItem.status === 'rented') {
-      const activeRental = supabaseRentals.find(r => 
-        r.status !== 'returned' &&
-        r.items.some(item => item.inventoryItemId === matchingItem.id)
-      );
-      
-      if (activeRental) {
-        const isOverdue = activeRental.status === 'overdue' || 
-          new Date(activeRental.endDate) < new Date();
-        
-        return {
-          status: isOverdue ? 'overdue' : 'rented',
-          rental: activeRental,
-          customerName: activeRental.customerName,
-          endDate: activeRental.endDate
-        };
-      }
+
+    // Always cross-check active rentals even if the inventory status is "available",
+    // because inventory status can be stale / not yet synced.
+    const activeRental = supabaseRentals.find(r =>
+      r.status !== 'returned' &&
+      r.items.some(item => item.inventoryItemId === matchingItem.id)
+    );
+
+    if (activeRental) {
+      const isOverdue =
+        activeRental.status === 'overdue' || new Date(activeRental.endDate) < new Date();
+
+      return {
+        status: isOverdue ? 'overdue' : 'rented',
+        rental: activeRental,
+        customerName: activeRental.customerName,
+        endDate: activeRental.endDate,
+      };
     }
-    
+
+    // If CellStation shows an active rental but the main system has no linked active rental
+    // and inventory is marked available → highlight mismatch.
+    if (matchingItem.status === 'available' && !isCellStationEnded) {
+      return { status: 'unsynced' };
+    }
+
     return { status: 'available' };
   };
 
@@ -247,6 +252,8 @@ export function ActiveRentalsTab({
                 {filteredRentals.map((rental, idx) => {
                   const rentalId = rental.rental_id || `${idx}`;
                   const isExpanded = expandedRentalIds.has(rentalId);
+                  const isCellStationEnded = rental.status === 'הסתיים' || rental.status === 'ended';
+
                   // Pass all three identifiers for proper matching:
                   // rental.local_number = Israeli (722587xxx)
                   // rental.israel_number = UK (447429xxx)
@@ -254,7 +261,8 @@ export function ActiveRentalsTab({
                   const mainSystemInfo = getMainSystemInfo(
                     rental.local_number,
                     rental.israel_number,
-                    rental.sim
+                    rental.sim,
+                    isCellStationEnded
                   );
                   const needsReplacement = mainSystemInfo.status === 'overdue';
                   
@@ -296,23 +304,41 @@ export function ActiveRentalsTab({
                               לא במערכת
                             </Badge>
                           )}
-                          {mainSystemInfo.status === 'returned' && (
-                            <Badge className="bg-success/20 text-success border-success/30 gap-1">
-                              <CheckCircle className="h-3 w-3" />
-                              הוחזר
-                            </Badge>
+
+                          {mainSystemInfo.status === 'unsynced' && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="inline-flex">
+                                    <Badge variant="warning" className="gap-1 cursor-help">
+                                      <AlertTriangle className="h-3 w-3" />
+                                      לא מסונכרן
+                                    </Badge>
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <div className="text-sm leading-relaxed">
+                                    ב-CellStation יש השכרה פעילה, אבל במערכת הראשית הפריט מסומן כ"זמין" ואין השכרה מקושרת.
+                                    <br />
+                                    לרוב זה אומר שההשכרה לא נרשמה/לא עודכן מלאי.
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           )}
+
                           {mainSystemInfo.status === 'available' && (
-                            <Badge className="bg-success/20 text-success border-success/30 gap-1">
+                            <Badge variant="success" className="gap-1">
                               <CheckCircle className="h-3 w-3" />
                               זמין
                             </Badge>
                           )}
+
                           {mainSystemInfo.status === 'rented' && (
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger>
-                                  <Badge className="bg-primary/20 text-primary border-primary/30 gap-1 cursor-help">
+                                  <Badge variant="default" className="gap-1 cursor-help">
                                     📱 מושכר
                                   </Badge>
                                 </TooltipTrigger>
@@ -325,6 +351,7 @@ export function ActiveRentalsTab({
                               </Tooltip>
                             </TooltipProvider>
                           )}
+
                           {mainSystemInfo.status === 'overdue' && (
                             <div className="flex flex-col gap-1">
                               <Badge variant="destructive" className="gap-1">
