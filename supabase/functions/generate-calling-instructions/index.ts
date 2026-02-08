@@ -583,6 +583,57 @@ serve(async (req) => {
         });
         
         console.log("Barcode added at:", barcodeX, barcodeY);
+        
+        // === ADD PACKAGE INFO next to barcode (for European SIM) ===
+        if (!isAmericanSim && (packageName || expiryDate)) {
+          const packageInfoX = barcodeX + barcodeWidth + 20; // Right side of barcode
+          const packageInfoY = barcodeY + barcodeHeight - 10;
+          const packageFontSize = 9;
+          const packageValueSize = 11;
+          
+          let infoY = packageInfoY;
+          
+          // Package name
+          if (packageName) {
+            page.drawText("Package:", {
+              x: packageInfoX,
+              y: infoY,
+              size: packageFontSize,
+              font,
+              color: rgb(0.3, 0.3, 0.3),
+            });
+            infoY -= 12;
+            page.drawText(packageName, {
+              x: packageInfoX,
+              y: infoY,
+              size: packageValueSize,
+              font: boldFont,
+              color: rgb(0, 0, 0),
+            });
+            infoY -= 16;
+          }
+          
+          // Expiry date
+          if (expiryDate) {
+            page.drawText("Expiry:", {
+              x: packageInfoX,
+              y: infoY,
+              size: packageFontSize,
+              font,
+              color: rgb(0.3, 0.3, 0.3),
+            });
+            infoY -= 12;
+            page.drawText(expiryDate, {
+              x: packageInfoX,
+              y: infoY,
+              size: packageValueSize,
+              font: boldFont,
+              color: rgb(0, 0, 0),
+            });
+          }
+          
+          console.log("Package info added next to barcode for European SIM");
+        }
       } catch (error) {
         console.error('Error adding barcode:', error);
       }
