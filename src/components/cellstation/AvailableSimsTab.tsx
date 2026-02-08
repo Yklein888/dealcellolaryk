@@ -50,6 +50,12 @@ export function AvailableSimsTab({
   const [addingSimId, setAddingSimId] = useState<string | null>(null);
 
   // Get main system status for a SIM
+  // IMPORTANT: CellStation/sim_cards field mapping:
+  // - sim_cards.local_number = UK number (447429xxx)
+  // - sim_cards.israeli_number = Israeli number (722587xxx)
+  // In Supabase inventory:
+  // - localNumber = UK number (447429xxx)
+  // - israeliNumber = Israeli number (722587xxx)
   const getMainSystemStatus = (sim: SimCard): {
     status: 'not_found' | 'available' | 'rented' | 'overdue';
     isInInventory: boolean;
@@ -57,14 +63,19 @@ export function AvailableSimsTab({
     customerName?: string;
     endDate?: string;
   } => {
-    const normalizedSim = normalizeForSearch(sim.sim_number);
-    const normalizedLocal = normalizeForSearch(sim.local_number);
+    const simNorm = normalizeForSearch(sim.sim_number);
+    const localNorm = normalizeForSearch(sim.local_number); // UK (447429xxx)
+    const israeliNorm = normalizeForSearch(sim.israeli_number); // Israeli (722587xxx)
     
     const matchingItem = supabaseInventory.find(item => {
       const itemSimNorm = normalizeForSearch(item.simNumber);
-      const itemLocalNorm = normalizeForSearch(item.localNumber);
-      return (normalizedSim && itemSimNorm === normalizedSim) ||
-             (normalizedLocal && itemLocalNorm === normalizedLocal);
+      const itemLocalNorm = normalizeForSearch(item.localNumber); // UK
+      const itemIsraeliNorm = normalizeForSearch(item.israeliNumber); // Israeli
+      
+      // Match by sim_number first (most reliable), then by phone numbers
+      return (simNorm && itemSimNorm === simNorm) ||
+             (localNorm && itemLocalNorm === localNorm) ||
+             (israeliNorm && itemIsraeliNorm === israeliNorm);
     });
 
     if (!matchingItem) return { status: 'not_found', isInInventory: false };

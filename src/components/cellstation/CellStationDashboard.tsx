@@ -198,14 +198,19 @@ export function CellStationDashboard() {
       }
       
       // Check main system status
+      // sim_cards.local_number = UK (447429xxx)
+      // sim_cards.israeli_number = Israeli (722587xxx)
       const normalizedSim = normalizeForSearch(sim.sim_number);
-      const normalizedLocal = normalizeForSearch(sim.local_number);
+      const normalizedLocal = normalizeForSearch(sim.local_number); // UK
+      const normalizedIsraeli = normalizeForSearch(sim.israeli_number); // Israeli
       
       const matchingItem = supabaseInventory.find(item => {
         const itemSimNorm = normalizeForSearch(item.simNumber);
-        const itemLocalNorm = normalizeForSearch(item.localNumber);
+        const itemLocalNorm = normalizeForSearch(item.localNumber); // UK
+        const itemIsraeliNorm = normalizeForSearch(item.israeliNumber); // Israeli
         return (normalizedSim && itemSimNorm === normalizedSim) ||
-               (normalizedLocal && itemLocalNorm === normalizedLocal);
+               (normalizedLocal && itemLocalNorm === normalizedLocal) ||
+               (normalizedIsraeli && itemIsraeliNorm === normalizedIsraeli);
       });
       
       if (matchingItem?.status === 'rented') {
