@@ -809,6 +809,14 @@ export function ActivationTab({
               />
             </div>
 
+            {/* Customer Requirement Warning */}
+            {!selectedCustomerId && selectedSim && (
+              <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning/30 rounded-lg text-sm text-warning">
+                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                <span className="font-medium">חובה לבחור לקוח לפני ההפעלה</span>
+              </div>
+            )}
+
             {/* Action Button */}
             <Button
               onClick={handleActivateAndRent}
