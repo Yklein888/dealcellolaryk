@@ -207,11 +207,11 @@ export default function Inventory() {
       const { error: syncError } = await supabase.functions.invoke('cellstation-sync');
       if (syncError) throw syncError;
 
-      // Fetch updated sim_cards
+      // Fetch ALL sim_cards (including inactive)
       const { data: simCards, error } = await supabase
         .from('sim_cards')
         .select('*')
-        .eq('is_active', true)
+        .order('is_active', { ascending: false })
         .order('expiry_date', { ascending: true });
 
       if (error) throw error;
@@ -568,17 +568,23 @@ export default function Inventory() {
                 </div>
 
                 {syncPreview.toAdd.length > 0 && (
-                  <div className="max-h-48 overflow-y-auto border rounded-lg">
+                  <div className="max-h-64 overflow-y-auto border rounded-lg">
                     <div className="divide-y">
-                      {syncPreview.toAdd.slice(0, 10).map((sim) => (
-                        <div key={sim.id} className="p-2 text-sm flex justify-between">
-                          <span className="font-mono text-xs">{sim.sim_number?.slice(-8) || '-'}</span>
-                          <span>{sim.israeli_number || sim.local_number || '-'}</span>
+                      {syncPreview.toAdd.slice(0, 20).map((sim) => (
+                        <div key={sim.id} className="p-2 text-sm flex justify-between items-center gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className={`w-2 h-2 rounded-full ${sim.is_active ? 'bg-success' : 'bg-destructive'}`} />
+                            <span className="font-mono text-xs">{sim.sim_number?.slice(-8) || '-'}</span>
+                          </div>
+                          <div className="text-right">
+                            <div>{sim.israeli_number || '-'}</div>
+                            <div className="text-xs text-muted-foreground">{sim.local_number || '-'}</div>
+                          </div>
                         </div>
                       ))}
-                      {syncPreview.toAdd.length > 10 && (
+                      {syncPreview.toAdd.length > 20 && (
                         <div className="p-2 text-sm text-muted-foreground text-center">
-                          ועוד {syncPreview.toAdd.length - 10} סימים...
+                          ועוד {syncPreview.toAdd.length - 20} סימים...
                         </div>
                       )}
                     </div>
