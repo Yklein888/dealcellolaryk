@@ -276,6 +276,14 @@ export default function Inventory() {
           const newLocal = formatPhoneWithLeadingZero(sim.local_number);
           const newExpiry = sim.expiry_date || undefined;
           
+          // Check name change (based on package type)
+          const newSimType = getSimTypeName(sim.package_name);
+          const phoneDisplay = newIsraeli || newLocal || sim.sim_number;
+          const expectedName = `${newSimType} ${phoneDisplay}`;
+          if (existingItem.name !== expectedName) {
+            changes.push(`שם: ${existingItem.name} → ${expectedName}`);
+          }
+          
           if (newIsraeli && newIsraeli !== existingItem.israeliNumber) {
             changes.push(`מספר ישראלי: ${existingItem.israeliNumber || '-'} → ${newIsraeli}`);
           }
