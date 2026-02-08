@@ -159,7 +159,8 @@ export function SimInventoryTab({
         inventoryItem?.barcode,
         false,
         sim.package_name || undefined,
-        sim.expiry_date || undefined
+        sim.expiry_date || undefined,
+        sim.sim_number || undefined
       );
       toast({
         title: 'הדפסה מתחילה',

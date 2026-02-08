@@ -403,7 +403,8 @@ export default function Rentals() {
     barcode?: string, 
     isAmericanSim?: boolean,
     packageName?: string,
-    expiryDate?: string
+    expiryDate?: string,
+    simNumber?: string
   ) => {
     if (!israeliNumber && !localNumber) {
       toast({
@@ -417,7 +418,7 @@ export default function Rentals() {
     setDownloadingInstructions(itemId);
 
     try {
-      await printCallingInstructions(israeliNumber, localNumber, barcode, isAmericanSim, packageName, expiryDate);
+      await printCallingInstructions(israeliNumber, localNumber, barcode, isAmericanSim, packageName, expiryDate, simNumber);
       toast({
         title: 'פותח חלון הדפסה',
         description: 'בחר מדפסת והדפס את ההוראות',
@@ -431,7 +432,7 @@ export default function Rentals() {
       });
       // Fallback to download
       try {
-        await downloadCallingInstructions(israeliNumber, localNumber, barcode, isAmericanSim, packageName, expiryDate);
+        await downloadCallingInstructions(israeliNumber, localNumber, barcode, isAmericanSim, packageName, expiryDate, simNumber);
         toast({
           title: 'הקובץ הורד',
           description: 'פתח את הקובץ והדפס אותו ידנית',
@@ -822,12 +823,13 @@ export default function Rentals() {
                                 let localNumber = inventoryItem?.localNumber;
                                 let barcode = inventoryItem?.barcode;
                                 let expiryDate = inventoryItem?.expiryDate;
+                                let simNumber = inventoryItem?.simNumber;
                                 let packageName: string | undefined;
                                 
                                 if (!inventoryItem && simItem.inventoryItemId) {
                                   const { data } = await supabase
                                     .from('inventory')
-                                    .select('israeli_number, local_number, barcode, expiry_date, name')
+                                    .select('israeli_number, local_number, barcode, expiry_date, name, sim_number')
                                     .eq('id', simItem.inventoryItemId)
                                     .maybeSingle();
                                   if (data) {
@@ -836,6 +838,7 @@ export default function Rentals() {
                                     barcode = data.barcode || undefined;
                                     expiryDate = data.expiry_date || undefined;
                                     packageName = data.name || undefined;
+                                    simNumber = data.sim_number || undefined;
                                   }
                                 } else if (inventoryItem) {
                                   packageName = inventoryItem.name;
@@ -853,7 +856,8 @@ export default function Rentals() {
                                   barcode || undefined, 
                                   isAmericanSim,
                                   packageName,
-                                  formattedExpiry
+                                  formattedExpiry,
+                                  simNumber
                                 );
                               }}
                                 className="gap-1 text-xs w-full"
