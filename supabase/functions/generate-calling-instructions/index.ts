@@ -590,20 +590,20 @@ serve(async (req) => {
           const packageInfoX = barcodeX + barcodeWidth + 20; // Right side of barcode
           const packageInfoY = barcodeY + barcodeHeight - 10;
           const packageFontSize = 9;
-          const packageValueSize = 11;
+          const packageValueSize = 10;
           
           let infoY = packageInfoY;
           
-          // SIM Number (ICCID)
+          // SIM Number (ICCID) - just the number, label optional since it's long
           if (simNumber) {
-            page.drawText("SIM:", {
+            page.drawText("ICCID:", {
               x: packageInfoX,
               y: infoY,
               size: packageFontSize,
               font,
               color: rgb(0.3, 0.3, 0.3),
             });
-            infoY -= 12;
+            infoY -= 11;
             page.drawText(simNumber, {
               x: packageInfoX,
               y: infoY,
@@ -611,39 +611,49 @@ serve(async (req) => {
               font: boldFont,
               color: rgb(0, 0, 0),
             });
-            infoY -= 16;
+            infoY -= 14;
           }
           
-          // Package name
+          // Package name - use English equivalent or sanitize Hebrew
           if (packageName) {
-            page.drawText("Package:", {
+            // Map Hebrew package names to English
+            const packageNameMap: Record<string, string> = {
+              'דיבור': 'Voice Only',
+              'גלישה': 'Data',
+              'דיבור וגלישה': 'Voice + Data',
+              'גלישה ודיבור': 'Voice + Data',
+            };
+            const englishPackageName = packageNameMap[packageName] || 
+              (packageName.match(/^[a-zA-Z0-9\s\-\.]+$/) ? packageName : 'Package');
+            
+            page.drawText("Plan:", {
               x: packageInfoX,
               y: infoY,
               size: packageFontSize,
               font,
               color: rgb(0.3, 0.3, 0.3),
             });
-            infoY -= 12;
-            page.drawText(packageName, {
+            infoY -= 11;
+            page.drawText(englishPackageName, {
               x: packageInfoX,
               y: infoY,
               size: packageValueSize,
               font: boldFont,
               color: rgb(0, 0, 0),
             });
-            infoY -= 16;
+            infoY -= 14;
           }
           
           // Expiry date
           if (expiryDate) {
-            page.drawText("Expiry:", {
+            page.drawText("Expires:", {
               x: packageInfoX,
               y: infoY,
               size: packageFontSize,
               font,
               color: rgb(0.3, 0.3, 0.3),
             });
-            infoY -= 12;
+            infoY -= 11;
             page.drawText(expiryDate, {
               x: packageInfoX,
               y: infoY,
