@@ -1,27 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { format, parseISO, differenceInDays, addDays } from 'date-fns';
-import { he } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -30,59 +13,46 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   RefreshCw,
   Package,
   Smartphone,
   Zap,
-  Users,
   CloudDownload,
-  Search,
-  Calendar,
   AlertTriangle,
   CheckCircle,
   XCircle,
   Clock,
   ArrowLeftRight,
   Loader2,
-  Printer,
-  Calculator,
   Plus,
-  Info,
-  ChevronDown,
-  ChevronUp,
 } from 'lucide-react';
 import { cn, normalizeForSearch } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useRental } from '@/hooks/useRental';
-import { printCallingInstructions } from '@/lib/callingInstructions';
-import { 
-  calculateRentalPrice, 
-  getExcludedDaysBreakdown, 
-  EUROPEAN_BUNDLE_DEVICE_RATE 
-} from '@/lib/pricing';
-import { ItemCategory, Rental as SupabaseRental } from '@/types/rental';
+import { useCellstationSync, SimCard } from '@/hooks/useCellstationSync';
+import { ItemCategory } from '@/types/rental';
+import { ActiveRentalsTab } from './ActiveRentalsTab';
+import { AvailableSimsTab } from './AvailableSimsTab';
+import { ExpiredSimsTab } from './ExpiredSimsTab';
+import { ActivationTab } from './ActivationTab';
 
 // ============================================
-// Cell Station Dashboard v5.0
-// סנכרון + הפעלות + החלפות + חישוב מחירים
+// Cell Station Dashboard v6.0
+// New categorized structure with mandatory customer selection
 // ============================================
 
 const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzKhHEQeldMrsNjL8RZMigkPvIKJDRSWD0WoDYpyGPAmGxBYFxDi_9EiUldFjnZ6TIE/exec';
 
 // === Types ===
-interface Rental {
+interface CellStationRental {
   rental_id: string;
   id: string;
   sim: string;
@@ -97,52 +67,12 @@ interface Rental {
   status: string;
 }
 
-interface InventoryItem {
-  id: string;
-  sim: string;
-  local_number: string;
-  israel_number: string;
-  plan: string;
-  expiry: string;
-  status: 'active' | 'inactive';
-}
-
-interface Customer {
-  name: string;
-  phone: string;
-  rentals_count: number;
-  last_rental: string;
-}
-
 interface Stats {
-  total_inventory: number;
-  active_inventory: number;
-  inactive_inventory: number;
-  available_for_rent: number;
-  total_rentals: number;
-  ending_today: number;
-  ending_tomorrow: number;
-  ended: number;
-}
-
-interface PendingAction {
-  action: string;
-  sim?: string;
-  customer_name?: string;
-  old_sim?: string;
-  new_sim?: string;
-}
-
-interface CalculatedPrice {
+  available: number;
+  rented: number;
+  overdue: number;
+  expired: number;
   total: number;
-  breakdown: Array<{ item: string; price: number; currency: string; details?: string }>;
-  businessDaysInfo?: { 
-    businessDays: number; 
-    excludedDates: string[];
-    totalDays: number;
-    saturdays: number;
-    holidays: number;
-  };
 }
 
 // === Stat Card Component ===
@@ -151,13 +81,15 @@ function StatCard({
   value, 
   icon: Icon, 
   variant = 'default',
-  highlight = false 
+  highlight = false,
+  onClick,
 }: { 
   title: string; 
   value: number; 
   icon: React.ElementType;
   variant?: 'default' | 'warning' | 'success' | 'destructive' | 'primary';
   highlight?: boolean;
+  onClick?: () => void;
 }) {
   const variantStyles = {
     default: 'border-border/50',
@@ -176,11 +108,14 @@ function StatCard({
   };
 
   return (
-    <Card className={cn(
-      'glass-card transition-all duration-200',
-      variantStyles[variant],
-      highlight && 'ring-2 ring-warning shadow-lg shadow-warning/20'
-    )}>
+    <Card 
+      className={cn(
+        'glass-card transition-all duration-200 cursor-pointer hover:shadow-lg',
+        variantStyles[variant],
+        highlight && 'ring-2 ring-warning shadow-lg shadow-warning/20'
+      )}
+      onClick={onClick}
+    >
       <CardContent className="p-4 text-center">
         <Icon className={cn('h-6 w-6 mx-auto mb-2', iconStyles[variant])} />
         <div className="text-2xl font-bold">{value}</div>
@@ -190,26 +125,7 @@ function StatCard({
   );
 }
 
-// === Helper Functions ===
-const parseExpiryDate = (expiry: string): string | undefined => {
-  if (!expiry) return undefined;
-  const parts = expiry.split('/');
-  if (parts.length === 3) {
-    const [day, month, year] = parts;
-    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-  }
-  return undefined;
-};
-
-// Format ISO date to DD/MM/YYYY
-const formatDate = (dateString: string): string => {
-  if (!dateString) return '';
-  const date = new Date(dateString);
-  if (isNaN(date.getTime())) return dateString; // Return original if invalid
-  return date.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' });
-};
-
-// Format phone number - add leading 0 if missing (all phones should start with 0)
+// Format phone number - add leading 0 if missing
 const formatPhone = (phone: string | number | null | undefined): string => {
   if (phone === null || phone === undefined || phone === '') return '';
   const str = String(phone);
@@ -220,38 +136,12 @@ const formatPhone = (phone: string | number | null | undefined): string => {
   return cleaned.startsWith('0') ? cleaned : '0' + cleaned;
 };
 
-// Format local number - add leading 0 if missing (for 07xxx numbers)
-const formatLocalNumber = (num: string | number | null | undefined): string => {
-  if (num === null || num === undefined || num === '') return '';
-  const str = String(num);
-  const cleaned = str.replace(/\D/g, '');
-  if (cleaned.startsWith('7') && cleaned.length === 9) {
-    return '0' + cleaned;
-  }
-  if (cleaned.startsWith('07')) {
-    return cleaned;
-  }
-  return '0' + cleaned;
-};
-
-const getSimExpiryWarning = (sim: InventoryItem, endDate: string): string | null => {
-  if (!sim.expiry || !endDate) return null;
-  
-  const parts = sim.expiry.split('/');
-  if (parts.length !== 3) return null;
-  
-  const expiryDate = new Date(
-    parseInt(parts[2]), 
-    parseInt(parts[1]) - 1, 
-    parseInt(parts[0])
-  );
-  const rentalEnd = new Date(endDate);
-  
-  if (expiryDate < rentalEnd) {
-    const daysUntilExpiry = Math.ceil((expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-    return `⚠️ הסים יפוג ב-${daysUntilExpiry} ימים - לפני סיום ההשכרה!`;
-  }
-  return null;
+// Format ISO date to DD/MM/YYYY
+const formatDate = (dateString: string): string => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return dateString;
+  return date.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' });
 };
 
 // === Main Component ===
@@ -263,140 +153,93 @@ export function CellStationDashboard() {
     inventory: supabaseInventory,
     rentals: supabaseRentals,
     customers: supabaseCustomers,
-    refreshData: refreshSupabaseData 
+    refreshData: refreshSupabaseData,
+    addCustomer,
   } = useRental();
 
+  const { simCards, isLoading: isLoadingSims, syncSims, isSyncing } = useCellstationSync();
+
   // State
-  const [rentals, setRentals] = useState<Rental[]>([]);
-  const [inventory, setInventory] = useState<InventoryItem[]>([]);
-  const [availableSims, setAvailableSims] = useState<InventoryItem[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [stats, setStats] = useState<Stats | null>(null);
+  const [cellStationRentals, setCellStationRentals] = useState<CellStationRental[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('rentals');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const [activeTab, setActiveTab] = useState('active-rentals');
 
   // Activate form state
-  const [selectedSim, setSelectedSim] = useState<InventoryItem | null>(null);
-  const [customerName, setCustomerName] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [price, setPrice] = useState('');
-  const [includeDevice, setIncludeDevice] = useState(false);
-  const [isActivating, setIsActivating] = useState(false);
-  const [addingToStock, setAddingToStock] = useState<string | null>(null); // Track which SIM is being added
-
-  // Calculated price state
-  const [calculatedPrice, setCalculatedPrice] = useState<CalculatedPrice | null>(null);
-
-  // Success dialog state
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
-  const [lastActivation, setLastActivation] = useState<{
-    sim: InventoryItem;
-    customerName: string;
-    customerPhone: string;
-    price: number;
-    startDate: string;
-    endDate: string;
-  } | null>(null);
+  const [selectedSim, setSelectedSim] = useState<SimCard | null>(null);
 
   // Replace form state
-  const [selectedRental, setSelectedRental] = useState<Rental | null>(null);
+  const [selectedRental, setSelectedRental] = useState<CellStationRental | null>(null);
   const [newSim, setNewSim] = useState('');
+  const [showReplaceDialog, setShowReplaceDialog] = useState(false);
 
-  // Expanded rental details state
-  const [expandedRentalIds, setExpandedRentalIds] = useState<Set<string>>(new Set());
-
-  // Toggle expanded rental details
-  const toggleRentalExpanded = (rentalId: string) => {
-    setExpandedRentalIds(prev => {
-      const next = new Set(prev);
-      if (next.has(rentalId)) {
-        next.delete(rentalId);
-      } else {
-        next.add(rentalId);
+  // === Calculate smart stats ===
+  const stats = useMemo((): Stats => {
+    const today = new Date();
+    
+    let available = 0;
+    let rented = 0;
+    let overdue = 0;
+    let expired = 0;
+    
+    simCards.forEach(sim => {
+      // Check if expired or inactive
+      if (!sim.is_active) {
+        expired++;
+        return;
       }
-      return next;
-    });
-  };
-
-  // === Get main system rental info for a SIM ===
-  const getMainSystemRentalInfo = (localNumber: string | null, simNumber: string | null): {
-    status: 'not_found' | 'available' | 'rented' | 'overdue';
-    rental?: SupabaseRental;
-    customerName?: string;
-    endDate?: string;
-  } => {
-    if (!localNumber && !simNumber) return { status: 'not_found' };
-    
-    const normalizedLocal = normalizeForSearch(localNumber);
-    const normalizedSim = normalizeForSearch(simNumber);
-    
-    // Find matching inventory item in Supabase
-    const matchingItem = supabaseInventory.find(item => {
-      const itemLocalNorm = normalizeForSearch(item.localNumber);
-      const itemSimNorm = normalizeForSearch(item.simNumber);
-      return (normalizedLocal && itemLocalNorm === normalizedLocal) ||
-             (normalizedSim && itemSimNorm === normalizedSim);
-    });
-
-    if (!matchingItem) return { status: 'not_found' };
-    
-    if (matchingItem.status === 'available') return { status: 'available' };
-    
-    if (matchingItem.status === 'rented') {
-      // Find the active rental
-      const activeRental = supabaseRentals.find(r => 
-        r.status !== 'returned' &&
-        r.items.some(item => item.inventoryItemId === matchingItem.id)
-      );
       
-      if (activeRental) {
-        const isOverdue = activeRental.status === 'overdue' || 
-          new Date(activeRental.endDate) < new Date();
-        
-        return {
-          status: isOverdue ? 'overdue' : 'rented',
-          rental: activeRental,
-          customerName: activeRental.customerName,
-          endDate: activeRental.endDate
-        };
+      if (sim.expiry_date) {
+        const expiryDate = parseISO(sim.expiry_date);
+        if (expiryDate < today) {
+          expired++;
+          return;
+        }
       }
-    }
-    
-    return { status: 'not_found' };
-  };
-
-  // === Calculate price effect ===
-  useEffect(() => {
-    if (!selectedSim || !startDate || !endDate) {
-      setCalculatedPrice(null);
-      return;
-    }
-
-    try {
-      const items: Array<{ category: ItemCategory; includeEuropeanDevice?: boolean }> = [
-        { category: 'sim_european' as ItemCategory, includeEuropeanDevice: includeDevice }
-      ];
-
-      const result = calculateRentalPrice(items, startDate, endDate);
-      setCalculatedPrice({
-        total: result.ilsTotal || result.total,
-        breakdown: result.breakdown,
-        businessDaysInfo: result.businessDaysInfo
+      
+      // Check main system status
+      const normalizedSim = normalizeForSearch(sim.sim_number);
+      const normalizedLocal = normalizeForSearch(sim.local_number);
+      
+      const matchingItem = supabaseInventory.find(item => {
+        const itemSimNorm = normalizeForSearch(item.simNumber);
+        const itemLocalNorm = normalizeForSearch(item.localNumber);
+        return (normalizedSim && itemSimNorm === normalizedSim) ||
+               (normalizedLocal && itemLocalNorm === normalizedLocal);
       });
-    } catch (err) {
-      console.error('Error calculating price:', err);
-      setCalculatedPrice(null);
-    }
-  }, [selectedSim, startDate, endDate, includeDevice]);
+      
+      if (matchingItem?.status === 'rented') {
+        const activeRental = supabaseRentals.find(r => 
+          r.status !== 'returned' &&
+          r.items.some(item => item.inventoryItemId === matchingItem.id)
+        );
+        
+        if (activeRental) {
+          const isOverdue = activeRental.status === 'overdue' || 
+            new Date(activeRental.endDate) < today;
+          
+          if (isOverdue) {
+            overdue++;
+          } else {
+            rented++;
+          }
+          return;
+        }
+      }
+      
+      // Count as available
+      if (sim.is_active && !sim.is_rented) {
+        available++;
+      } else if (sim.is_rented) {
+        rented++;
+      }
+    });
+    
+    return { available, rented, overdue, expired, total: simCards.length };
+  }, [simCards, supabaseInventory, supabaseRentals]);
 
-  // Fetch data
-  const fetchData = async () => {
+  // Fetch CellStation rentals data from Google Script
+  const fetchCellStationData = async () => {
     setLoading(true);
     setError(null);
     try {
@@ -404,307 +247,32 @@ export function CellStationDashboard() {
       const data = await res.json();
 
       if (data.success !== false) {
-        setRentals(data.rentals || []);
-        setInventory(data.inventory || []);
-        setAvailableSims(data.available_sims || []);
-        setStats(data.stats || null);
-        setPendingAction(data.pending || null);
+        setCellStationRentals(data.rentals || []);
       } else {
         setError(data.error || 'שגיאה בטעינת נתונים');
       }
     } catch (err) {
-      setError('שגיאה בחיבור - לחץ על הסימנייה ב-Cell Station לסנכרון ראשוני');
+      setError('שגיאה בחיבור - לחץ על כפתור הסנכרון');
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchCustomers = async () => {
-    try {
-      const res = await fetch(WEBAPP_URL + '?action=customers');
-      const data = await res.json();
-      if (data.customers) setCustomers(data.customers);
-    } catch (e) {}
-  };
-
   useEffect(() => {
-    fetchData();
-    fetchCustomers();
+    fetchCellStationData();
   }, []);
 
-  // Quick date helpers
-  const setQuickDate = (days: number) => {
-    const today = new Date();
-    const start = format(today, 'yyyy-MM-dd');
-    const end = format(addDays(today, days - 1), 'yyyy-MM-dd');
-    setStartDate(start);
-    setEndDate(end);
+  // Handle replace SIM
+  const handleReplaceSim = (rental: CellStationRental) => {
+    setSelectedRental(rental);
+    setShowReplaceDialog(true);
   };
 
-  // Filter rentals with smart search (ignores dashes)
-  const filteredRentals = useMemo(() => {
-    if (!searchTerm) return rentals;
-    
-    const searchNormalized = normalizeForSearch(searchTerm);
-    const searchLower = searchTerm.toLowerCase();
-    
-    return rentals.filter(r => {
-      const localNormalized = normalizeForSearch(r.local_number);
-      const phoneNormalized = normalizeForSearch(r.customer_phone);
-      const simNormalized = normalizeForSearch(r.sim);
-      
-      return (
-        r.customer_name?.toLowerCase().includes(searchLower) ||
-        localNormalized.includes(searchNormalized) ||
-        phoneNormalized.includes(searchNormalized) ||
-        simNormalized.includes(searchNormalized)
-      );
-    });
-  }, [rentals, searchTerm]);
-
-  // Filter inventory by status and search term with smart search
-  const filteredInventory = useMemo(() => {
-    let result = inventory;
-    
-    // Filter by status
-    if (statusFilter === 'active') {
-      result = result.filter(s => s.status === 'active');
-    } else if (statusFilter === 'inactive') {
-      result = result.filter(s => s.status === 'inactive');
-    }
-    
-    // Filter by search term with smart search
-    if (searchTerm) {
-      const searchNormalized = normalizeForSearch(searchTerm);
-      result = result.filter(s => {
-        const localNormalized = normalizeForSearch(s.local_number);
-        const simNormalized = normalizeForSearch(s.sim);
-        const idNormalized = normalizeForSearch(s.id);
-        
-        return (
-          localNormalized.includes(searchNormalized) ||
-          simNormalized.includes(searchNormalized) ||
-          idNormalized.includes(searchNormalized)
-        );
-      });
-    }
-    
-    return result;
-  }, [inventory, searchTerm, statusFilter]);
-
-  // Get status variant
-  const getStatusVariant = (status: string): 'default' | 'destructive' | 'warning' | 'success' => {
-    if (status === 'הסתיים' || status === 'ended') return 'destructive';
-    if (status === 'מסתיים היום!' || status.includes('היום')) return 'warning';
-    if (status === 'מסתיים מחר' || status.includes('מחר')) return 'warning';
-    return 'success';
-  };
-
-  // Reset form
-  const resetForm = () => {
-    setSelectedSim(null);
-    setCustomerName('');
-    setCustomerPhone('');
-    setStartDate('');
-    setEndDate('');
-    setPrice('');
-    setIncludeDevice(false);
-    setCalculatedPrice(null);
-  };
-
-  // Print instructions helper
-  const handlePrintInstructions = async (sim: InventoryItem) => {
-    try {
-      await printCallingInstructions(
-        sim.israel_number,
-        sim.local_number,
-        `SIM-${sim.sim.slice(-8)}`,
-        false, // סים אירופאי
-        sim.plan,
-        sim.expiry
-      );
-      toast({ title: '🖨️ הודפס בהצלחה', description: 'ההוראות נשלחו למדפסת' });
-    } catch (error) {
-      console.error('Print error:', error);
-      toast({ title: 'שגיאה בהדפסה', variant: 'destructive' });
-    }
-  };
-
-  // Check if SIM is already in Supabase inventory
-  const isSimInStock = (simNumber: string): boolean => {
-    return supabaseInventory.some(i => i.simNumber === simNumber);
-  };
-
-  // Add SIM to Supabase inventory
-  const handleAddToStock = async (sim: InventoryItem) => {
-    if (isSimInStock(sim.sim)) {
-      toast({ 
-        title: 'הסים כבר במלאי', 
-        description: 'הסים כבר קיים במלאי הראשי',
-        variant: 'default' 
-      });
-      return;
-    }
-
-    setAddingToStock(sim.sim);
-
-    try {
-      await addInventoryItem({
-        category: 'sim_european' as ItemCategory,
-        name: `סים ${formatLocalNumber(sim.local_number)}`,
-        localNumber: sim.local_number || undefined,
-        israeliNumber: sim.israel_number || undefined,
-        expiryDate: parseExpiryDate(sim.expiry),
-        simNumber: sim.sim,
-        status: 'available',
-      });
-
-      await refreshSupabaseData();
-
-      toast({ 
-        title: '✅ נוסף למלאי', 
-        description: `הסים ${formatLocalNumber(sim.local_number)} נוסף למלאי הראשי` 
-      });
-    } catch (error) {
-      console.error('Error adding to stock:', error);
-      toast({ 
-        title: 'שגיאה', 
-        description: 'לא ניתן להוסיף למלאי', 
-        variant: 'destructive' 
-      });
-    } finally {
-      setAddingToStock(null);
-    }
-  };
-
-  // Send activate request with Supabase sync
-  const handleActivate = async () => {
-    if (!selectedSim || !customerName || !startDate || !endDate) {
+  const executeReplace = async () => {
+    if (!selectedRental || !newSim || newSim.length < 19) {
       toast({
         title: 'שגיאה',
-        description: 'נא למלא את כל השדות',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setIsActivating(true);
-
-    try {
-      // Step 1: Send to Google Script
-      const res = await fetch(WEBAPP_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'activate',
-          sim: selectedSim.sim,
-          customer_name: customerName,
-          customer_phone: customerPhone,
-          start_date: startDate,
-          end_date: endDate,
-          price: calculatedPrice?.total || parseFloat(price) || 0,
-        }),
-      });
-      const data = await res.json();
-
-      if (!data.success) {
-        throw new Error(data.error || 'שגיאה בשליחה ל-Google Script');
-      }
-
-      // Step 2: Check if SIM is already in Supabase inventory
-      const existingItem = supabaseInventory.find(i => i.simNumber === selectedSim.sim);
-      let inventoryItemId = existingItem?.id;
-
-      // Note: SIMs are NOT automatically added to inventory here.
-      // User must explicitly add them using the "Add to Stock" button in inventory tab
-      // or the SIM will be marked as generic in the rental
-
-      // Step 3: Create rental in Supabase
-      const rentalItems = [
-        {
-          inventoryItemId: inventoryItemId || '',
-          itemCategory: 'sim_european' as ItemCategory,
-          itemName: `סים אירופאי - ${formatLocalNumber(selectedSim.local_number)}`,
-          hasIsraeliNumber: !!selectedSim.israel_number,
-          isGeneric: !inventoryItemId, // Mark as generic if no inventory ID
-        }
-      ];
-
-      // Add device to bundle if selected
-      if (includeDevice) {
-        rentalItems.push({
-          inventoryItemId: '',
-          itemCategory: 'device_simple' as ItemCategory,
-          itemName: 'מכשיר פשוט (באנדל אירופאי)',
-          hasIsraeliNumber: false,
-          isGeneric: true,
-        });
-      }
-
-      try {
-        await addRental({
-          customerId: '',
-          customerName,
-          items: rentalItems,
-          startDate,
-          endDate,
-          totalPrice: calculatedPrice?.total || parseFloat(price) || 0,
-          currency: 'ILS',
-          status: 'active',
-          notes: `הופעל מ-CellStation | טלפון: ${customerPhone}`,
-        });
-      } catch (err) {
-        console.error('Error creating Supabase rental:', err);
-        // Show warning but don't fail completely
-        toast({
-          title: 'אזהרה',
-          description: 'ההפעלה נשלחה אך נכשלה בשמירה למערכת המקומית',
-          variant: 'destructive',
-        });
-      }
-
-      // Step 4: Show success dialog
-      setLastActivation({
-        sim: selectedSim,
-        customerName,
-        customerPhone,
-        price: calculatedPrice?.total || parseFloat(price) || 0,
-        startDate,
-        endDate,
-      });
-      setShowSuccessDialog(true);
-
-      // Reset form and refresh
-      resetForm();
-      fetchData();
-      refreshSupabaseData();
-
-    } catch (err: any) {
-      toast({
-        title: 'שגיאה',
-        description: err.message || 'נכשל בהפעלה',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsActivating(false);
-    }
-  };
-
-  // Send replace request
-  const handleReplace = async () => {
-    if (!selectedRental || !newSim) {
-      toast({
-        title: 'שגיאה',
-        description: 'נא לבחור השכרה ולהזין מספר סים חדש',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (newSim.length < 19 || newSim.length > 20) {
-      toast({
-        title: 'שגיאה',
-        description: 'מספר סים חייב להיות 19-20 ספרות',
+        description: 'נא להזין מספר סים תקין (19-20 ספרות)',
         variant: 'destructive',
       });
       return;
@@ -726,46 +294,73 @@ export function CellStationDashboard() {
       if (data.success) {
         toast({
           title: '✅ החלפה נשמרה!',
-          description: `סים ישן: ${selectedRental.local_number} → סים חדש: ${newSim.slice(-6)}`,
+          description: 'לחץ על הסימנייה באתר CellStation להשלמת ההחלפה',
         });
-
+        setShowReplaceDialog(false);
         setSelectedRental(null);
         setNewSim('');
-        fetchData();
+        fetchCellStationData();
       } else {
-        toast({
-          title: 'שגיאה',
-          description: data.error || 'לא ידוע',
-          variant: 'destructive',
-        });
+        throw new Error(data.error || 'שגיאה בהחלפה');
       }
-    } catch (err) {
+    } catch (err: any) {
       toast({
-        title: 'שגיאה בשליחה',
+        title: 'שגיאה',
+        description: err.message,
         variant: 'destructive',
       });
     }
   };
 
-  // Cancel pending
-  const handleCancelPending = async () => {
-    try {
-      await fetch(WEBAPP_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'cancel_pending' }),
-      });
-      setPendingAction(null);
-      fetchData();
+  // Handle add to inventory
+  const handleAddToInventory = async (sim: SimCard) => {
+    if (!sim.sim_number) {
       toast({
-        title: 'בוטל',
-        description: 'הפעולה הממתינה בוטלה',
+        title: 'שגיאה',
+        description: 'לסים זה אין מספר ICCID',
+        variant: 'destructive',
       });
-    } catch (e) {}
+      return;
+    }
+
+    try {
+      await addInventoryItem({
+        category: 'sim_european' as ItemCategory,
+        name: `סים ${sim.local_number || sim.sim_number}`,
+        localNumber: sim.local_number || undefined,
+        israeliNumber: sim.israeli_number || undefined,
+        expiryDate: sim.expiry_date || undefined,
+        simNumber: sim.sim_number,
+        status: 'available',
+        notes: sim.package_name ? `חבילה: ${sim.package_name}` : undefined,
+      });
+
+      toast({
+        title: 'נוסף למלאי',
+        description: `הסים ${sim.local_number || sim.sim_number} נוסף בהצלחה`,
+      });
+    } catch (error) {
+      console.error('Error adding SIM to inventory:', error);
+      toast({
+        title: 'שגיאה',
+        description: 'לא ניתן להוסיף את הסים למלאי',
+        variant: 'destructive',
+      });
+    }
   };
 
-  // Expiry warning for selected SIM
-  const expiryWarning = selectedSim && endDate ? getSimExpiryWarning(selectedSim, endDate) : null;
+  // Handle activate - switch to activation tab with selected SIM
+  const handleActivate = (sim: SimCard) => {
+    setSelectedSim(sim);
+    setActiveTab('activation');
+  };
+
+  const handleRefresh = async () => {
+    await Promise.all([
+      fetchCellStationData(),
+      refreshSupabaseData(),
+    ]);
+  };
 
   return (
     <div className="space-y-6" dir="rtl">
@@ -777,60 +372,70 @@ export function CellStationDashboard() {
             Cell Station
           </h1>
           <p className="text-muted-foreground">
-            ניהול סימים והשכרות עם סנכרון Supabase
+            ניהול סימים חכם עם אינטגרציה מלאה
           </p>
         </div>
-        <Button
-          onClick={fetchData}
-          disabled={loading}
-          className="gap-2"
-        >
-          {loading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <RefreshCw className="h-4 w-4" />
-          )}
-          {loading ? 'טוען...' : 'רענן'}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={syncSims}
+            disabled={isSyncing}
+            variant="outline"
+            className="gap-2"
+          >
+            {isSyncing ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <CloudDownload className="h-4 w-4" />
+            )}
+            סנכרן מ-CellStation
+          </Button>
+          <Button
+            onClick={handleRefresh}
+            disabled={loading || isLoadingSims}
+            className="gap-2"
+          >
+            {loading || isLoadingSims ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+            רענן
+          </Button>
+        </div>
       </div>
 
-      {/* Pending Action Alert */}
-      {pendingAction && (
-        <Card className="border-warning bg-warning/10">
-          <CardContent className="p-4 flex justify-between items-center">
-            <div className="flex items-center gap-3">
-              <Clock className="h-5 w-5 text-warning" />
-              <div>
-                <span className="font-bold text-warning">פעולה ממתינה: </span>
-                {pendingAction.action === 'activate' && (
-                  <span>הפעלת השכרה - {pendingAction.customer_name} - SIM: {pendingAction.sim?.slice(-6)}</span>
-                )}
-                {pendingAction.action === 'replace_sim' && (
-                  <span>החלפת סים - מ-{pendingAction.old_sim?.slice(-6)} ל-{pendingAction.new_sim?.slice(-6)}</span>
-                )}
-                <span className="text-sm text-muted-foreground block">לך ל-Cell Station ולחץ על הסימנייה</span>
-              </div>
-            </div>
-            <Button variant="destructive" size="sm" onClick={handleCancelPending}>
-              ביטול
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Stats */}
-      {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-          <StatCard title="השכרות" value={stats.total_rentals} icon={Package} variant="primary" />
-          <StatCard title="היום!" value={stats.ending_today} icon={AlertTriangle} variant="warning" highlight={stats.ending_today > 0} />
-          <StatCard title="מחר" value={stats.ending_tomorrow} icon={Calendar} variant="warning" />
-          <StatCard title="הסתיימו" value={stats.ended} icon={XCircle} variant="destructive" />
-          <StatCard title="מלאי" value={stats.total_inventory} icon={Smartphone} />
-          <StatCard title="פעילים" value={stats.active_inventory} icon={CheckCircle} variant="success" />
-          <StatCard title="פנויים" value={stats.available_for_rent} icon={Zap} variant="success" />
-          <StatCard title="לא פעילים" value={stats.inactive_inventory} icon={XCircle} />
-        </div>
-      )}
+      {/* Smart Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <StatCard 
+          title="זמינים להפעלה" 
+          value={stats.available} 
+          icon={CheckCircle} 
+          variant="success"
+          onClick={() => setActiveTab('available')}
+        />
+        <StatCard 
+          title="מושכרים" 
+          value={stats.rented} 
+          icon={Package} 
+          variant="primary"
+          onClick={() => setActiveTab('active-rentals')}
+        />
+        <StatCard 
+          title="באיחור" 
+          value={stats.overdue} 
+          icon={AlertTriangle} 
+          variant="destructive"
+          highlight={stats.overdue > 0}
+          onClick={() => setActiveTab('active-rentals')}
+        />
+        <StatCard 
+          title="לא בתוקף" 
+          value={stats.expired} 
+          icon={XCircle} 
+          variant="default"
+          onClick={() => setActiveTab('expired')}
+        />
+      </div>
 
       {/* Error */}
       {error && (
@@ -844,775 +449,128 @@ export function CellStationDashboard() {
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
-          <TabsTrigger value="rentals" className="gap-2">
+          <TabsTrigger value="active-rentals" className="gap-2">
             <Package className="h-4 w-4" />
-            השכרות ({rentals.length})
+            השכרות פעילות
           </TabsTrigger>
-          <TabsTrigger value="inventory" className="gap-2">
-            <Smartphone className="h-4 w-4" />
-            מלאי ({inventory.length})
+          <TabsTrigger value="available" className="gap-2">
+            <CheckCircle className="h-4 w-4" />
+            זמינים ({stats.available})
           </TabsTrigger>
-          <TabsTrigger value="activate" className="gap-2">
+          <TabsTrigger value="expired" className="gap-2">
+            <XCircle className="h-4 w-4" />
+            לא בתוקף ({stats.expired})
+          </TabsTrigger>
+          <TabsTrigger value="activation" className="gap-2">
             <Zap className="h-4 w-4" />
             הפעלה חדשה
           </TabsTrigger>
-          <TabsTrigger value="replace" className="gap-2">
-            <ArrowLeftRight className="h-4 w-4" />
-            החלפת סים
-          </TabsTrigger>
         </TabsList>
 
-        {/* Rentals Tab */}
-        <TabsContent value="rentals">
-          <Card className="glass-card">
-            <CardContent className="pt-6">
-              <div className="mb-4">
-                <div className="relative">
-                  <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    placeholder="🔍 חיפוש חכם - עם או בלי מקפים..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pr-10"
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  💡 החיפוש מזהה מספרים בכל פורמט (עם/בלי מקפים)
-                </p>
-              </div>
-
-              {loading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-              ) : filteredRentals.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  אין השכרות להצגה
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table className="w-full text-right" dir="rtl">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-right w-8"></TableHead>
-                        <TableHead className="text-right">לקוח</TableHead>
-                        <TableHead className="text-right">טלפון</TableHead>
-                        <TableHead className="text-right">מספר מקומי</TableHead>
-                        <TableHead className="text-right">תוכנית</TableHead>
-                        <TableHead className="text-right">סיום</TableHead>
-                        <TableHead className="text-right">סטטוס CellStation</TableHead>
-                        <TableHead className="text-right">סטטוס מערכת</TableHead>
-                        <TableHead className="text-right">פעולות</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredRentals.map((rental, idx) => {
-                        const rentalId = rental.rental_id || `${idx}`;
-                        const isExpanded = expandedRentalIds.has(rentalId);
-                        const mainSystemInfo = getMainSystemRentalInfo(rental.local_number, rental.sim);
-                        
-                        return (
-                          <React.Fragment key={idx}>
-                            <TableRow className="hover:bg-muted/30">
-                              <TableCell className="p-1">
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-8 w-8 p-0"
-                                        onClick={() => toggleRentalExpanded(rentalId)}
-                                      >
-                                        {isExpanded ? (
-                                          <ChevronUp className="h-4 w-4" />
-                                        ) : (
-                                          <Info className="h-4 w-4 text-muted-foreground" />
-                                        )}
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>מידע נוסף</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </TableCell>
-                              <TableCell className="font-medium">{rental.customer_name}</TableCell>
-                              <TableCell>{formatPhone(rental.customer_phone)}</TableCell>
-                              <TableCell className="font-mono text-sm">{formatLocalNumber(rental.local_number)}</TableCell>
-                              <TableCell>{rental.plan}</TableCell>
-                              <TableCell>{formatDate(rental.end_date)}</TableCell>
-                              <TableCell>
-                                <Badge variant={getStatusVariant(rental.status)}>
-                                  {rental.status}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                {mainSystemInfo.status === 'not_found' && (
-                                  <Badge variant="outline" className="text-muted-foreground">
-                                    לא במערכת
-                                  </Badge>
-                                )}
-                                {mainSystemInfo.status === 'available' && (
-                                  <Badge variant="success" className="gap-1">
-                                    <CheckCircle className="h-3 w-3" />
-                                    זמין
-                                  </Badge>
-                                )}
-                                {mainSystemInfo.status === 'rented' && (
-                                  <Badge className="bg-primary/20 text-primary border-primary/30 gap-1">
-                                    📱 מושכר
-                                  </Badge>
-                                )}
-                                {mainSystemInfo.status === 'overdue' && (
-                                  <Badge variant="destructive" className="gap-1">
-                                    <AlertTriangle className="h-3 w-3" />
-                                    באיחור!
-                                  </Badge>
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => {
-                                    setSelectedRental(rental);
-                                    setActiveTab('replace');
-                                  }}
-                                  className="gap-1"
-                                >
-                                  <ArrowLeftRight className="h-3 w-3" />
-                                  החלפה
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                            
-                            {/* Expanded Details Row */}
-                            {isExpanded && (
-                              <TableRow className="bg-muted/20 hover:bg-muted/30">
-                                <TableCell colSpan={9} className="p-0">
-                                  <div className="p-4 space-y-3 border-r-4 border-primary/30">
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                      <div>
-                                        <span className="text-muted-foreground block">👤 לקוח</span>
-                                        <span className="font-medium">{rental.customer_name}</span>
-                                      </div>
-                                      <div>
-                                        <span className="text-muted-foreground block">📞 טלפון</span>
-                                        <span className="font-mono">{formatPhone(rental.customer_phone)}</span>
-                                      </div>
-                                      <div>
-                                        <span className="text-muted-foreground block">📅 תאריך התחלה</span>
-                                        <span>{formatDate(rental.start_date)}</span>
-                                      </div>
-                                      <div>
-                                        <span className="text-muted-foreground block">📅 תאריך סיום</span>
-                                        <span>{formatDate(rental.end_date)}</span>
-                                      </div>
-                                      <div>
-                                        <span className="text-muted-foreground block">📱 מספר סים (ICCID)</span>
-                                        <span className="font-mono text-xs">{rental.sim}</span>
-                                      </div>
-                                      <div>
-                                        <span className="text-muted-foreground block">🌍 מספר מקומי</span>
-                                        <span className="font-mono">{formatLocalNumber(rental.local_number)}</span>
-                                      </div>
-                                      <div>
-                                        <span className="text-muted-foreground block">🇮🇱 מספר ישראלי</span>
-                                        <span className="font-mono">{rental.israel_number || 'אין'}</span>
-                                      </div>
-                                      <div>
-                                        <span className="text-muted-foreground block">📋 ימים</span>
-                                        <span>{rental.days}</span>
-                                      </div>
-                                    </div>
-                                    
-                                    {/* Main System Info */}
-                                    {mainSystemInfo.status !== 'not_found' && mainSystemInfo.rental && (
-                                      <div className={cn(
-                                        "p-3 rounded-lg border",
-                                        mainSystemInfo.status === 'overdue' 
-                                          ? "bg-destructive/10 border-destructive/30" 
-                                          : "bg-primary/10 border-primary/30"
-                                      )}>
-                                        <div className="flex items-center gap-2 mb-2">
-                                          {mainSystemInfo.status === 'overdue' ? (
-                                            <AlertTriangle className="h-4 w-4 text-destructive" />
-                                          ) : (
-                                            <Package className="h-4 w-4 text-primary" />
-                                          )}
-                                          <span className="font-medium">
-                                            {mainSystemInfo.status === 'overdue' 
-                                              ? '⚠️ באיחור במערכת ההשכרות!' 
-                                              : '📱 מושכר במערכת ההשכרות'}
-                                          </span>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-2 text-sm">
-                                          <div>
-                                            <span className="text-muted-foreground">לקוח במערכת: </span>
-                                            <span className="font-medium">{mainSystemInfo.customerName}</span>
-                                          </div>
-                                          <div>
-                                            <span className="text-muted-foreground">תאריך החזרה: </span>
-                                            <span className="font-medium">{mainSystemInfo.endDate ? formatDate(mainSystemInfo.endDate) : '-'}</span>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            )}
-                          </React.Fragment>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        {/* Active Rentals Tab */}
+        <TabsContent value="active-rentals">
+          <ActiveRentalsTab
+            rentals={cellStationRentals}
+            supabaseRentals={supabaseRentals}
+            supabaseInventory={supabaseInventory}
+            isLoading={loading}
+            onReplaceSim={handleReplaceSim}
+          />
         </TabsContent>
 
-        {/* Inventory Tab */}
-        <TabsContent value="inventory">
-          <Card className="glass-card">
-            <CardContent className="pt-6">
-              {/* Search and Filter Row */}
-              <div className="flex flex-col sm:flex-row gap-4 mb-4">
-                <div className="relative flex-1">
-                  <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    placeholder="🔍 חיפוש לפי מספר..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pr-10"
-                  />
-                </div>
-                
-                {/* Status Filter */}
-                <Select
-                  value={statusFilter}
-                  onValueChange={(value: 'all' | 'active' | 'inactive') => setStatusFilter(value)}
-                >
-                  <SelectTrigger className="w-full sm:w-[180px]">
-                    <SelectValue placeholder="סינון לפי סטטוס" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">📋 הכל ({inventory.length})</SelectItem>
-                    <SelectItem value="active">🟢 פעילים ({inventory.filter(s => s.status === 'active').length})</SelectItem>
-                    <SelectItem value="inactive">🔴 לא פעילים ({inventory.filter(s => s.status === 'inactive').length})</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {loading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table className="w-full text-right" dir="rtl">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-right">ID</TableHead>
-                        <TableHead className="text-right">מספר מקומי</TableHead>
-                        <TableHead className="text-right">מספר ישראלי</TableHead>
-                        <TableHead className="text-right">תוכנית</TableHead>
-                        <TableHead className="text-right">תוקף</TableHead>
-                        <TableHead className="text-right">סטטוס CellStation</TableHead>
-                        <TableHead className="text-right">סטטוס מערכת</TableHead>
-                        <TableHead className="text-right">פעולות</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredInventory.map((item, idx) => {
-                        const mainSystemInfo = getMainSystemRentalInfo(item.local_number, item.sim);
-                        
-                        return (
-                          <TableRow
-                            key={idx}
-                            className={cn(
-                              item.status === 'active' ? 'bg-success/5' : 'bg-destructive/5',
-                              mainSystemInfo.status === 'overdue' && 'ring-1 ring-destructive/50'
-                            )}
-                          >
-                            <TableCell>{item.id}</TableCell>
-                            <TableCell className="font-mono">{formatLocalNumber(item.local_number)}</TableCell>
-                            <TableCell className="font-mono">{item.israel_number}</TableCell>
-                            <TableCell>{item.plan}</TableCell>
-                            <TableCell>{item.expiry}</TableCell>
-                            <TableCell>
-                              <Badge variant={item.status === 'active' ? 'success' : 'destructive'}>
-                                {item.status === 'active' ? '🟢 פעיל' : '🔴 לא פעיל'}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              {mainSystemInfo.status === 'not_found' && (
-                                <Badge variant="outline" className="text-muted-foreground text-xs">
-                                  לא במערכת
-                                </Badge>
-                              )}
-                              {mainSystemInfo.status === 'available' && (
-                                <Badge variant="success" className="gap-1 text-xs">
-                                  <CheckCircle className="h-3 w-3" />
-                                  זמין
-                                </Badge>
-                              )}
-                              {mainSystemInfo.status === 'rented' && (
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger>
-                                      <Badge className="bg-primary/20 text-primary border-primary/30 gap-1 text-xs cursor-help">
-                                        📱 מושכר
-                                      </Badge>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <div className="text-sm">
-                                        <div>לקוח: {mainSystemInfo.customerName}</div>
-                                        <div>עד: {mainSystemInfo.endDate ? formatDate(mainSystemInfo.endDate) : '-'}</div>
-                                      </div>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              )}
-                              {mainSystemInfo.status === 'overdue' && (
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger>
-                                      <Badge variant="destructive" className="gap-1 text-xs cursor-help">
-                                        <AlertTriangle className="h-3 w-3" />
-                                        באיחור!
-                                      </Badge>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <div className="text-sm">
-                                        <div className="font-bold text-destructive">⚠️ באיחור במערכת!</div>
-                                        <div>לקוח: {mainSystemInfo.customerName}</div>
-                                        <div>היה אמור להחזיר: {mainSystemInfo.endDate ? formatDate(mainSystemInfo.endDate) : '-'}</div>
-                                      </div>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex flex-wrap gap-1">
-                                {/* Stock status indicator */}
-                                {isSimInStock(item.sim) ? (
-                                  <Badge variant="outline" className="text-xs bg-success/10 text-success border-success/30">
-                                    ✓ במלאי
-                                  </Badge>
-                                ) : (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleAddToStock(item)}
-                                    disabled={addingToStock === item.sim}
-                                    title="הוסף למלאי הראשי"
-                                    className="gap-1"
-                                  >
-                                    {addingToStock === item.sim ? (
-                                      <Loader2 className="h-3 w-3 animate-spin" />
-                                    ) : (
-                                      <Plus className="h-3 w-3" />
-                                    )}
-                                    למלאי
-                                  </Button>
-                                )}
-                                
-                                {/* Print button */}
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handlePrintInstructions(item)}
-                                  title="הדפס הוראות חיוג"
-                                >
-                                  <Printer className="h-3 w-3" />
-                                </Button>
-                                
-                                {/* Activate button - works for both active and inactive SIMs */}
-                                <Button
-                                  size="sm"
-                                  variant={item.status === 'active' ? 'default' : 'secondary'}
-                                  onClick={() => {
-                                    setSelectedSim(item);
-                                    setActiveTab('activate');
-                                  }}
-                                  className="gap-1"
-                                  title={item.status === 'inactive' ? 'הפעל סים לא פעיל' : 'הפעל סים'}
-                                >
-                                  <Zap className="h-3 w-3" />
-                                  {item.status === 'inactive' ? 'הפעל' : 'הפעל'}
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        {/* Available SIMs Tab */}
+        <TabsContent value="available">
+          <AvailableSimsTab
+            simCards={simCards}
+            supabaseRentals={supabaseRentals}
+            supabaseInventory={supabaseInventory}
+            isLoading={isLoadingSims}
+            onActivate={handleActivate}
+            onAddToInventory={handleAddToInventory}
+          />
         </TabsContent>
 
-        {/* Activate Tab */}
-        <TabsContent value="activate">
-          <Card className="glass-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Zap className="h-5 w-5 text-primary" />
-                הפעלת השכרה חדשה
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid md:grid-cols-2 gap-6">
-                {/* SIM Selection */}
-                <div className="space-y-4">
-                  <div>
-                    <label className="block font-medium mb-2">📱 בחר סים פנוי:</label>
-                    <Select
-                      value={selectedSim?.sim || ''}
-                      onValueChange={(value) => {
-                        const sim = availableSims.find((s) => s.sim === value);
-                        setSelectedSim(sim || null);
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="-- בחר סים --" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableSims.map((sim, idx) => (
-                          <SelectItem key={idx} value={sim.sim}>
-                            {sim.local_number} - {sim.plan} (תוקף: {sim.expiry})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {selectedSim && (
-                    <Card className="bg-success/10 border-success/30">
-                      <CardContent className="p-4 text-sm space-y-1">
-                        <div><strong>ID:</strong> {selectedSim.id}</div>
-                        <div><strong>ICCID:</strong> {selectedSim.sim}</div>
-                        <div><strong>🇮🇱 מספר ישראלי:</strong> {selectedSim.israel_number || 'אין'}</div>
-                        <div><strong>📞 מספר מקומי:</strong> {selectedSim.local_number}</div>
-                        <div><strong>📅 תוקף:</strong> {selectedSim.expiry}</div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* Expiry Warning */}
-                  {expiryWarning && (
-                    <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning/30 rounded-lg text-warning">
-                      <AlertTriangle className="h-5 w-5 flex-shrink-0" />
-                      <span className="text-sm font-medium">{expiryWarning}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Customer Details */}
-                <div className="space-y-4">
-                  <div>
-                    <label className="block font-medium mb-1">👤 שם לקוח:</label>
-                    <Input
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      placeholder="שם הלקוח"
-                      list="customers-list"
-                    />
-                    <datalist id="customers-list">
-                      {customers.map((c, i) => (
-                        <option key={i} value={c.name}>
-                          {c.phone}
-                        </option>
-                      ))}
-                      {supabaseCustomers.map((c, i) => (
-                        <option key={`sb-${i}`} value={c.name}>
-                          {c.phone}
-                        </option>
-                      ))}
-                    </datalist>
-                  </div>
-
-                  <div>
-                    <label className="block font-medium mb-1">📞 טלפון לקוח:</label>
-                    <Input
-                      type="tel"
-                      value={customerPhone}
-                      onChange={(e) => setCustomerPhone(e.target.value)}
-                      placeholder="05X-XXXXXXX"
-                    />
-                  </div>
-
-                  {/* Quick Date Buttons */}
-                  <div>
-                    <label className="block font-medium mb-2">📅 תקופה:</label>
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      <Button size="sm" variant="outline" onClick={() => setQuickDate(7)}>
-                        שבוע
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => setQuickDate(14)}>
-                        שבועיים
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => setQuickDate(30)}>
-                        חודש
-                      </Button>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm mb-1">התחלה:</label>
-                        <Input
-                          type="date"
-                          value={startDate}
-                          onChange={(e) => setStartDate(e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm mb-1">סיום:</label>
-                        <Input
-                          type="date"
-                          value={endDate}
-                          onChange={(e) => setEndDate(e.target.value)}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Device Bundle Option */}
-                  <div className="flex items-center space-x-2 space-x-reverse p-3 bg-primary/5 rounded-lg border border-primary/20">
-                    <Checkbox
-                      id="include-device"
-                      checked={includeDevice}
-                      onCheckedChange={(checked) => setIncludeDevice(checked === true)}
-                    />
-                    <label
-                      htmlFor="include-device"
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                    >
-                      📦 הוסף מכשיר פשוט (+{EUROPEAN_BUNDLE_DEVICE_RATE}₪ ליום עסקים)
-                    </label>
-                  </div>
-
-                  {/* Price Display */}
-                  {calculatedPrice && (
-                    <Card className="bg-primary/10 border-primary/30">
-                      <CardContent className="p-4">
-                        <h4 className="font-semibold mb-3 flex items-center gap-2">
-                          <Calculator className="h-4 w-4" />
-                          💰 פירוט מחיר
-                        </h4>
-                        <div className="space-y-2">
-                          {calculatedPrice.breakdown.map((item, idx) => (
-                            <div key={idx} className="flex justify-between text-sm">
-                              <span>{item.item}</span>
-                              <span className="font-mono">{item.currency}{item.price.toFixed(2)}</span>
-                            </div>
-                          ))}
-                        </div>
-                        {calculatedPrice.businessDaysInfo && (
-                          <div className="text-xs text-muted-foreground mt-3 pt-2 border-t border-primary/20">
-                            <div>סה"כ ימים: {calculatedPrice.businessDaysInfo.totalDays}</div>
-                            <div>ימי עסקים: {calculatedPrice.businessDaysInfo.businessDays}</div>
-                            {calculatedPrice.businessDaysInfo.excludedDates.length > 0 && (
-                              <div className="mt-1">
-                                הוחרגו: {calculatedPrice.businessDaysInfo.excludedDates.slice(0, 3).join(', ')}
-                                {calculatedPrice.businessDaysInfo.excludedDates.length > 3 && '...'}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        <div className="border-t border-primary/30 pt-3 mt-3 flex justify-between font-bold text-lg">
-                          <span>סה"כ לתשלום:</span>
-                          <span className="text-primary">₪{calculatedPrice.total.toFixed(2)}</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  <Button
-                    onClick={handleActivate}
-                    disabled={!selectedSim || !customerName || !startDate || !endDate || isActivating}
-                    className="w-full gap-2"
-                    size="lg"
-                  >
-                    {isActivating ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Zap className="h-4 w-4" />
-                    )}
-                    {isActivating ? 'שולח...' : '⚡ הפעל והשכר'}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        {/* Expired SIMs Tab */}
+        <TabsContent value="expired">
+          <ExpiredSimsTab
+            simCards={simCards}
+            isLoading={isLoadingSims}
+          />
         </TabsContent>
 
-        {/* Replace Tab */}
-        <TabsContent value="replace">
-          <Card className="glass-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ArrowLeftRight className="h-5 w-5 text-primary" />
-                החלפת סים בהשכרה קיימת
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid md:grid-cols-2 gap-6">
-                {/* Rental Selection */}
-                <div className="space-y-4">
-                  <div>
-                    <label className="block font-medium mb-2">בחר השכרה:</label>
-                    <Select
-                      value={selectedRental?.sim || ''}
-                      onValueChange={(value) => {
-                        const rental = rentals.find((r) => r.sim === value);
-                        setSelectedRental(rental || null);
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="-- בחר השכרה --" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {rentals.map((r, idx) => (
-                          <SelectItem key={idx} value={r.sim}>
-                            <div className="flex flex-col items-start">
-                              <span className="font-medium">{r.customer_name}</span>
-                              <span className="text-xs text-muted-foreground">
-                                📞 {formatPhone(r.customer_phone)} • 📱 {formatLocalNumber(r.local_number)} • עד {formatDate(r.end_date)}
-                              </span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {selectedRental && (
-                    <Card className="bg-primary/10 border-primary/30">
-                      <CardContent className="p-4 text-sm space-y-1">
-                        <div><strong>לקוח:</strong> {selectedRental.customer_name}</div>
-                        <div><strong>SIM נוכחי:</strong> {selectedRental.sim}</div>
-                        <div><strong>מספר מקומי:</strong> {selectedRental.local_number}</div>
-                        <div><strong>תאריכים:</strong> {selectedRental.start_date} - {selectedRental.end_date}</div>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
-
-                {/* New SIM Input */}
-                <div className="space-y-4">
-                  <div>
-                    <label className="block font-medium mb-1">מספר סים חדש (ICCID):</label>
-                    <Input
-                      value={newSim}
-                      onChange={(e) => setNewSim(e.target.value.replace(/\D/g, ''))}
-                      className="font-mono"
-                      placeholder="19-20 ספרות"
-                      maxLength={20}
-                    />
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {newSim.length}/20 ספרות
-                      {newSim.length >= 19 && newSim.length <= 20 && ' ✅'}
-                    </p>
-                  </div>
-
-                  <Card className="bg-warning/10 border-warning/30">
-                    <CardContent className="p-4">
-                      <p className="font-medium text-warning flex items-center gap-2">
-                        <AlertTriangle className="h-4 w-4" />
-                        שים לב!
-                      </p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        החלפת סים היא פעולה בלתי הפיכה. הסים הישן יימחק לצמיתות.
-                      </p>
-                    </CardContent>
-                  </Card>
-
-                  <Button
-                    onClick={handleReplace}
-                    disabled={!selectedRental || newSim.length < 19}
-                    className="w-full gap-2"
-                    size="lg"
-                    variant="secondary"
-                  >
-                    <ArrowLeftRight className="h-4 w-4" />
-                    שלח להחלפה
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        {/* Activation Tab */}
+        <TabsContent value="activation">
+          <ActivationTab
+            simCards={simCards}
+            customers={supabaseCustomers}
+            inventory={supabaseInventory}
+            selectedSim={selectedSim}
+            onSimChange={setSelectedSim}
+            addCustomer={addCustomer}
+            addInventoryItem={addInventoryItem}
+            addRental={addRental}
+          />
         </TabsContent>
       </Tabs>
 
-      {/* Success Dialog */}
-      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
-        <DialogContent className="sm:max-w-md">
+      {/* Replace SIM Dialog */}
+      <Dialog open={showReplaceDialog} onOpenChange={setShowReplaceDialog}>
+        <DialogContent className="sm:max-w-md" dir="rtl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-success">
-              <CheckCircle className="h-6 w-6" />
-              ההפעלה נשלחה בהצלחה!
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowLeftRight className="h-5 w-5 text-primary" />
+              החלפת סים בהשכרה
             </DialogTitle>
             <DialogDescription>
-              הפעולה נשמרה ומחכה לביצוע בסימנייה
+              הסים הישן יוחלף בסים חדש. הפעולה לא הפיכה.
             </DialogDescription>
           </DialogHeader>
           
-          {lastActivation && (
+          {selectedRental && (
             <div className="space-y-4">
               <Card className="bg-muted/50">
-                <CardContent className="p-4 space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span>📱 SIM:</span>
-                    <span className="font-mono">{lastActivation.sim.local_number}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>👤 לקוח:</span>
-                    <span>{lastActivation.customerName}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>📅 תקופה:</span>
-                    <span>{lastActivation.startDate} - {lastActivation.endDate}</span>
-                  </div>
-                  <div className="flex justify-between font-bold text-primary">
-                    <span>💰 מחיר:</span>
-                    <span>₪{lastActivation.price.toFixed(2)}</span>
-                  </div>
+                <CardContent className="p-4 space-y-1 text-sm">
+                  <div><strong>לקוח:</strong> {selectedRental.customer_name}</div>
+                  <div><strong>טלפון:</strong> {formatPhone(selectedRental.customer_phone)}</div>
+                  <div><strong>סים נוכחי:</strong> {selectedRental.local_number}</div>
+                  <div><strong>תאריכים:</strong> {formatDate(selectedRental.start_date)} - {formatDate(selectedRental.end_date)}</div>
                 </CardContent>
               </Card>
 
-              <div className="flex items-center gap-2 p-3 bg-success/10 border border-success/30 rounded-lg text-sm">
-                <CheckCircle className="h-4 w-4 text-success flex-shrink-0" />
-                <span>נוצרה השכרה חדשה במערכת Supabase</span>
+              <div className="space-y-2">
+                <label className="block font-medium text-sm">מספר סים חדש (ICCID):</label>
+                <Input
+                  value={newSim}
+                  onChange={(e) => setNewSim(e.target.value.replace(/\D/g, ''))}
+                  className="font-mono"
+                  placeholder="19-20 ספרות"
+                  maxLength={20}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {newSim.length}/20 ספרות
+                  {newSim.length >= 19 && newSim.length <= 20 && ' ✅'}
+                </p>
               </div>
 
               <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning/30 rounded-lg text-sm">
-                <Clock className="h-4 w-4 text-warning flex-shrink-0" />
-                <span>עכשיו לחץ על הסימנייה באתר CellStation להשלמת ההפעלה</span>
+                <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0" />
+                <span>לאחר הלחיצה, לחץ על הסימנייה באתר CellStation להשלמת ההחלפה</span>
               </div>
 
               <div className="flex gap-2">
                 <Button
-                  variant="default"
+                  onClick={executeReplace}
+                  disabled={newSim.length < 19}
                   className="flex-1 gap-2"
-                  onClick={() => {
-                    handlePrintInstructions(lastActivation.sim);
-                  }}
                 >
-                  <Printer className="h-4 w-4" />
-                  🖨️ הדפס הוראות
+                  <ArrowLeftRight className="h-4 w-4" />
+                  החלף סים
                 </Button>
                 <Button
                   variant="outline"
-                  className="flex-1"
-                  onClick={() => setShowSuccessDialog(false)}
+                  onClick={() => setShowReplaceDialog(false)}
                 >
-                  ← חזור לדאשבורד
+                  ביטול
                 </Button>
               </div>
             </div>
