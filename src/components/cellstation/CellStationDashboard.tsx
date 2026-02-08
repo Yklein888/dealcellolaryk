@@ -41,6 +41,7 @@ import { useCellstationSync, SimCard } from '@/hooks/useCellstationSync';
 import { ItemCategory } from '@/types/rental';
 import { ActiveRentalsTab } from './ActiveRentalsTab';
 import { AvailableSimsTab } from './AvailableSimsTab';
+import { NeedsReplacementTab } from './NeedsReplacementTab';
 import { ExpiredSimsTab } from './ExpiredSimsTab';
 import { ActivationTab } from './ActivationTab';
 import { AllSimsTab } from './AllSimsTab';
@@ -73,6 +74,7 @@ interface Stats {
   rented: number;
   overdue: number;
   expired: number;
+  needsReplacement: number;
   total: number;
 }
 
@@ -182,6 +184,7 @@ export function CellStationDashboard() {
     let rented = 0;
     let overdue = 0;
     let expired = 0;
+    let needsReplacement = 0;
     
     simCards.forEach(sim => {
       // Check if expired or inactive
@@ -211,7 +214,8 @@ export function CellStationDashboard() {
         const itemIsraeliNorm = normalizeForSearch(item.israeliNumber); // Israeli
         return (normalizedSim && itemSimNorm === normalizedSim) ||
                (normalizedLocal && itemLocalNorm === normalizedLocal) ||
-               (normalizedIsraeli && itemIsraeliNorm === normalizedIsraeli);
+               (normalizedIsraeli && itemIsraeliNorm === normalizedIsraeli) ||
+               (normalizedIsraeli && itemLocalNorm === normalizedIsraeli);
       });
       
       if (matchingItem?.status === 'rented') {
@@ -221,6 +225,12 @@ export function CellStationDashboard() {
         );
         
         if (activeRental) {
+          // SIM is available in CellStation but rented in main system = needs replacement
+          if (!sim.is_rented) {
+            needsReplacement++;
+            return;
+          }
+          
           const isOverdue = activeRental.status === 'overdue' || 
             new Date(activeRental.endDate) < today;
           
@@ -241,7 +251,7 @@ export function CellStationDashboard() {
       }
     });
     
-    return { available, rented, overdue, expired, total: simCards.length };
+    return { available, rented, overdue, expired, needsReplacement, total: simCards.length };
   }, [simCards, supabaseInventory, supabaseRentals]);
 
   // Fetch CellStation rentals data from Google Script
@@ -356,9 +366,10 @@ export function CellStationDashboard() {
   };
 
   // Handle activate - switch to activation tab with selected SIM
-  const handleActivate = (sim: SimCard) => {
+  const handleActivate = (sim: SimCard, requiresReplacement?: boolean, existingRental?: any) => {
     setSelectedSim(sim);
     setActiveTab('activation');
+    // TODO: Pass requiresReplacement flag to ActivationTab if needed
   };
 
   const handleRefresh = async () => {
@@ -411,13 +422,21 @@ export function CellStationDashboard() {
       </div>
 
       {/* Smart Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <StatCard 
           title="זמינים להפעלה" 
           value={stats.available} 
           icon={CheckCircle} 
           variant="success"
           onClick={() => setActiveTab('available')}
+        />
+        <StatCard 
+          title="צריך החלפה" 
+          value={stats.needsReplacement} 
+          icon={ArrowLeftRight} 
+          variant="warning"
+          highlight={stats.needsReplacement > 0}
+          onClick={() => setActiveTab('needs-replacement')}
         />
         <StatCard 
           title="מושכרים" 
@@ -454,22 +473,29 @@ export function CellStationDashboard() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
-          <TabsTrigger value="active-rentals" className="gap-2">
-            <Package className="h-4 w-4" />
-            השכרות פעילות
-          </TabsTrigger>
+        <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-grid">
           <TabsTrigger value="available" className="gap-2">
             <CheckCircle className="h-4 w-4" />
             זמינים ({stats.available})
           </TabsTrigger>
-          <TabsTrigger value="all-sims" className="gap-2">
-            <Smartphone className="h-4 w-4" />
-            כל הסימים
+          <TabsTrigger value="needs-replacement" className="gap-2 relative">
+            <ArrowLeftRight className="h-4 w-4" />
+            צריך החלפה ({stats.needsReplacement})
+            {stats.needsReplacement > 0 && (
+              <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-warning" />
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="active-rentals" className="gap-2">
+            <Package className="h-4 w-4" />
+            מושכרים ({stats.rented})
           </TabsTrigger>
           <TabsTrigger value="expired" className="gap-2">
             <XCircle className="h-4 w-4" />
             לא בתוקף ({stats.expired})
+          </TabsTrigger>
+          <TabsTrigger value="all-sims" className="gap-2">
+            <Smartphone className="h-4 w-4" />
+            כל הסימים
           </TabsTrigger>
           <TabsTrigger value="activation" className="gap-2">
             <Zap className="h-4 w-4" />
@@ -497,6 +523,17 @@ export function CellStationDashboard() {
             isLoading={isLoadingSims}
             onActivate={handleActivate}
             onAddToInventory={handleAddToInventory}
+          />
+        </TabsContent>
+
+        {/* Needs Replacement Tab */}
+        <TabsContent value="needs-replacement">
+          <NeedsReplacementTab
+            simCards={simCards}
+            supabaseRentals={supabaseRentals}
+            supabaseInventory={supabaseInventory}
+            isLoading={isLoadingSims}
+            onActivate={handleActivate}
           />
         </TabsContent>
 
