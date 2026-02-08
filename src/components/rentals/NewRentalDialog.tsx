@@ -36,6 +36,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { printCallingInstructions, downloadCallingInstructions } from '@/lib/callingInstructions';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   RentalItem, 
   ItemCategory,
@@ -185,6 +186,9 @@ export function NewRentalDialog({
 
   const [downloadingInstructions, setDownloadingInstructions] = useState<string | null>(null);
 
+  // Auto-activate SIM checkbox state
+  const [autoActivateSim, setAutoActivateSim] = useState(true);
+
   // Reset form
   const resetForm = () => {
     setFormData({ customerId: '', deposit: '', notes: '' });
@@ -194,6 +198,7 @@ export function NewRentalDialog({
     setCustomerSearchTerm('');
     setItemSearchTerm('');
     setItemCategoryFilter('all');
+    setAutoActivateSim(true);
   };
 
   // Auto-add pre-selected item when dialog opens
@@ -591,6 +596,40 @@ export function NewRentalDialog({
         pickupTime,
       });
 
+      // Auto-activate European SIMs if checkbox is checked
+      if (autoActivateSim) {
+        const europeanSimItems = selectedItems.filter(
+          item => item.category === 'sim_european' && !item.isGeneric
+        );
+
+        for (const simItem of europeanSimItems) {
+          const inventoryItem = inventory.find(i => i.id === simItem.inventoryItemId);
+          if (inventoryItem?.simNumber) {
+            try {
+              await supabase.functions.invoke('sim-activation-request', {
+                body: {
+                  sim_number: inventoryItem.simNumber,
+                  customer_id: customer.id,
+                  customer_name: customer.name,
+                  start_date: format(startDate, 'yyyy-MM-dd'),
+                  end_date: format(endDate, 'yyyy-MM-dd'),
+                }
+              });
+            } catch (activationError) {
+              console.error('Error auto-activating SIM:', activationError);
+              // Don't fail the rental creation, just log the error
+            }
+          }
+        }
+
+        if (europeanSimItems.length > 0) {
+          toast({
+            title: 'בקשת הפעלה נשלחה',
+            description: `${europeanSimItems.length} סימים נשלחו להפעלה. לחץ על ה-Bookmarklet להשלמת ההפעלה.`,
+          });
+        }
+      }
+
       toast({
         title: 'השכרה נוצרה',
         description: `השכרה חדשה נוצרה עבור ${customer.name}`,
@@ -892,6 +931,25 @@ export function NewRentalDialog({
                   />
                 </div>
               </div>
+
+              {/* Auto-activate SIM checkbox - only show if European SIM is selected */}
+              {selectedItems.some(item => item.category === 'sim_european' && !item.isGeneric) && (
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-primary/10 border border-primary/30">
+                  <Checkbox
+                    id="autoActivateSim"
+                    checked={autoActivateSim}
+                    onCheckedChange={(checked) => setAutoActivateSim(checked === true)}
+                  />
+                  <div className="flex-1">
+                    <Label htmlFor="autoActivateSim" className="text-sm font-medium cursor-pointer">
+                      ⚡ הפעל סים אוטומטית
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      הסים יישלח להפעלה מיד עם יצירת ההשכרה
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Submit Button - Hidden on mobile (shows in fixed bottom) */}
               <Button 
