@@ -51,7 +51,7 @@ import { AllSimsTab } from './AllSimsTab';
 // New categorized structure with mandatory customer selection
 // ============================================
 
-const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzKhHEQeldMrsNjL8RZMigkPvIKJDRSWD0WoDYpyGPAmGxBYFxDi_9EiUldFjnZ6TIE/exec';
+const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbx7HRL6ythPzBINoQDir2PreXod3FNtQJJwfrev3z84xQb-84X8-PHPwb1XFzc750j5/exec';
 
 // === Types ===
 interface CellStationRental {
