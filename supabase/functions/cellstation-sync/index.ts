@@ -51,11 +51,25 @@ Deno.serve(async (req) => {
 
     const response = await fetch(GOOGLE_URL, { redirect: 'follow' });
     
+    const responseText = await response.text();
+    console.log('📡 Response status:', response.status, 'Content-Type:', response.headers.get('content-type'));
+    console.log('📡 Response preview:', responseText.substring(0, 300));
+
     if (!response.ok) {
-      throw new Error(`Google Apps Script error: ${response.status}`);
+      throw new Error(`Google Apps Script error: ${response.status} - ${responseText.substring(0, 200)}`);
     }
 
-    const data = await response.json();
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('text/html') || responseText.trimStart().startsWith('<')) {
+      throw new Error(`Google Apps Script returned HTML instead of JSON. The script URL may be invalid or the script has an error. Preview: ${responseText.substring(0, 200)}`);
+    }
+
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseErr) {
+      throw new Error(`Failed to parse response as JSON: ${responseText.substring(0, 200)}`);
+    }
     const services = data.services || [];
     const rentals = data.rentals || [];
 
