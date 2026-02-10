@@ -152,15 +152,88 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`🎉 סנכרון הושלם: ${updated} עודכנו, ${inserted} נוספו (סה"כ ${processedSims.size} סימים)`);
+    // Cross-reference with inventory and rentals
+    console.log('🔄 מצליב נתונים עם המלאי וההשכרות...');
+    
+    // Get all inventory items that are SIMs (european/american) with their rental status
+    const { data: inventoryItems } = await supabase
+      .from('inventory')
+      .select('id, sim_number, israeli_number, local_number, status')
+      .in('category', ['sim_european', 'sim_american']);
+
+    // Get all active rentals with their items
+    const { data: activeRentals } = await supabase
+      .from('rentals')
+      .select('id, customer_id, customer_name, status, rental_items(inventory_item_id)')
+      .in('status', ['active', 'overdue']);
+
+    // Build a map: inventory_item_id -> rental info
+    const rentalMap = new Map<string, { rentalId: string; customerId: string | null; customerName: string }>();
+    if (activeRentals) {
+      for (const rental of activeRentals) {
+        const items = (rental as any).rental_items || [];
+        for (const item of items) {
+          if (item.inventory_item_id) {
+            rentalMap.set(item.inventory_item_id, {
+              rentalId: rental.id,
+              customerId: rental.customer_id,
+              customerName: rental.customer_name,
+            });
+          }
+        }
+      }
+    }
+
+    // Build a map: normalized number / sim_number -> inventory item
+    const invBySim = new Map<string, any>();
+    const invByIsraeli = new Map<string, any>();
+    if (inventoryItems) {
+      for (const inv of inventoryItems) {
+        if (inv.sim_number) invBySim.set(normalizeNumber(inv.sim_number), inv);
+        if (inv.israeli_number) invByIsraeli.set(normalizeNumber(inv.israeli_number), inv);
+      }
+    }
+
+    // Now update sim_cards with cross-referenced data
+    let crossUpdated = 0;
+    const { data: allSimCards } = await supabase.from('sim_cards').select('id, sim_number, israeli_number');
+    
+    if (allSimCards) {
+      for (const sim of allSimCards) {
+        // Find matching inventory item
+        const normSim = normalizeNumber(sim.sim_number);
+        const normIsraeli = normalizeNumber(sim.israeli_number);
+        const inv = (normSim && invBySim.get(normSim)) || (normIsraeli && invByIsraeli.get(normIsraeli));
+        
+        if (inv) {
+          const rental = rentalMap.get(inv.id);
+          const updateData: any = {
+            is_rented: inv.status === 'rented',
+          };
+          if (rental) {
+            updateData.linked_rental_id = rental.rentalId;
+            updateData.linked_customer_id = rental.customerId;
+          } else {
+            updateData.linked_rental_id = null;
+            updateData.linked_customer_id = null;
+          }
+          
+          await supabase.from('sim_cards').update(updateData).eq('id', sim.id);
+          crossUpdated++;
+        }
+      }
+    }
+
+    console.log(`🎉 סנכרון הושלם: ${updated} עודכנו, ${inserted} נוספו, ${crossUpdated} הוצלבו (סה"כ ${processedSims.size} סימים)`);
 
     return new Response(
       JSON.stringify({
         success: true,
         updated,
         inserted,
+        crossReferenced: crossUpdated,
         total: processedSims.size,
-        message: `${updated} סימים עודכנו, ${inserted} סימים נוספו`,
+        message: `${updated} סימים עודכנו, ${inserted} סימים נוספו, ${crossUpdated} הוצלבו עם המלאי`,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
