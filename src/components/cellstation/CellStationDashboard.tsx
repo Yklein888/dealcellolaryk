@@ -36,6 +36,7 @@ import {
 import { cn, normalizeForSearch } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { externalSupabase } from '@/integrations/external-supabase/client';
 import { useRental } from '@/hooks/useRental';
 import { useCellstationSync, SimCard } from '@/hooks/useCellstationSync';
 import { ItemCategory } from '@/types/rental';
@@ -50,9 +51,6 @@ import { AllSimsTab } from './AllSimsTab';
 // Cell Station Dashboard v6.0
 // New categorized structure with mandatory customer selection
 // ============================================
-
-// Google Apps Script URL is no longer used - data comes from external Supabase
-const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbx7HRL6ythPzBINoQDir2PreXod3FNtQJJwfrev3z84xQb-84X8-PHPwb1XFzc750j5/exec';
 
 // === Types ===
 interface CellStationRental {
@@ -161,7 +159,7 @@ export function CellStationDashboard() {
     addCustomer,
   } = useRental();
 
-  const { simCards, isLoading: isLoadingSims, syncSims, isSyncing } = useCellstationSync();
+  const { simCards, isLoading: isLoadingSims, syncSims, isSyncing, requestSimSwap } = useCellstationSync();
 
   // State
   const [cellStationRentals, setCellStationRentals] = useState<CellStationRental[]>([]);
@@ -255,19 +253,37 @@ export function CellStationDashboard() {
     return { available, rented, overdue, expired, needsReplacement, total: simCards.length };
   }, [simCards, supabaseInventory, supabaseRentals]);
 
-  // Fetch CellStation rentals data from Google Script
+  // Fetch rentals from external Supabase (rented SIMs)
   const fetchCellStationData = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(WEBAPP_URL);
-      const data = await res.json();
+      const { data, error: fetchError } = await externalSupabase
+        .from('cellstation_sims')
+        .select('*')
+        .eq('status', 'rented');
 
-      if (data.success !== false) {
-        setCellStationRentals(data.rentals || []);
-      } else {
-        setError(data.error || 'שגיאה בטעינת נתונים');
+      if (fetchError) {
+        setError(fetchError.message);
+        return;
       }
+
+      const rentals: CellStationRental[] = (data || []).map((row: any) => ({
+        rental_id: row.id,
+        id: row.id,
+        sim: row.iccid || '',
+        local_number: row.il_number || '',
+        israel_number: row.uk_number || '',
+        plan: row.plan_type || '',
+        start_date: row.start_date || '',
+        end_date: row.end_date || '',
+        days: '',
+        customer_name: row.customer_name || '',
+        customer_phone: '',
+        status: row.status_detail || row.status || '',
+      }));
+
+      setCellStationRentals(rentals);
     } catch (err) {
       setError('שגיאה בחיבור - לחץ על כפתור הסנכרון');
     } finally {
@@ -296,30 +312,16 @@ export function CellStationDashboard() {
     }
 
     try {
-      const res = await fetch(WEBAPP_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'replace_sim',
-          old_sim: selectedRental.sim,
-          new_sim: newSim,
-          rental_id: selectedRental.rental_id,
-        }),
-      });
-      const data = await res.json();
+      await requestSimSwap(selectedRental.sim, newSim, selectedRental.customer_name);
 
-      if (data.success) {
-        toast({
-          title: '✅ החלפה נשמרה!',
-          description: 'לחץ על הסימנייה באתר CellStation להשלמת ההחלפה',
-        });
-        setShowReplaceDialog(false);
-        setSelectedRental(null);
-        setNewSim('');
-        fetchCellStationData();
-      } else {
-        throw new Error(data.error || 'שגיאה בהחלפה');
-      }
+      toast({
+        title: '✅ בקשת החלפה נשלחה!',
+        description: 'התוסף יבצע את ההחלפה באתר CellStation',
+      });
+      setShowReplaceDialog(false);
+      setSelectedRental(null);
+      setNewSim('');
+      fetchCellStationData();
     } catch (err: any) {
       toast({
         title: 'שגיאה',
@@ -612,7 +614,7 @@ export function CellStationDashboard() {
 
               <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning/30 rounded-lg text-sm">
                 <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0" />
-                <span>לאחר הלחיצה, לחץ על הסימנייה באתר CellStation להשלמת ההחלפה</span>
+                <span>לאחר הלחיצה, התוסף שלך יבצע את ההחלפה באתר CellStation באופן אוטומטי</span>
               </div>
 
               <div className="flex gap-2">

@@ -6,8 +6,7 @@ import { externalSupabase } from '@/integrations/external-supabase/client';
  * Hook to detect SIM cards that need replacement.
  * A SIM needs swap when:
  * - It's in an active/overdue rental in our system (inventory.status = 'rented')
- * - But CellStation shows it as available (sim_cards.is_rented = false)
- * This means the SIM expired/was deactivated while the rental is still running.
+ * - But CellStation shows it as available (status != 'rented')
  */
 export const useDetectSwapNeeded = () => {
   const detectSwapNeeded = useCallback(async () => {
@@ -27,7 +26,7 @@ export const useDetectSwapNeeded = () => {
       // Get all sims from external CellStation DB
       const { data: rawSims, error: simError } = await externalSupabase
         .from('cellstation_sims')
-        .select('sim_number, israeli_number, status_detail');
+        .select('iccid, il_number, status');
 
       if (simError || !rawSims) {
         console.error('Error fetching cellstation_sims:', simError);
@@ -35,12 +34,11 @@ export const useDetectSwapNeeded = () => {
       }
 
       const simCards = rawSims.map((s: any) => {
-        const statusLower = (s.status_detail || '').toLowerCase();
+        const statusLower = (s.status || '').toLowerCase();
         return {
-          sim_number: s.sim_number,
-          israeli_number: s.israeli_number,
+          iccid: s.iccid,
+          il_number: s.il_number,
           is_rented: statusLower === 'rented',
-          is_active: statusLower === 'active' || statusLower === 'rented',
         };
       });
 
@@ -48,8 +46,8 @@ export const useDetectSwapNeeded = () => {
       const simByIccid = new Map<string, any>();
       const simByIsraeli = new Map<string, any>();
       for (const sim of simCards) {
-        if (sim.sim_number) simByIccid.set(normalizeNumber(sim.sim_number), sim);
-        if (sim.israeli_number) simByIsraeli.set(normalizeNumber(sim.israeli_number), sim);
+        if (sim.iccid) simByIccid.set(normalizeNumber(sim.iccid), sim);
+        if (sim.il_number) simByIsraeli.set(normalizeNumber(sim.il_number), sim);
       }
 
       let flagged = 0;
@@ -61,14 +59,12 @@ export const useDetectSwapNeeded = () => {
         const matchedSim = (normSim && simByIccid.get(normSim)) || (normIsraeli && simByIsraeli.get(normIsraeli));
 
         if (matchedSim && !matchedSim.is_rented) {
-          // SIM is available in CellStation but rented in our system → needs swap
           await supabase
             .from('inventory')
             .update({ needs_swap: true })
             .eq('id', inv.id);
           flagged++;
         } else if (matchedSim && matchedSim.is_rented) {
-          // SIM is still rented in CellStation → clear swap flag if set
           await supabase
             .from('inventory')
             .update({ needs_swap: false })

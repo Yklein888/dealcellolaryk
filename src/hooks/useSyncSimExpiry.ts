@@ -3,8 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { externalSupabase } from '@/integrations/external-supabase/client';
 
 /**
- * Hook to sync SIM expiry dates and status from sim_cards table to inventory table.
- * Matches by sim_number (ICCID) as primary key.
+ * Hook to sync SIM expiry dates and status from external cellstation_sims table to inventory table.
+ * Matches by ICCID as primary key.
  * Runs on mount and every 5 minutes.
  */
 export const useSyncSimExpiry = () => {
@@ -13,7 +13,7 @@ export const useSyncSimExpiry = () => {
       // Get all SIM cards from external CellStation DB
       const { data: rawSims, error: simError } = await externalSupabase
         .from('cellstation_sims')
-        .select('sim_number, expiry_date, status_detail, israeli_number, local_number');
+        .select('iccid, plan_expiry, status, status_detail, il_number, uk_number');
 
       if (simError || !rawSims) {
         console.error('Error fetching cellstation_sims for sync:', simError);
@@ -22,13 +22,13 @@ export const useSyncSimExpiry = () => {
 
       // Map external fields to internal format
       const simCards = rawSims.map((s: any) => {
-        const statusLower = (s.status_detail || '').toLowerCase();
+        const statusLower = (s.status || '').toLowerCase();
         return {
-          sim_number: s.sim_number,
-          israeli_number: s.israeli_number,
-          local_number: s.local_number,
-          expiry_date: s.expiry_date,
-          is_active: statusLower === 'active' || statusLower === 'rented',
+          iccid: s.iccid,
+          il_number: s.il_number,
+          uk_number: s.uk_number,
+          plan_expiry: s.plan_expiry,
+          is_active: statusLower !== 'expired',
           is_rented: statusLower === 'rented',
         };
       });
@@ -44,12 +44,12 @@ export const useSyncSimExpiry = () => {
         return;
       }
 
-      // Build lookup maps for sim_cards
+      // Build lookup maps
       const simByIccid = new Map<string, any>();
       const simByIsraeli = new Map<string, any>();
       for (const sim of simCards) {
-        if (sim.sim_number) simByIccid.set(normalizeNumber(sim.sim_number), sim);
-        if (sim.israeli_number) simByIsraeli.set(normalizeNumber(sim.israeli_number), sim);
+        if (sim.iccid) simByIccid.set(normalizeNumber(sim.iccid), sim);
+        if (sim.il_number) simByIsraeli.set(normalizeNumber(sim.il_number), sim);
       }
 
       let synced = 0;
@@ -62,7 +62,7 @@ export const useSyncSimExpiry = () => {
 
         if (matchedSim) {
           const cellstationStatus = matchedSim.is_rented ? 'rented' : matchedSim.is_active ? 'active' : 'inactive';
-          const newExpiry = matchedSim.expiry_date || null;
+          const newExpiry = matchedSim.plan_expiry || null;
 
           // Only update if something changed
           if (inv.expiry_date !== newExpiry || inv.cellstation_status !== cellstationStatus) {
@@ -89,7 +89,7 @@ export const useSyncSimExpiry = () => {
 
   useEffect(() => {
     syncExpiry();
-    const interval = setInterval(syncExpiry, 5 * 60 * 1000); // Every 5 minutes
+    const interval = setInterval(syncExpiry, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, [syncExpiry]);
 
