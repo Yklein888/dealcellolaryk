@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { useRental } from '@/hooks/useRental';
+import { useSyncSimExpiry } from '@/hooks/useSyncSimExpiry';
+import { useDetectSwapNeeded } from '@/hooks/useDetectSwapNeeded';
 import { InventoryItem } from '@/types/rental';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -76,6 +78,16 @@ export default function Rentals() {
     getAvailableItems 
   } = useRental();
   const { toast } = useToast();
+  
+  // Sync SIM expiry data and detect swaps on page load
+  const { syncExpiry } = useSyncSimExpiry();
+  const { detectSwapNeeded } = useDetectSwapNeeded();
+  
+  useEffect(() => {
+    // Run swap detection after sync
+    const timer = setTimeout(() => detectSwapNeeded(), 3000);
+    return () => clearTimeout(timer);
+  }, [detectSwapNeeded]);
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const [searchTerm, setSearchTerm] = useState('');

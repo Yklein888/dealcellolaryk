@@ -224,7 +224,57 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`🎉 סנכרון הושלם: ${updated} עודכנו, ${inserted} נוספו, ${crossUpdated} הוצלבו (סה"כ ${processedSims.size} סימים)`);
+    // Step 3: Sync expiry dates and status from sim_cards to inventory
+    console.log('📅 מסנכרן תוקף ל-inventory...');
+    let invSynced = 0;
+    
+    const { data: simInventoryItems } = await supabase
+      .from('inventory')
+      .select('id, sim_number, israeli_number, expiry_date, cellstation_status')
+      .in('category', ['sim_european', 'sim_american']);
+
+    if (simInventoryItems && allSimCards) {
+      // Build sim_cards lookup
+      const simByIccid = new Map<string, any>();
+      const simByIsraeli2 = new Map<string, any>();
+      for (const sim of allSimCards) {
+        if (sim.sim_number) simByIccid.set(normalizeNumber(sim.sim_number), sim);
+        if (sim.israeli_number) simByIsraeli2.set(normalizeNumber(sim.israeli_number), sim);
+      }
+
+      for (const inv of simInventoryItems) {
+        const normSim = normalizeNumber(inv.sim_number);
+        const normIsraeli = normalizeNumber(inv.israeli_number);
+        const matched = (normSim && simByIccid.get(normSim)) || (normIsraeli && simByIsraeli2.get(normIsraeli));
+
+        if (matched) {
+          const { data: simRecord } = await supabase
+            .from('sim_cards')
+            .select('expiry_date, is_active, is_rented')
+            .eq('id', matched.id)
+            .maybeSingle();
+
+          if (simRecord) {
+            const cellStatus = simRecord.is_rented ? 'rented' : simRecord.is_active ? 'active' : 'inactive';
+            const newExpiry = simRecord.expiry_date || null;
+            
+            if (inv.expiry_date !== newExpiry || inv.cellstation_status !== cellStatus) {
+              await supabase
+                .from('inventory')
+                .update({
+                  expiry_date: newExpiry,
+                  cellstation_status: cellStatus,
+                  last_sync: new Date().toISOString(),
+                })
+                .eq('id', inv.id);
+              invSynced++;
+            }
+          }
+        }
+      }
+    }
+
+    console.log(`🎉 סנכרון הושלם: ${updated} עודכנו, ${inserted} נוספו, ${crossUpdated} הוצלבו, ${invSynced} תוקפים סונכרנו (סה"כ ${processedSims.size} סימים)`);
 
     return new Response(
       JSON.stringify({
@@ -232,8 +282,9 @@ Deno.serve(async (req) => {
         updated,
         inserted,
         crossReferenced: crossUpdated,
+        inventorySynced: invSynced,
         total: processedSims.size,
-        message: `${updated} סימים עודכנו, ${inserted} סימים נוספו, ${crossUpdated} הוצלבו עם המלאי`,
+        message: `${updated} סימים עודכנו, ${inserted} סימים נוספו, ${crossUpdated} הוצלבו, ${invSynced} תוקפים סונכרנו`,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

@@ -1,0 +1,4 @@
+
+ALTER TABLE public.inventory ADD COLUMN IF NOT EXISTS cellstation_status TEXT;
+ALTER TABLE public.inventory ADD COLUMN IF NOT EXISTS last_sync TIMESTAMP WITH TIME ZONE;
+ALTER TABLE public.inventory ADD COLUMN IF NOT EXISTS needs_swap BOOLEAN DEFAULT FALSE;

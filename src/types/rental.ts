@@ -24,6 +24,9 @@ export interface InventoryItem {
   status: 'available' | 'rented' | 'maintenance';
   notes?: string;
   barcode?: string;
+  cellstationStatus?: string;
+  lastSync?: string;
+  needsSwap?: boolean;
 }
 
 export interface Customer {
