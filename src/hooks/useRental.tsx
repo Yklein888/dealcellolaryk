@@ -196,7 +196,7 @@ export function RentalProvider({ children }: { children: ReactNode }) {
           failedParts.push('מלאי');
         } else {
           anyDataFetched = true;
-          const nextInventory = (data || []).map((i) => ({
+          const nextInventory = (data || []).map((i: any) => ({
             id: i.id,
             category: i.category as ItemCategory,
             name: i.name,
@@ -207,6 +207,9 @@ export function RentalProvider({ children }: { children: ReactNode }) {
             status: i.status as 'available' | 'rented' | 'maintenance',
             notes: i.notes || undefined,
             barcode: i.barcode || undefined,
+            cellstationStatus: i.cellstation_status || undefined,
+            lastSync: i.last_sync || undefined,
+            needsSwap: i.needs_swap || false,
           }));
           saveInventory(nextInventory);
         }

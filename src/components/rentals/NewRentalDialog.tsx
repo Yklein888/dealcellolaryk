@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { ExpiryWarningDialog } from '@/components/rentals/ExpiryWarningDialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -189,6 +190,10 @@ export function NewRentalDialog({
   // Auto-activate SIM checkbox state
   const [autoActivateSim, setAutoActivateSim] = useState(true);
 
+  // Expiry warning dialog state
+  const [expiryWarningOpen, setExpiryWarningOpen] = useState(false);
+  const [pendingExpiredItem, setPendingExpiredItem] = useState<InventoryItem | null>(null);
+
   // Reset form
   const resetForm = () => {
     setFormData({ customerId: '', deposit: '', notes: '' });
@@ -291,11 +296,9 @@ export function NewRentalDialog({
     const validityStatus = isSimValidForPeriod(item, endDate);
     
     if (validityStatus === 'expired') {
-      toast({
-        title: 'סים פג תוקף',
-        description: 'לא ניתן להשכיר סים שכבר פג תוקפו',
-        variant: 'destructive',
-      });
+      // Show warning dialog instead of blocking
+      setPendingExpiredItem(item);
+      setExpiryWarningOpen(true);
       return;
     }
     
@@ -1068,12 +1071,12 @@ export function NewRentalDialog({
                             key={item.id}
                             type="button"
                             onClick={() => handleAddItem(item)}
-                            disabled={isSelected || isExpiredSim}
+                            disabled={isSelected}
                             className={cn(
                               "relative flex flex-col items-center gap-1 sm:gap-2 p-3 sm:p-4 rounded-xl border-2 transition-all text-center",
                               colors.bg,
                               isExpiredSim 
-                                ? "opacity-50 cursor-not-allowed border-destructive/50"
+                                ? "opacity-75 border-amber-400/50 cursor-pointer hover:border-amber-500"
                                 : isSelected 
                                   ? "border-green-500 ring-2 ring-green-500/30 cursor-default" 
                                   : validityStatus === 'warning'
@@ -1126,7 +1129,7 @@ export function NewRentalDialog({
                                 )}
                               </div>
                             )}
-                            {!isSelected && !isExpiredSim && (
+                            {!isSelected && (
                               <div className="absolute bottom-2 left-2">
                                 <Plus className="h-5 w-5 text-primary/50" />
                               </div>
@@ -1276,6 +1279,29 @@ export function NewRentalDialog({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Expiry Warning Dialog */}
+      <ExpiryWarningDialog
+        isOpen={expiryWarningOpen}
+        onOpenChange={setExpiryWarningOpen}
+        item={pendingExpiredItem}
+        onConfirm={() => {
+          if (pendingExpiredItem) {
+            setSelectedItems([...selectedItems, {
+              inventoryItemId: pendingExpiredItem.id,
+              category: pendingExpiredItem.category,
+              name: pendingExpiredItem.name,
+              hasIsraeliNumber: false,
+            }]);
+            toast({
+              title: '⚠️ סים פג תוקף נוסף',
+              description: 'זכור להאריך את תוקף הסים לפני ההפעלה',
+            });
+          }
+          setPendingExpiredItem(null);
+          setExpiryWarningOpen(false);
+        }}
+      />
     </>
   );
 }

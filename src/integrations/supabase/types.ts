@@ -120,12 +120,15 @@ export type Database = {
         Row: {
           barcode: string | null
           category: Database["public"]["Enums"]["item_category"]
+          cellstation_status: string | null
           created_at: string
           expiry_date: string | null
           id: string
           israeli_number: string | null
+          last_sync: string | null
           local_number: string | null
           name: string
+          needs_swap: boolean | null
           notes: string | null
           sim_number: string | null
           status: Database["public"]["Enums"]["item_status"]
@@ -134,12 +137,15 @@ export type Database = {
         Insert: {
           barcode?: string | null
           category: Database["public"]["Enums"]["item_category"]
+          cellstation_status?: string | null
           created_at?: string
           expiry_date?: string | null
           id?: string
           israeli_number?: string | null
+          last_sync?: string | null
           local_number?: string | null
           name: string
+          needs_swap?: boolean | null
           notes?: string | null
           sim_number?: string | null
           status?: Database["public"]["Enums"]["item_status"]
@@ -148,12 +154,15 @@ export type Database = {
         Update: {
           barcode?: string | null
           category?: Database["public"]["Enums"]["item_category"]
+          cellstation_status?: string | null
           created_at?: string
           expiry_date?: string | null
           id?: string
           israeli_number?: string | null
+          last_sync?: string | null
           local_number?: string | null
           name?: string
+          needs_swap?: boolean | null
           notes?: string | null
           sim_number?: string | null
           status?: Database["public"]["Enums"]["item_status"]
@@ -1009,12 +1018,15 @@ export type Database = {
         Returns: {
           barcode: string | null
           category: Database["public"]["Enums"]["item_category"]
+          cellstation_status: string | null
           created_at: string
           expiry_date: string | null
           id: string
           israeli_number: string | null
+          last_sync: string | null
           local_number: string | null
           name: string
+          needs_swap: boolean | null
           notes: string | null
           sim_number: string | null
           status: Database["public"]["Enums"]["item_status"]
