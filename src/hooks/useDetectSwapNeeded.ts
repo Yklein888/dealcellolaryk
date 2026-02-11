@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { externalSupabase } from '@/integrations/external-supabase/client';
 
 /**
  * Hook to detect SIM cards that need replacement.
@@ -23,15 +24,25 @@ export const useDetectSwapNeeded = () => {
         return;
       }
 
-      // Get all sim_cards
-      const { data: simCards, error: simError } = await supabase
-        .from('sim_cards')
-        .select('sim_number, israeli_number, is_rented, is_active');
+      // Get all sims from external CellStation DB
+      const { data: rawSims, error: simError } = await externalSupabase
+        .from('cellstation_sims')
+        .select('sim_number, israeli_number, status_detail');
 
-      if (simError || !simCards) {
-        console.error('Error fetching sim_cards:', simError);
+      if (simError || !rawSims) {
+        console.error('Error fetching cellstation_sims:', simError);
         return;
       }
+
+      const simCards = rawSims.map((s: any) => {
+        const statusLower = (s.status_detail || '').toLowerCase();
+        return {
+          sim_number: s.sim_number,
+          israeli_number: s.israeli_number,
+          is_rented: statusLower === 'rented',
+          is_active: statusLower === 'active' || statusLower === 'rented',
+        };
+      });
 
       // Build lookup
       const simByIccid = new Map<string, any>();

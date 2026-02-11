@@ -51,6 +51,7 @@ import { AllSimsTab } from './AllSimsTab';
 // New categorized structure with mandatory customer selection
 // ============================================
 
+// Google Apps Script URL is no longer used - data comes from external Supabase
 const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbx7HRL6ythPzBINoQDir2PreXod3FNtQJJwfrev3z84xQb-84X8-PHPwb1XFzc750j5/exec';
 
 // === Types ===

@@ -1,5 +1,6 @@
 import { useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { externalSupabase } from '@/integrations/external-supabase/client';
 
 /**
  * Hook to sync SIM expiry dates and status from sim_cards table to inventory table.
@@ -9,15 +10,28 @@ import { supabase } from '@/integrations/supabase/client';
 export const useSyncSimExpiry = () => {
   const syncExpiry = useCallback(async () => {
     try {
-      // Get all SIM cards from CellStation data
-      const { data: simCards, error: simError } = await supabase
-        .from('sim_cards')
-        .select('sim_number, expiry_date, is_active, is_rented, israeli_number, local_number');
+      // Get all SIM cards from external CellStation DB
+      const { data: rawSims, error: simError } = await externalSupabase
+        .from('cellstation_sims')
+        .select('sim_number, expiry_date, status_detail, israeli_number, local_number');
 
-      if (simError || !simCards) {
-        console.error('Error fetching sim_cards for sync:', simError);
+      if (simError || !rawSims) {
+        console.error('Error fetching cellstation_sims for sync:', simError);
         return;
       }
+
+      // Map external fields to internal format
+      const simCards = rawSims.map((s: any) => {
+        const statusLower = (s.status_detail || '').toLowerCase();
+        return {
+          sim_number: s.sim_number,
+          israeli_number: s.israeli_number,
+          local_number: s.local_number,
+          expiry_date: s.expiry_date,
+          is_active: statusLower === 'active' || statusLower === 'rented',
+          is_rented: statusLower === 'rented',
+        };
+      });
 
       // Get all SIM inventory items
       const { data: inventoryItems, error: invError } = await supabase

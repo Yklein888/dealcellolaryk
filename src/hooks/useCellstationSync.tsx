@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { externalSupabase } from '@/integrations/external-supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 export interface SimCard {
@@ -20,82 +20,99 @@ export interface SimCard {
   updated_at: string | null;
 }
 
+interface CellstationSimRow {
+  id: string;
+  sim_number: string | null;
+  status_detail: string | null;
+  plan: string | null;
+  expiry_date: string | null;
+  [key: string]: any;
+}
+
+function mapToSimCard(row: CellstationSimRow): SimCard {
+  const statusLower = (row.status_detail || '').toLowerCase();
+  const isActive = statusLower === 'active' || statusLower === 'פעיל';
+  const isRented = statusLower === 'rented' || statusLower === 'מושכר';
+
+  return {
+    id: row.id,
+    sim_number: row.sim_number,
+    local_number: row.local_number || null,
+    israeli_number: row.israeli_number || null,
+    short_number: row.short_number || null,
+    expiry_date: row.expiry_date,
+    is_active: isActive || isRented,
+    is_rented: isRented,
+    status: row.status_detail,
+    package_name: row.plan,
+    notes: null,
+    last_synced: new Date().toISOString(),
+    created_at: row.created_at || null,
+    updated_at: row.updated_at || null,
+  };
+}
+
 export function useCellstationSync() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [isSyncing, setIsSyncing] = useState(false);
 
   const { data: simCards = [], isLoading, refetch, isRefetching } = useQuery({
-    queryKey: ['sim_cards'],
+    queryKey: ['cellstation_sims_external'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('sim_cards')
+      const { data, error } = await externalSupabase
+        .from('cellstation_sims')
         .select('*')
         .order('expiry_date', { ascending: true });
 
       if (error) {
-        console.error('Error fetching SIM cards:', error);
+        console.error('Error fetching from external cellstation_sims:', error);
         throw error;
       }
 
-      return data as SimCard[];
+      return (data as CellstationSimRow[]).map(mapToSimCard);
     },
   });
 
-  // Real-time subscription for sim_cards table
+  // Real-time subscription on external DB
   useEffect(() => {
-    const channel = supabase
-      .channel('sim_cards_changes')
+    const channel = externalSupabase
+      .channel('cellstation_sims_changes')
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'sim_cards',
+          table: 'cellstation_sims',
         },
         () => {
-          // Refetch data when any change occurs
-          queryClient.invalidateQueries({ queryKey: ['sim_cards'] });
+          queryClient.invalidateQueries({ queryKey: ['cellstation_sims_external'] });
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      externalSupabase.removeChannel(channel);
     };
   }, [queryClient]);
 
   const syncSims = async () => {
-    setIsSyncing(true);
     try {
       toast({
-        title: 'מתחיל סנכרון...',
-        description: 'מתחבר לשרת CellStation',
+        title: 'מרענן נתונים...',
+        description: 'טוען נתונים עדכניים מ-CellStation',
       });
-
-      const { data, error } = await supabase.functions.invoke('cellstation-sync');
-
-      if (error) throw error;
-
-      if (data.success) {
-        toast({
-          title: 'סנכרון הושלם',
-          description: data.message,
-        });
-        // Refetch to update UI
-        await refetch();
-      } else {
-        throw new Error(data.error || 'Sync failed');
-      }
+      await refetch();
+      toast({
+        title: 'הנתונים עודכנו',
+        description: `${simCards.length} סימים נטענו בהצלחה`,
+      });
     } catch (error: any) {
       console.error('Sync error:', error);
       toast({
-        title: 'שגיאה בסנכרון',
-        description: error.message || 'לא ניתן היה לסנכרן את הנתונים',
+        title: 'שגיאה בטעינה',
+        description: error.message || 'לא ניתן היה לטעון את הנתונים',
         variant: 'destructive',
       });
-    } finally {
-      setIsSyncing(false);
     }
   };
 
@@ -119,7 +136,7 @@ export function useCellstationSync() {
   return {
     simCards,
     isLoading,
-    isSyncing,
+    isSyncing: isRefetching,
     isRefreshing: isRefetching,
     syncSims,
     refreshData,
