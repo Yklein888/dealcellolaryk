@@ -38,13 +38,14 @@ interface CellstationSimRow {
   iccid: string | null;
   status: string | null;
   status_detail: string | null;
-  plan_expiry: string | null;
+  expiry_date: string | null;
+  plan: string | null;
   plan_type: string | null;
   start_date: string | null;
   end_date: string | null;
   customer_name: string | null;
+  last_sync: string | null;
   created_at: string | null;
-  updated_at: string | null;
   [key: string]: any;
 }
 
@@ -62,23 +63,23 @@ function mapToSimCard(row: CellstationSimRow): SimCard {
     iccid: row.iccid,
     status: row.status,
     status_detail: row.status_detail,
-    plan_expiry: row.plan_expiry,
+    plan_expiry: row.expiry_date,
     plan_type: row.plan_type,
     start_date: row.start_date,
     end_date: row.end_date,
     customer_name: row.customer_name,
     created_at: row.created_at || null,
-    updated_at: row.updated_at || null,
+    updated_at: null,
     // Backward compat mapped fields
     short_number: row.sim_number,
     local_number: row.uk_number,
     israeli_number: row.il_number,
-    expiry_date: row.plan_expiry,
+    expiry_date: row.expiry_date,
     is_rented: isRented,
     is_active: isActive,
-    package_name: row.plan_type,
+    package_name: row.plan || row.plan_type,
     notes: null,
-    last_synced: new Date().toISOString(),
+    last_synced: row.last_sync || new Date().toISOString(),
   };
 }
 
@@ -92,7 +93,7 @@ export function useCellstationSync() {
       const { data, error } = await externalSupabase
         .from('cellstation_sims')
         .select('*')
-        .order('plan_expiry', { ascending: true });
+        .order('expiry_date', { ascending: true });
 
       if (error) {
         console.error('Error fetching from external cellstation_sims:', error);
