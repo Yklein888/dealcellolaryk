@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { externalSupabase } from '@/integrations/external-supabase/client';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { useRental } from '@/hooks/useRental';
 import { PageHeader } from '@/components/PageHeader';
@@ -227,24 +228,20 @@ export default function Inventory() {
     return 'סים';
   };
 
-  // Load sync preview from CellStation
+  // Load sync preview from CellStation (external Supabase)
   const loadSyncPreview = async () => {
     setIsLoadingPreview(true);
     try {
-      // First sync with CellStation to get latest data
-      const { error: syncError } = await supabase.functions.invoke('cellstation-sync');
-      if (syncError) throw syncError;
-
-      // Fetch ALL sim_cards (including inactive)
-      const { data: simCards, error } = await supabase
-        .from('sim_cards')
+      // Fetch ALL sims from external CellStation DB
+      const { data: simCards, error } = await externalSupabase
+        .from('cellstation_sims')
         .select('*')
-        .order('is_active', { ascending: false })
-        .order('expiry_date', { ascending: true });
+        .order('status', { ascending: false })
+        .order('plan_expiry', { ascending: true });
 
       if (error) throw error;
 
-      // Build inventory lookup by ICCID (sim_number)
+      // Build inventory lookup by ICCID
       const inventoryByIccid = new Map<string, InventoryItem>();
       inventory
         .filter(item => item.simNumber)
@@ -261,9 +258,9 @@ export default function Inventory() {
       }> = [];
 
       for (const sim of simCards || []) {
-        if (!sim.sim_number) continue;
+        if (!sim.iccid) continue;
         
-        const existingItem = inventoryByIccid.get(sim.sim_number.toLowerCase());
+        const existingItem = inventoryByIccid.get(sim.iccid.toLowerCase());
         
         if (!existingItem) {
           // New SIM - add to inventory
@@ -272,12 +269,12 @@ export default function Inventory() {
           // Existing SIM - check if needs update
           const changes: string[] = [];
           
-          const newIsraeli = formatPhoneWithLeadingZero(sim.israeli_number);
-          const newLocal = formatPhoneWithLeadingZero(sim.local_number);
-          const newExpiry = sim.expiry_date || undefined;
+          const newIsraeli = formatPhoneWithLeadingZero(sim.il_number);
+          const newLocal = formatPhoneWithLeadingZero(sim.uk_number);
+          const newExpiry = sim.plan_expiry || undefined;
           
-          // Check name change (based on package type) - name is just the type, no phone number
-          const expectedName = getSimTypeName(sim.package_name);
+          // Check name change (based on package type)
+          const expectedName = getSimTypeName(sim.plan_type);
           if (existingItem.name !== expectedName) {
             changes.push(`שם: ${existingItem.name} → ${expectedName}`);
           }
@@ -330,16 +327,16 @@ export default function Inventory() {
       // Add new SIMs
       for (const sim of syncPreview.toAdd || []) {
         try {
-          const simType = getSimTypeName(sim.package_name);
+          const simType = getSimTypeName(sim.plan_type);
           await addInventoryItem({
             category: 'sim_european' as ItemCategory,
             name: simType,
-            localNumber: formatPhoneWithLeadingZero(sim.local_number),
-            israeliNumber: formatPhoneWithLeadingZero(sim.israeli_number),
-            expiryDate: sim.expiry_date || undefined,
-            simNumber: sim.sim_number || undefined,
+            localNumber: formatPhoneWithLeadingZero(sim.uk_number),
+            israeliNumber: formatPhoneWithLeadingZero(sim.il_number),
+            expiryDate: sim.plan_expiry || undefined,
+            simNumber: sim.iccid || undefined,
             status: 'available',
-            notes: sim.package_name ? `חבילה: ${sim.package_name}` : undefined,
+            notes: sim.plan_type ? `חבילה: ${sim.plan_type}` : undefined,
           });
           added++;
         } catch (e) {
@@ -351,13 +348,13 @@ export default function Inventory() {
       // Update existing SIMs
       for (const { sim, inventoryItem } of syncPreview.toUpdate || []) {
         try {
-          const simType = getSimTypeName(sim.package_name);
+          const simType = getSimTypeName(sim.plan_type);
           const { error: updateError } = await supabase
             .from('inventory')
             .update({
-              israeli_number: formatPhoneWithLeadingZero(sim.israeli_number),
-              local_number: formatPhoneWithLeadingZero(sim.local_number),
-              expiry_date: sim.expiry_date || null,
+              israeli_number: formatPhoneWithLeadingZero(sim.il_number),
+              local_number: formatPhoneWithLeadingZero(sim.uk_number),
+              expiry_date: sim.plan_expiry || null,
               name: simType,
               updated_at: new Date().toISOString(),
             })

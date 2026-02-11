@@ -9,6 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Loader2, CheckCircle, AlertTriangle, ArrowLeftRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { externalSupabase } from '@/integrations/external-supabase/client';
 import { InventoryItem } from '@/types/rental';
 import { useToast } from '@/hooks/use-toast';
 
@@ -63,15 +64,15 @@ export function ActivateWithSwapDialog({
 
       setStep('swapping');
 
-      // Step 2: Send SIM swap request
-      const { error: swapError } = await supabase.functions.invoke('sim-activation-request', {
-        body: {
-          action: 'replace_sim',
-          old_sim_number: oldSim.simNumber,
-          new_sim_number: newSim.simNumber,
+      // Step 2: Insert SIM swap request into external Supabase
+      const { error: swapError } = await externalSupabase
+        .from('pending_sim_swaps')
+        .insert({
+          old_iccid: oldSim.simNumber,
+          new_iccid: newSim.simNumber,
           customer_name: customerName,
-        }
-      });
+          status: 'pending',
+        });
 
       if (swapError) {
         throw new Error(`שגיאה בהחלפת סים: ${swapError.message}`);
@@ -87,7 +88,7 @@ export function ActivateWithSwapDialog({
 
       toast({
         title: 'הפעלה והחלפה הושלמו',
-        description: 'הסים החדש הופעל ובקשת ההחלפה נשלחה. לחץ על הבוקמרקלט להשלמה.',
+        description: 'הסים החדש הופעל ובקשת ההחלפה נשלחה. התוסף יבצע את ההחלפה.',
       });
 
       setTimeout(() => {
