@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { externalSupabase } from '@/integrations/external-supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 export type ActivationStatus = 'none' | 'pending' | 'activated' | 'failed';
@@ -12,8 +13,6 @@ export interface SimActivationData {
   linkedRentalId: string | null;
   linkedCustomerId: string | null;
 }
-
-
 
 export function useSimActivation() {
   const { toast } = useToast();
@@ -36,53 +35,75 @@ export function useSimActivation() {
     setActivatingSimNumbers(prev => new Set(prev).add(simNumber));
 
     try {
-      // Fetch customer name if customer_id provided
+      // Fetch customer info
       let customerName = '';
+      let customerPhone = '';
       if (customerId) {
         const { data: customerData } = await supabase
           .from('customers')
-          .select('name')
+          .select('name, phone')
           .eq('id', customerId)
           .single();
         customerName = customerData?.name || '';
+        customerPhone = customerData?.phone || '';
       }
 
-      // Fetch rental dates if rental_id provided
+      // Fetch rental dates and customer name
       let startDate = '';
       let endDate = '';
+      let totalPrice = 0;
       if (rentalId) {
         const { data: rentalData } = await supabase
           .from('rentals')
-          .select('start_date, end_date, customer_name')
+          .select('start_date, end_date, customer_name, total_price')
           .eq('id', rentalId)
           .single();
         startDate = rentalData?.start_date || '';
         endDate = rentalData?.end_date || '';
-        // Use rental customer name if no customer id provided
+        totalPrice = rentalData?.total_price || 0;
         if (!customerName) {
           customerName = rentalData?.customer_name || '';
         }
       }
 
-      // Send activation request via Edge Function (bypasses CORS)
-      const { error } = await supabase.functions.invoke('sim-activation-request', {
-        body: {
-          sim_number: simNumber,
-          rental_id: rentalId,
-          customer_id: customerId,
+      // Look up ICCID from external cellstation_sims table
+      // simNumber could be the sim_number (short number) or iccid
+      let iccid = simNumber;
+      let simShortNumber = simNumber;
+      
+      const { data: externalSim } = await externalSupabase
+        .from('cellstation_sims')
+        .select('iccid, sim_number')
+        .or(`sim_number.eq.${simNumber},iccid.eq.${simNumber}`)
+        .limit(1)
+        .single();
+
+      if (externalSim) {
+        iccid = externalSim.iccid || simNumber;
+        simShortNumber = externalSim.sim_number || simNumber;
+      }
+
+      // Insert into external pending_activations table
+      const { error } = await externalSupabase
+        .from('pending_activations')
+        .insert({
+          iccid: iccid,
+          sim_number: simShortNumber,
           customer_name: customerName,
-          start_date: startDate,
-          end_date: endDate,
-        }
-      });
+          customer_phone: customerPhone,
+          customer_price: totalPrice,
+          start_date: startDate || null,
+          end_date: endDate || null,
+          status: 'pending',
+        });
 
       if (error) {
-        throw new Error(error.message || 'Failed to send activation request');
+        throw new Error(error.message || 'Failed to create pending activation');
       }
 
       toast({
-        title: 'הפקודה נשלחה!',
-        description: 'כעת לחץ על ה-Bookmarklet באתר CellStation',
+        title: 'בקשת הפעלה נוצרה!',
+        description: 'הבוקמרקלט יבצע את ההפעלה באתר CellStation',
       });
 
       return true;

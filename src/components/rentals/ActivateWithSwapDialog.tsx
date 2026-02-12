@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Loader2, CheckCircle, AlertTriangle, ArrowLeftRight } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client'; // still used for inventory update
 import { externalSupabase } from '@/integrations/external-supabase/client';
 import { InventoryItem } from '@/types/rental';
 import { useToast } from '@/hooks/use-toast';
@@ -48,15 +48,17 @@ export function ActivateWithSwapDialog({
     try {
       setStep('activating');
 
-      // Step 1: Send activation request for new SIM
-      const { error: activationError } = await supabase.functions.invoke('sim-activation-request', {
-        body: {
-          sim_number: newSim.simNumber,
+      // Step 1: Insert activation request into external pending_activations
+      const { error: activationError } = await externalSupabase
+        .from('pending_activations')
+        .insert({
+          iccid: newSim.simNumber,
+          sim_number: newSim.name || newSim.simNumber,
           customer_name: customerName,
-          start_date: startDate,
-          end_date: endDate,
-        }
-      });
+          start_date: startDate || null,
+          end_date: endDate || null,
+          status: 'pending',
+        });
 
       if (activationError) {
         throw new Error(`שגיאה בהפעלת סים: ${activationError.message}`);
