@@ -31,10 +31,7 @@ export function QuickStatsRow({
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-      <div 
-        className="p-4 rounded-2xl glass border border-success/20 flex items-center gap-4 card-glow animate-slide-up"
-        style={{ animationDelay: '250ms' }}
-      >
+      <div className="p-4 rounded-2xl glass border border-success/20 flex items-center gap-4 card-glow">
         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-success/30 to-success/10 shadow-sm">
           <CheckCircle2 className="h-6 w-6 text-success" />
         </div>
@@ -44,10 +41,7 @@ export function QuickStatsRow({
         </div>
       </div>
 
-      <div 
-        className="p-4 rounded-2xl glass border border-accent/20 flex items-center gap-4 card-glow animate-slide-up"
-        style={{ animationDelay: '300ms' }}
-      >
+      <div className="p-4 rounded-2xl glass border border-accent/20 flex items-center gap-4 card-glow">
         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-accent/30 to-accent/10 shadow-sm">
           <Calendar className="h-6 w-6 text-accent" />
         </div>
@@ -57,10 +51,7 @@ export function QuickStatsRow({
         </div>
       </div>
 
-      <div 
-        className="p-4 rounded-2xl glass border border-primary/20 flex items-center gap-4 card-glow animate-slide-up"
-        style={{ animationDelay: '350ms' }}
-      >
+      <div className="p-4 rounded-2xl glass border border-primary/20 flex items-center gap-4 card-glow">
         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary/30 to-accent/10 shadow-sm">
           <Activity className="h-6 w-6 text-primary" />
         </div>
@@ -71,10 +62,7 @@ export function QuickStatsRow({
       </div>
 
       {isSupported && (
-        <div 
-          className="p-4 rounded-2xl glass border border-primary/20 flex items-center gap-4 card-glow animate-slide-up"
-          style={{ animationDelay: '400ms' }}
-        >
+        <div className="p-4 rounded-2xl glass border border-primary/20 flex items-center gap-4 card-glow">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary/30 to-accent/20 shadow-sm">
             <Bell className="h-6 w-6 text-primary" />
           </div>

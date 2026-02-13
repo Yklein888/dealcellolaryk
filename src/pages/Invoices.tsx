@@ -314,7 +314,7 @@ ${invoice.description || 'חיוב'}
   }
 
   return (
-    <div className="animate-fade-in">
+    <div>
       <PageHeader
         title="חשבוניות"
         description="צפייה והורדה של כל החשבוניות שהופקו"

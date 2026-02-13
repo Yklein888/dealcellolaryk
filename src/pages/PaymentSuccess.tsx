@@ -16,7 +16,7 @@ export default function PaymentSuccess() {
   }, [navigate]);
 
   return (
-    <div className="min-h-[60vh] flex flex-col items-center justify-center text-center animate-fade-in">
+    <div className="min-h-[60vh] flex flex-col items-center justify-center text-center">
       <div className="p-6 rounded-full bg-success/20 mb-6">
         <CheckCircle className="h-16 w-16 text-success" />
       </div>

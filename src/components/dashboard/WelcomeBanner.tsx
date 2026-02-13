@@ -11,7 +11,7 @@ export function WelcomeBanner({ overdueRentals, readyRepairs }: WelcomeBannerPro
   const hasReady = readyRepairs.length > 0;
 
   return (
-    <div className="mb-6 sm:mb-8 relative overflow-hidden animate-fade-in">
+    <div className="mb-6 sm:mb-8 relative overflow-hidden">
       {/* Background gradient mesh */}
       <div className="absolute inset-0 bg-gradient-to-l from-primary/10 via-accent/5 to-transparent rounded-2xl sm:rounded-3xl" />
       <div className="absolute -top-10 -left-10 w-32 sm:w-40 h-32 sm:h-40 bg-primary/20 rounded-full blur-3xl" />

@@ -38,7 +38,7 @@ export function DashboardStatsGrid({ stats, inventory }: DashboardStatsGridProps
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-6 sm:mb-8">
-      <div className="animate-slide-up" style={{ animationDelay: '0ms' }}>
+      <div>
         <StatCard
           title="השכרות פעילות"
           value={stats.activeRentals}
@@ -47,7 +47,7 @@ export function DashboardStatsGrid({ stats, inventory }: DashboardStatsGridProps
           href="/rentals?status=active"
         />
       </div>
-      <div className="animate-slide-up" style={{ animationDelay: '50ms' }}>
+      <div>
         <StatCard
           title="באיחור"
           value={stats.overdueReturns}
@@ -56,7 +56,7 @@ export function DashboardStatsGrid({ stats, inventory }: DashboardStatsGridProps
           href="/rentals?status=overdue"
         />
       </div>
-      <div className="animate-slide-up" style={{ animationDelay: '100ms' }}>
+      <div>
         <StatCard
           title="מסתיימות היום"
           value={stats.endingToday}
@@ -65,7 +65,7 @@ export function DashboardStatsGrid({ stats, inventory }: DashboardStatsGridProps
           href="/rentals?status=ending_today"
         />
       </div>
-      <div className="animate-slide-up" style={{ animationDelay: '150ms' }}>
+      <div>
         <StatCard
           title="תיקונים בתהליך"
           value={stats.repairsInProgress}
@@ -74,7 +74,7 @@ export function DashboardStatsGrid({ stats, inventory }: DashboardStatsGridProps
           href="/repairs?status=in_lab"
         />
       </div>
-      <div className="animate-slide-up" style={{ animationDelay: '200ms' }}>
+      <div>
         <StatCard
           title="החזרות קרובות"
           value={stats.upcomingReturns}
@@ -83,7 +83,7 @@ export function DashboardStatsGrid({ stats, inventory }: DashboardStatsGridProps
           href="/rentals?status=upcoming"
         />
       </div>
-      <div className="animate-slide-up col-span-2 sm:col-span-1" style={{ animationDelay: '250ms' }}>
+      <div className="col-span-2 sm:col-span-1">
         <StatCard
           title="פריטים זמינים"
           value={availableItems.length}

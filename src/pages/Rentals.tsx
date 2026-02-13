@@ -543,7 +543,7 @@ export default function Rentals() {
   };
 
   return (
-    <div className="animate-fade-in">
+    <div>
       <PageHeader 
         title="ניהול השכרות" 
         description="יצירה וניהול השכרות קיימות"
@@ -668,7 +668,7 @@ export default function Rentals() {
           {filteredRentals.map((rental, index) => (
             <div 
               key={rental.id}
-              className={`stat-card hover:border-primary/30 transition-all duration-200 p-5 flex flex-col min-h-[280px] border-r-4 animate-slide-up ${
+              className={`stat-card hover:border-primary/30 transition-all duration-200 p-5 flex flex-col min-h-[280px] border-r-4 ${
                 rental.status === 'active' ? 'border-r-primary' :
                 rental.status === 'overdue' ? 'border-r-destructive' :
                 'border-r-success'

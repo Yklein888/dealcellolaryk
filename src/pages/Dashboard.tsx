@@ -105,7 +105,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="animate-fade-in">
+    <div>
       <PageHeader 
         title="דאשבורד" 
         description="סקירה כללית של המערכת"
@@ -169,7 +169,7 @@ export default function Dashboard() {
       </div>
 
       {/* Notification Settings */}
-      <div className="mb-8 animate-slide-up" style={{ animationDelay: '450ms' }}>
+      <div className="mb-8">
         <NotificationSettings />
       </div>
 
