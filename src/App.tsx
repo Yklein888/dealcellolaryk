@@ -20,7 +20,7 @@ import PaymentError from "./pages/PaymentError";
 import PaymentHistory from "./pages/PaymentHistory";
 import Invoices from "./pages/Invoices";
 import POS from "./pages/POS";
-import SimCards from "./pages/SimCards";
+
 import NotFound from "./pages/NotFound";
 import Install from "./pages/Install";
 
@@ -54,7 +54,7 @@ const App = () => (
                         <Route path="/payments" element={<PaymentHistory />} />
                         <Route path="/invoices" element={<Invoices />} />
                         <Route path="/pos" element={<POS />} />
-                        <Route path="/sim-cards" element={<SimCards />} />
+                        
                         <Route path="/payment-success" element={<PaymentSuccess />} />
                         <Route path="/payment-error" element={<PaymentError />} />
                         <Route path="*" element={<NotFound />} />

@@ -396,7 +396,7 @@ export default function Inventory() {
   };
 
   return (
-    <div className="animate-fade-in">
+    <div>
       <PageHeader 
         title="ניהול מלאי" 
         description="הוספה, עריכה ומעקב אחר פריטים במלאי"
@@ -812,11 +812,7 @@ export default function Inventory() {
           {categoryOrder
             .filter(cat => inventoryByCategory[cat]?.length > 0)
             .map((category, index) => (
-              <div 
-                key={category}
-                className="animate-slide-up"
-                style={{ animationDelay: `${index * 100}ms` }}
-              >
+              <div key={category}>
                 <InventoryCategorySection
                   category={category}
                   items={inventoryByCategory[category]}

@@ -432,7 +432,7 @@ export default function Repairs() {
   };
 
   return (
-    <div className="animate-fade-in">
+    <div>
       <PageHeader 
         title="מעבדת תיקונים" 
         description="ניהול מכשירים שנכנסו לתיקון"
@@ -671,8 +671,7 @@ export default function Repairs() {
           {filteredRepairs.map((repair, index) => (
             <div 
               key={repair.id}
-              className="stat-card hover:border-primary/30 transition-all duration-200 animate-slide-up"
-              style={{ animationDelay: `${index * 50}ms` }}
+              className="stat-card hover:border-primary/30 transition-all duration-200"
             >
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-start gap-4">

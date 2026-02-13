@@ -329,7 +329,7 @@ export default function UserManagement() {
 
   return (
     <RequireAdmin>
-      <div className="animate-fade-in">
+      <div>
         <PageHeader
           title="ניהול משתמשים"
           description="ניהול הרשאות ותפקידים במערכת"
