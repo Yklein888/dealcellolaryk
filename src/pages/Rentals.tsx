@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { useRental } from '@/hooks/useRental';
-import { useSyncSimExpiry } from '@/hooks/useSyncSimExpiry';
-import { useDetectSwapNeeded } from '@/hooks/useDetectSwapNeeded';
 import { InventoryItem } from '@/types/rental';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -10,8 +8,6 @@ import { CallHistoryBadge } from '@/components/CallHistoryBadge';
 import { NewRentalDialog } from '@/components/rentals/NewRentalDialog';
 import { EditRentalDialog } from '@/components/rentals/EditRentalDialog';
 import { PaymentConfirmationDialog } from '@/components/rentals/PaymentConfirmationDialog';
-import { PendingActivationsAlert } from '@/components/rentals/PendingActivationsAlert';
-import { RentalSimActivation } from '@/components/rentals/RentalSimActivation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -79,15 +75,6 @@ export default function Rentals() {
   } = useRental();
   const { toast } = useToast();
   
-  // Sync SIM expiry data and detect swaps on page load
-  const { syncExpiry } = useSyncSimExpiry();
-  const { detectSwapNeeded } = useDetectSwapNeeded();
-  
-  useEffect(() => {
-    // Run swap detection after sync
-    const timer = setTimeout(() => detectSwapNeeded(), 3000);
-    return () => clearTimeout(timer);
-  }, [detectSwapNeeded]);
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const [searchTerm, setSearchTerm] = useState('');
@@ -568,8 +555,6 @@ export default function Rentals() {
         />
       </PageHeader>
 
-      {/* Pending Activations Alert */}
-      <PendingActivationsAlert />
 
       {/* Status Quick Access */}
       <div className="grid grid-cols-3 gap-3 mb-6">
@@ -888,20 +873,6 @@ export default function Rentals() {
                             </div>
                           )}
                           
-                          {/* SIM Activation Button - now integrated in rental cards */}
-                          {(isEuropeanSim || isAmericanSim) && inventoryItem?.simNumber && rental.status !== 'returned' && (
-                            <div className="flex justify-center mt-2">
-                              <RentalSimActivation
-                                simNumber={inventoryItem.simNumber}
-                                rentalId={rental.id}
-                                customerId={rental.customerId || undefined}
-                                customerName={rental.customerName}
-                                startDate={rental.startDate}
-                                endDate={rental.endDate}
-                                compact
-                              />
-                            </div>
-                          )}
                         </div>
                       );
                     })}
