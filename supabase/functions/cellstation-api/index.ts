@@ -320,20 +320,37 @@ serve(async (req) => {
         }
         console.log('All discovered field values:', JSON.stringify(discoveredFields));
         
-        // Step 3: POST to dynamic/submit.php with combined form data
-        // Hidden fields already contain: product, country, phone_id, number, account_name, 
-        // il_number, sim_card, mor_id, c_nu, store_id, command (243), submitted (1)
-        // Convert dates from dd/MM/yyyy to yyyy-MM-dd (portal JS uses new Date() which expects ISO format)
+        // === Date normalization ===
+        // Convert dates from dd/MM/yyyy to yyyy-MM-dd (portal expects ISO format)
         let startRental = params.start_rental || "";
         let endRental = params.end_rental || "";
-        // If dates are in dd/MM/yyyy format, convert to yyyy-MM-dd
-        const ddmmyyyyRegex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+        const ddmmyyyyRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
         const startMatch = startRental.match(ddmmyyyyRegex);
-        if (startMatch) startRental = `${startMatch[3]}-${startMatch[2]}-${startMatch[1]}`;
+        if (startMatch) {
+          startRental = `${startMatch[3]}-${startMatch[2].padStart(2,'0')}-${startMatch[1].padStart(2,'0')}`;
+        }
         const endMatch = endRental.match(ddmmyyyyRegex);
-        if (endMatch) endRental = `${endMatch[3]}-${endMatch[2]}-${endMatch[1]}`;
-        console.log('Converted dates:', startRental, endRental);
+        if (endMatch) {
+          endRental = `${endMatch[3]}-${endMatch[2].padStart(2,'0')}-${endMatch[1].padStart(2,'0')}`;
+        }
+        console.log(`Date conversion: start "${params.start_rental}" -> "${startRental}", end "${params.end_rental}" -> "${endRental}"`);
         
+        // === Step 2.5: Call calculate_days.php (required by portal before submission) ===
+        const productForCalc = discoveredFields['product'] || params.product || "";
+        const expForCalc = discoveredFields['exp'] || "";
+        console.log('Step 2.5 - Calling calculate_days.php with:', JSON.stringify({ start_rental: startRental, end_rental: endRental, product: productForCalc, exp: expForCalc }));
+        
+        const calcResponse = await session.post("content/dashboard/rentals/calculate_days.php", {
+          start_rental: startRental,
+          end_rental: endRental,
+          product: productForCalc,
+          exp: expForCalc,
+        });
+        const calcResult = await calcResponse.text();
+        console.log('calculate_days response status:', calcResponse.status);
+        console.log('calculate_days response:', calcResult.substring(0, 500));
+        
+        // === Step 3: Submit form ===
         const formData: Record<string, string> = {
           ...discoveredFields,
           start_rental: startRental,
@@ -342,11 +359,7 @@ serve(async (req) => {
           calculated_days_input: params.days || "",
           note: params.note || "",
         };
-        // IMPORTANT: Do NOT override 'product' - the portal expects the numeric ID (e.g. "4")
-        // from the form, not the display name (e.g. "10 גיגה גלישה") from our params.
-        // Same for 'exp' - use the portal's value unless we have a specific override reason.
-        // Do NOT override: product, exp, country, phone_id, number, account_name, 
-        // il_number, sim_card, mor_id, c_nu, store_id, command, submitted
+        // IMPORTANT: Do NOT override portal-provided fields like product, exp, command, store_id etc.
         console.log('Step 3 - Submitting to dynamic/submit.php with data:', JSON.stringify(formData, null, 2));
         
         const submitResponse = await session.post("dynamic/submit.php", formData);
@@ -481,16 +494,41 @@ serve(async (req) => {
           if (n) discoveredValsAS[n[1]] = v ? v[1] : "";
         }
         
+        // === Date normalization ===
+        let startRentalAS = params.start_rental || "";
+        let endRentalAS = params.end_rental || "";
+        const ddmmAS = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+        const smAS = startRentalAS.match(ddmmAS);
+        if (smAS) startRentalAS = `${smAS[3]}-${smAS[2].padStart(2,'0')}-${smAS[1].padStart(2,'0')}`;
+        const emAS = endRentalAS.match(ddmmAS);
+        if (emAS) endRentalAS = `${emAS[3]}-${emAS[2].padStart(2,'0')}-${emAS[1].padStart(2,'0')}`;
+        console.log(`A&S Date conversion: start "${params.start_rental}" -> "${startRentalAS}", end "${params.end_rental}" -> "${endRentalAS}"`);
+        
+        // === Step 2.5: Call calculate_days.php ===
+        const productAS = discoveredValsAS['product'] || params.product || "";
+        const expAS = discoveredValsAS['exp'] || "";
+        console.log('A&S Step 2.5 - calculate_days.php:', JSON.stringify({ start_rental: startRentalAS, end_rental: endRentalAS, product: productAS, exp: expAS }));
+        
+        const calcRespAS = await session.post("content/dashboard/rentals/calculate_days.php", {
+          start_rental: startRentalAS,
+          end_rental: endRentalAS,
+          product: productAS,
+          exp: expAS,
+        });
+        const calcResultAS = await calcRespAS.text();
+        console.log('A&S calculate_days response:', calcRespAS.status, calcResultAS.substring(0, 500));
+        
         // Step 3: Submit activation
         const actFormData: Record<string, string> = {
           ...discoveredValsAS,
-          start_rental: params.start_rental,
-          end_rental: params.end_rental,
+          start_rental: startRentalAS,
+          end_rental: endRentalAS,
           deler4cus_price: params.price || "",
           note: params.note || "",
         };
-        if (params.product) actFormData.product = params.product;
+        // Do NOT override product - use portal's numeric ID
         
+        console.log('A&S Step 3 - Submitting activation:', JSON.stringify(actFormData, null, 2));
         const actSubmit = await session.post("dynamic/submit.php", actFormData);
         const actResult = await actSubmit.text();
         console.log('Activation submit result:', actResult.substring(0, 500));
