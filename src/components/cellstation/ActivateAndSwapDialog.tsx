@@ -122,6 +122,23 @@ export function ActivateAndSwapDialog({
         {/* Step 1: Enter ICCID */}
         {step === 1 && (
           <div className="space-y-4">
+            {/* Prominent warning: SIM not returned */}
+            {oldSim.status === 'available' && (
+              <div className="p-4 rounded-lg bg-red-50 dark:bg-red-950/30 border-2 border-red-400 dark:border-red-700">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400 shrink-0" />
+                  <span className="font-bold text-red-700 dark:text-red-300 text-base">
+                    ⚠️ הסים לא הוחזר לחנות!
+                  </span>
+                </div>
+                <p className="text-sm text-red-600 dark:text-red-400 leading-relaxed">
+                  הסים הישן עדיין רשום כמושכר במערכת שלנו אך שוחרר בפורטל.
+                  <strong className="block mt-1">חובה לבצע הפעלה + החלפה ביחד</strong>
+                  כדי שהמספר יעבור לסים החדש בצורה תקינה.
+                </p>
+              </div>
+            )}
+
             <div className="p-3 rounded-md bg-muted/50 border">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-yellow-500" />
@@ -168,6 +185,15 @@ export function ActivateAndSwapDialog({
         {/* Step 2: Confirm */}
         {step === 2 && (
           <div className="space-y-4">
+            {/* Repeat warning in confirmation step */}
+            {oldSim.status === 'available' && (
+              <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border-2 border-red-400 dark:border-red-700 text-center">
+                <p className="text-sm font-bold text-red-700 dark:text-red-300">
+                  ⚠️ הסים לא הוחזר — הפעלה + החלפה חובה!
+                </p>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-3">
               <div className="p-3 rounded-md border border-red-200 bg-red-50 dark:bg-red-950/20">
                 <Label className="text-xs text-red-600">סים ישן</Label>
