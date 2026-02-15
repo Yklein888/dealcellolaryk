@@ -243,10 +243,12 @@ export default function CellStation() {
       setNeedsSwapIccids(swapNeeded);
 
       // 3. Load overdue rentals and cross-reference
+      const today = new Date().toISOString().split('T')[0];
       const { data: overdueRentals } = await supabase
         .from('rentals')
         .select('id, customer_name, end_date, customer_id')
-        .eq('status', 'overdue');
+        .eq('status', 'active')
+        .lt('end_date', today);
 
       if (overdueRentals && overdueRentals.length > 0) {
         // Get rental items for overdue rentals
