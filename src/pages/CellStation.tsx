@@ -147,19 +147,29 @@ export default function CellStation() {
   const [swapDialogSim, setSwapDialogSim] = useState<SimRow | null>(null);
   const [activateSwapSim, setActivateSwapSim] = useState<SimRow | null>(null);
 
-  // Get inventory items that need swap
+  // Get ICCIDs that need swap: SIM is "available" in cellstation_sims BUT "rented" in inventory
   const [needsSwapIccids, setNeedsSwapIccids] = useState<Set<string>>(new Set());
 
-  // Load needs_swap inventory items
   useEffect(() => {
     import('@/integrations/supabase/client').then(({ supabase }) => {
+      // Get inventory items that are currently rented and have a sim_number
       supabase
         .from('inventory' as any)
         .select('sim_number')
-        .eq('needs_swap', true)
+        .eq('status', 'rented')
+        .not('sim_number', 'is', null)
         .then(({ data }) => {
           if (data) {
-            setNeedsSwapIccids(new Set((data as any[]).map(d => d.sim_number).filter(Boolean)));
+            // Set of ICCIDs that are rented in our inventory
+            const rentedIccids = new Set((data as any[]).map(d => d.sim_number).filter(Boolean));
+            // Cross-reference: SIM is "available" in cellstation_sims but "rented" in inventory
+            const swapNeeded = new Set<string>();
+            for (const sim of simCards) {
+              if (sim.status === 'available' && sim.iccid && rentedIccids.has(sim.iccid)) {
+                swapNeeded.add(sim.iccid);
+              }
+            }
+            setNeedsSwapIccids(swapNeeded);
           }
         });
     });
