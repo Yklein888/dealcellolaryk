@@ -22,15 +22,21 @@ class CellStationSession {
         return false;
       }
 
+      // Step 1: Get login page to extract cookies and form action
       const loginPageResponse = await fetch(CELLSTATION_BASE + "/login.php", { redirect: "manual" });
       this.extractCookies(loginPageResponse);
+      console.log('Login page status:', loginPageResponse.status, 'Cookies after login page:', this.cookies);
+      
       const hashedPassword = await sha512(password);
+      
+      // Step 2: Submit login form
       const loginResponse = await fetch(CELLSTATION_BASE + "/process_login.php", {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
           "Cookie": this.cookies,
           "Referer": CELLSTATION_BASE + "/login.php",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         },
         body: new URLSearchParams({
           username: username,
@@ -40,8 +46,28 @@ class CellStationSession {
         redirect: "manual",
       });
       this.extractCookies(loginResponse);
-      this.isLoggedIn = loginResponse.status === 302 || loginResponse.status === 301 || loginResponse.status === 200;
-      return this.isLoggedIn;
+      console.log('Login response status:', loginResponse.status, 'Cookies after login:', this.cookies);
+      
+      // Follow redirect if 302
+      if (loginResponse.status === 302 || loginResponse.status === 301) {
+        const redirectUrl = loginResponse.headers.get("location");
+        console.log('Login redirect to:', redirectUrl);
+        if (redirectUrl) {
+          const fullUrl = redirectUrl.startsWith("http") ? redirectUrl : CELLSTATION_BASE + "/" + redirectUrl;
+          const redirectResponse = await fetch(fullUrl, {
+            headers: {
+              "Cookie": this.cookies,
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            },
+            redirect: "manual",
+          });
+          this.extractCookies(redirectResponse);
+          console.log('Redirect response status:', redirectResponse.status, 'Cookies after redirect:', this.cookies);
+        }
+      }
+      
+      this.isLoggedIn = true;
+      return true;
     } catch (error) {
       console.error("Login failed:", error);
       return false;
@@ -67,10 +93,11 @@ class CellStationSession {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
       },
     });
-    // Check if we got redirected to login page - if so, re-login and retry
+    // Check if we got redirected to login page or unauthorized
     const cloned = response.clone();
     const text = await cloned.text();
-    if (text.includes('process_login.php') || (text.includes('login_form') && text.length < 5000)) {
+    const isUnauthorized = text.trim() === 'Unauthorized access' || response.status === 401;
+    if (isUnauthorized || text.includes('process_login.php') || (text.includes('login_form') && text.length < 5000)) {
       console.log('Session expired - re-authenticating...');
       this.isLoggedIn = false;
       this.cookies = "";
@@ -170,7 +197,15 @@ serve(async (req) => {
       case "sync_csv": {
         const csvResponse = await session.get("content/bh/bh_export_csv.php");
         const csvText = await csvResponse.text();
+        console.log('CSV response status:', csvResponse.status);
+        console.log('CSV response length:', csvText.length);
+        console.log('CSV first 500 chars:', csvText.substring(0, 500));
+        console.log('CSV last 200 chars:', csvText.substring(Math.max(0, csvText.length - 200)));
         const sims = parseCSV(csvText);
+        console.log('Parsed sims count:', sims.length);
+        if (sims.length > 0) {
+          console.log('First sim:', JSON.stringify(sims[0]));
+        }
         result = { success: true, action: "sync_csv", sims, count: sims.length };
         break;
       }
