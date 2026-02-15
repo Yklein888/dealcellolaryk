@@ -62,6 +62,8 @@ export function RentalProvider({ children }: { children: ReactNode }) {
   // Background retry state
   const backgroundRetryRef = useRef(0);
   const backgroundRetryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Debounce ref for realtime updates
+  const realtimeDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
   // Save functions that also update cache
   const saveCustomers = useCallback((data: Customer[]) => {
@@ -363,25 +365,66 @@ export function RentalProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Debounced fetch for realtime - coalesces multiple rapid changes into one fetch
+  const debouncedFetchData = useCallback(() => {
+    if (realtimeDebounceRef.current) {
+      clearTimeout(realtimeDebounceRef.current);
+    }
+    realtimeDebounceRef.current = setTimeout(() => {
+      fetchData(0, true);
+    }, 1000);
+  }, []);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (backgroundRetryTimeoutRef.current) {
         clearTimeout(backgroundRetryTimeoutRef.current);
       }
+      if (realtimeDebounceRef.current) {
+        clearTimeout(realtimeDebounceRef.current);
+      }
     };
   }, []);
 
+  // Initial fetch
   useEffect(() => {
     fetchData();
   }, []);
 
-  // Stats calculation
-  const [stats, setStats] = useState<DashboardStats>(calculateStats(customers, inventory, rentals, repairs));
-
+  // Real-time subscriptions for live updates
   useEffect(() => {
-    setStats(calculateStats(customers, inventory, rentals, repairs));
-  }, [customers, inventory, rentals, repairs]);
+    const channel = supabase
+      .channel('realtime-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rentals' }, () => {
+        console.log('[Realtime] rentals changed');
+        debouncedFetchData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rental_items' }, () => {
+        console.log('[Realtime] rental_items changed');
+        debouncedFetchData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, () => {
+        console.log('[Realtime] inventory changed');
+        debouncedFetchData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, () => {
+        console.log('[Realtime] customers changed');
+        debouncedFetchData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'repairs' }, () => {
+        console.log('[Realtime] repairs changed');
+        debouncedFetchData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [debouncedFetchData]);
+
+  // Stats calculation with useMemo
+  const stats = useMemo(() => calculateStats(customers, inventory, rentals, repairs), [customers, inventory, rentals, repairs]);
 
   // Create state setters for sub-modules
   const customersState = useMemo(() => ({ data: customers, save: saveCustomers }), [customers, saveCustomers]);
@@ -408,26 +451,28 @@ export function RentalProvider({ children }: { children: ReactNode }) {
 
   const validation = useMemo(() => createRentalValidation(inventory, rentals), [inventory, rentals]);
 
-  const refreshData = async () => {
+  const refreshData = useCallback(async () => {
     await fetchData();
-  };
+  }, []);
+
+  const contextValue = useMemo(() => ({
+    customers,
+    inventory,
+    rentals,
+    repairs,
+    stats,
+    loading,
+    ...customerOps,
+    ...inventoryOps,
+    ...rentalOps,
+    updateRentalItems: rentalItemOps.updateRentalItems,
+    ...repairOps,
+    ...validation,
+    refreshData,
+  }), [customers, inventory, rentals, repairs, stats, loading, customerOps, inventoryOps, rentalOps, rentalItemOps, repairOps, validation, refreshData]);
 
   return (
-    <RentalContext.Provider value={{
-      customers,
-      inventory,
-      rentals,
-      repairs,
-      stats,
-      loading,
-      ...customerOps,
-      ...inventoryOps,
-      ...rentalOps,
-      updateRentalItems: rentalItemOps.updateRentalItems,
-      ...repairOps,
-      ...validation,
-      refreshData,
-    }}>
+    <RentalContext.Provider value={contextValue}>
       {children}
     </RentalContext.Provider>
   );

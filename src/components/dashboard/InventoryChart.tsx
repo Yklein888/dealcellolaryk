@@ -1,69 +1,52 @@
+import { memo, useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { InventoryItem, categoryLabels, ItemCategory } from '@/types/rental';
 import { Package } from 'lucide-react';
-import { parseISO, isAfter } from 'date-fns';
+import { isItemTrulyAvailable } from '@/hooks/rental/useRentalStats';
 
 interface InventoryChartProps {
   inventory: InventoryItem[];
 }
 
 const COLORS = [
-  'hsl(173, 80%, 35%)', // primary - teal
-  'hsl(199, 89%, 48%)', // accent - blue
-  'hsl(142, 76%, 36%)', // success - green
-  'hsl(38, 92%, 50%)',  // warning - orange
-  'hsl(280, 60%, 50%)', // purple
-  'hsl(340, 70%, 50%)', // pink
+  'hsl(173, 80%, 35%)',
+  'hsl(199, 89%, 48%)',
+  'hsl(142, 76%, 36%)',
+  'hsl(38, 92%, 50%)',
+  'hsl(280, 60%, 50%)',
+  'hsl(340, 70%, 50%)',
 ];
 
-// Helper function to check if item is truly available (status + valid expiry for SIMs)
-const isItemTrulyAvailable = (item: InventoryItem): boolean => {
-  if (item.status !== 'available') return false;
-  
-  // For SIMs, check expiry date
-  const isSim = item.category === 'sim_american' || item.category === 'sim_european';
-  if (isSim && item.expiryDate) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const expiryDate = parseISO(item.expiryDate);
-    return isAfter(expiryDate, today) || expiryDate.getTime() === today.getTime();
+const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number }> }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="glass-strong rounded-xl p-3 shadow-lg">
+        <p className="text-sm font-medium text-foreground">{payload[0].name}</p>
+        <p className="text-lg font-bold text-primary">{payload[0].value} פריטים</p>
+      </div>
+    );
   }
-  
-  return true;
+  return null;
 };
 
-export function InventoryChart({ inventory }: InventoryChartProps) {
-  // Filter only truly available items (status + valid expiry for SIMs)
-  const availableItems = inventory.filter(isItemTrulyAvailable);
-  
-  // Group by category
-  const categoryData = availableItems.reduce((acc, item) => {
-    const category = item.category as ItemCategory;
-    const existing = acc.find(d => d.category === category);
-    if (existing) {
-      existing.value += 1;
-    } else {
-      acc.push({
-        category,
-        name: categoryLabels[category] || category,
-        value: 1,
-      });
-    }
-    return acc;
-  }, [] as { category: ItemCategory; name: string; value: number }[]);
-
-  // Custom tooltip
-  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number }> }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="glass-strong rounded-xl p-3 shadow-lg">
-          <p className="text-sm font-medium text-foreground">{payload[0].name}</p>
-          <p className="text-lg font-bold text-primary">{payload[0].value} פריטים</p>
-        </div>
-      );
-    }
-    return null;
-  };
+export const InventoryChart = memo(function InventoryChart({ inventory }: InventoryChartProps) {
+  const categoryData = useMemo(() => {
+    const availableItems = inventory.filter(isItemTrulyAvailable);
+    return availableItems.reduce((acc, item) => {
+      const category = item.category as ItemCategory;
+      const existing = acc.find(d => d.category === category);
+      if (existing) {
+        existing.value += 1;
+      } else {
+        acc.push({
+          category,
+          name: categoryLabels[category] || category,
+          value: 1,
+        });
+      }
+      return acc;
+    }, [] as { category: ItemCategory; name: string; value: number }[]);
+  }, [inventory]);
 
   if (categoryData.length === 0) {
     return (
@@ -77,7 +60,7 @@ export function InventoryChart({ inventory }: InventoryChartProps) {
   }
 
   return (
-    <div className="stat-card animate-slide-up" style={{ animationDelay: '300ms' }}>
+    <div className="stat-card">
       <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
         <Package className="h-5 w-5 text-primary" />
         פריטים זמינים לפי קטגוריה
@@ -115,4 +98,4 @@ export function InventoryChart({ inventory }: InventoryChartProps) {
       </div>
     </div>
   );
-}
+});
