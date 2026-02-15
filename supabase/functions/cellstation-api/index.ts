@@ -165,7 +165,40 @@ serve(async (req) => {
         };
         console.log('Response analysis:', JSON.stringify(debugInfo, null, 2));
 
-        result = { success: true, action: "activate_sim", html_length: html.length, debug: debugInfo };
+        // Extract specific error messages from HTML
+        const errorPatterns = [
+          /שגיאה[^<]*(<[^>]*>)*[^<]*/gi,
+          /error[^<]*(<[^>]*>)*[^<]*/gi,
+          /alert[^<]*(<[^>]*>)*[^<]*/gi,
+          /הודעה[^<]*(<[^>]*>)*[^<]*/gi,
+        ];
+        const errorMessages: string[] = [];
+        errorPatterns.forEach(pattern => {
+          const matches = html.match(pattern);
+          if (matches) errorMessages.push(...matches);
+        });
+        console.log('Extracted error messages:', JSON.stringify(errorMessages, null, 2));
+
+        const formValidationErrors = {
+          hasProductError: html.includes('product') && html.includes('required'),
+          hasDateError: html.includes('date') && html.includes('invalid'),
+          hasPriceError: html.includes('price') && html.includes('error'),
+        };
+        console.log('Form validation errors:', JSON.stringify(formValidationErrors, null, 2));
+
+        if (debugInfo.hasErrorMessage && !debugInfo.hasSuccessMessage) {
+          result = {
+            success: false,
+            action: "activate_sim",
+            error: "Cell Station returned error",
+            errorMessages,
+            formValidationErrors,
+            htmlPreview: html.substring(0, 2000),
+            debug: debugInfo,
+          };
+        } else {
+          result = { success: true, action: "activate_sim", html_length: html.length, debug: debugInfo };
+        }
         break;
       }
       case "swap_sim": {
