@@ -277,7 +277,17 @@ serve(async (req) => {
         // Step 2: Fetch SIM details form (this is what fillSearchBox triggers)
         const iccid = params.iccid || params.swap_iccid || "";
         console.log('Step 2 - Fetching SIM details for ICCID:', iccid);
-        const detailsResponse = await session.get("content/rentals/fetch_BHsim_details.php?zehut=" + encodeURIComponent(iccid));
+        
+        // Validate ICCID format
+        if (!iccid || iccid.length < 19 || iccid.length > 20 || !/^\d+$/.test(iccid)) {
+          result = { success: false, error: "Invalid ICCID format. Must be 19-20 digits.", action: "activate_sim" };
+          break;
+        }
+        if (!iccid.startsWith('89445300')) {
+          console.warn('ICCID does not start with expected prefix 89445300:', iccid);
+        }
+        
+        const detailsResponse = await session.get("content/dashboard/rentals/fetch_BHsim_details.php?zehut=" + encodeURIComponent(iccid));
         const detailsHtml = await detailsResponse.text();
         console.log('SIM details response status:', detailsResponse.status);
         console.log('SIM details response length:', detailsHtml.length);
@@ -287,11 +297,11 @@ serve(async (req) => {
         const detailFields = detailsHtml.match(/name=["']([^"']+)["']/g);
         console.log('Detail form fields:', JSON.stringify(detailFields));
         
-        // Extract hidden fields and their values
-        const hiddenFields = detailsHtml.match(/<input[^>]*type=["']hidden["'][^>]*>/gi);
-        console.log('Hidden fields:', JSON.stringify(hiddenFields));
+        // Extract ALL form fields (hidden and visible) and their values
+        const allInputFields = detailsHtml.match(/<input[^>]*name=["'][^"']+["'][^>]*>/gi) || [];
+        console.log('All input fields count:', allInputFields.length);
         
-        // Extract select options
+        // Extract select fields
         const selectFields = detailsHtml.match(/<select[^>]*name=["']([^"']+)["'][^>]*>[\s\S]*?<\/select>/gi);
         console.log('Select fields:', JSON.stringify(selectFields?.slice(0, 5)));
         
@@ -299,30 +309,32 @@ serve(async (req) => {
         const formMatch = detailsHtml.match(/<form[^>]*(?:action=["']([^"']+)["'])?[^>]*class=["'][^"']*FormSubmit[^"']*["'][^>]*>/i);
         console.log('Form match:', formMatch ? formMatch[0] : 'No FormSubmit form found');
         
-        // Build form data from discovered fields + user params
-        // Parse hidden field values
-        const hiddenFieldValues: Record<string, string> = {};
-        if (hiddenFields) {
-          for (const field of hiddenFields) {
-            const nameMatch = field.match(/name=["']([^"']+)["']/);
-            const valueMatch = field.match(/value=["']([^"']+)["']/);
-            if (nameMatch) {
-              hiddenFieldValues[nameMatch[1]] = valueMatch ? valueMatch[1] : "";
-            }
+        // Build form data from ALL discovered input fields
+        const discoveredFields: Record<string, string> = {};
+        for (const field of allInputFields) {
+          const nameMatch = field.match(/name=["']([^"']+)["']/);
+          const valueMatch = field.match(/value=["']([^"']*)["']/);
+          if (nameMatch) {
+            discoveredFields[nameMatch[1]] = valueMatch ? valueMatch[1] : "";
           }
         }
-        console.log('Hidden field values:', JSON.stringify(hiddenFieldValues));
+        console.log('All discovered field values:', JSON.stringify(discoveredFields));
         
         // Step 3: POST to dynamic/submit.php with combined form data
+        // Hidden fields already contain: product, country, phone_id, number, account_name, 
+        // il_number, sim_card, mor_id, c_nu, store_id, command (243), submitted (1)
         const formData: Record<string, string> = {
-          ...hiddenFieldValues,
-          product: params.product || "",
+          ...discoveredFields,
           start_rental: params.start_rental,
           end_rental: params.end_rental,
           deler4cus_price: params.price || "",
           calculated_days_input: params.days || "",
           note: params.note || "",
         };
+        // Only override product if explicitly provided (hidden field has correct default)
+        if (params.product) formData.product = params.product;
+        // exp field comes from the form too - use it if provided
+        if (params.exp) formData.exp = params.exp;
         console.log('Step 3 - Submitting to dynamic/submit.php with data:', JSON.stringify(formData, null, 2));
         
         const submitResponse = await session.post("dynamic/submit.php", formData);
@@ -341,8 +353,7 @@ serve(async (req) => {
           success: !hasError && submitResponse.status === 200, 
           action: "activate_sim", 
           debug: {
-            detailFields,
-            hiddenFieldValues,
+            discoveredFields,
             formDataSent: formData,
             submitResponsePreview: submitHtml.substring(0, 1000),
             hasSuccess,
@@ -368,7 +379,7 @@ serve(async (req) => {
         // Step 2: Fetch current SIM details to get the swap form
         const currentIccid = params.current_iccid || "";
         console.log('Step 2 - Fetching details for current ICCID:', currentIccid);
-        const swapDetailsResp = await session.get("content/rentals/fetch_BHsim_details.php?zehut=" + encodeURIComponent(currentIccid));
+        const swapDetailsResp = await session.get("content/dashboard/rentals/fetch_BHsim_details.php?zehut=" + encodeURIComponent(currentIccid));
         const swapDetailsHtml = await swapDetailsResp.text();
         console.log('Swap details response status:', swapDetailsResp.status);
         console.log('Swap details length:', swapDetailsHtml.length);
@@ -442,27 +453,31 @@ serve(async (req) => {
         
         // Step 2: Fetch SIM details
         const iccidAS = params.iccid || params.swap_iccid || "";
-        const detailsAS = await session.get("content/rentals/fetch_BHsim_details.php?zehut=" + encodeURIComponent(iccidAS));
+        if (!iccidAS || iccidAS.length < 19 || iccidAS.length > 20 || !/^\d+$/.test(iccidAS)) {
+          result = { success: false, error: "Invalid ICCID format. Must be 19-20 digits.", action: "activate_and_swap" };
+          break;
+        }
+        const detailsAS = await session.get("content/dashboard/rentals/fetch_BHsim_details.php?zehut=" + encodeURIComponent(iccidAS));
         const detailsHtmlAS = await detailsAS.text();
         
-        // Parse hidden fields
-        const hiddenAS = detailsHtmlAS.match(/<input[^>]*type=["']hidden["'][^>]*>/gi) || [];
-        const hiddenValsAS: Record<string, string> = {};
-        for (const field of hiddenAS) {
+        // Parse ALL input fields from the form
+        const allFieldsAS = detailsHtmlAS.match(/<input[^>]*name=["'][^"']+["'][^>]*>/gi) || [];
+        const discoveredValsAS: Record<string, string> = {};
+        for (const field of allFieldsAS) {
           const n = field.match(/name=["']([^"']+)["']/);
-          const v = field.match(/value=["']([^"']+)["']/);
-          if (n) hiddenValsAS[n[1]] = v ? v[1] : "";
+          const v = field.match(/value=["']([^"']*)["']/);
+          if (n) discoveredValsAS[n[1]] = v ? v[1] : "";
         }
         
         // Step 3: Submit activation
         const actFormData: Record<string, string> = {
-          ...hiddenValsAS,
-          product: params.product || "",
+          ...discoveredValsAS,
           start_rental: params.start_rental,
           end_rental: params.end_rental,
           deler4cus_price: params.price || "",
           note: params.note || "",
         };
+        if (params.product) actFormData.product = params.product;
         
         const actSubmit = await session.post("dynamic/submit.php", actFormData);
         const actResult = await actSubmit.text();
@@ -563,7 +578,7 @@ serve(async (req) => {
         // Also inspect the AJAX endpoint that loads activation details
         const testIccid = params?.iccid || '0000000000000000000';
         try {
-          const ajaxResp = await session.get("content/rentals/fetch_BHsim_details.php?zehut=" + encodeURIComponent(testIccid));
+          const ajaxResp = await session.get("content/dashboard/rentals/fetch_BHsim_details.php?zehut=" + encodeURIComponent(testIccid));
           const ajaxHtml = await ajaxResp.text();
           
           const ajaxFormRegex = /<form[^>]*>([\s\S]*?)<\/form>/gi;
