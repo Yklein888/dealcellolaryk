@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useCellStation } from '@/hooks/useCellStation';
+import { supabase } from '@/integrations/supabase/client';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -12,7 +13,8 @@ import { StatCard } from '@/components/StatCard';
 import { ActivationTab } from '@/components/cellstation/ActivationTab';
 import { SwapSimDialog } from '@/components/cellstation/SwapSimDialog';
 import { ActivateAndSwapDialog } from '@/components/cellstation/ActivateAndSwapDialog';
-import { RefreshCw, Search, Signal, CheckCircle, XCircle, Clock, ArrowLeftRight, Zap, AlertTriangle } from 'lucide-react';
+import { RefreshCw, Search, Signal, CheckCircle, XCircle, Clock, ArrowLeftRight, Zap, AlertTriangle, Phone } from 'lucide-react';
+import { differenceInDays } from 'date-fns';
 
 function StatusBadge({ status, detail }: { status: string | null; detail: string | null }) {
   if (status === 'rented') {
@@ -58,16 +60,46 @@ interface SimRow {
   customer_name: string | null;
 }
 
+// Cross-reference status type
+type SystemStatus = 'match' | 'needs_swap' | 'not_in_inventory' | 'both_rented';
+
+interface InventoryMap {
+  [iccid: string]: { status: string; id: string };
+}
+
 interface SimTableProps {
   sims: SimRow[];
   showCustomer?: boolean;
   showSwap?: boolean;
+  showSystemStatus?: boolean;
+  inventoryMap?: InventoryMap;
   onSwapClick?: (sim: SimRow) => void;
   onActivateAndSwapClick?: (sim: SimRow) => void;
   needsSwapIccids?: Set<string>;
 }
 
-function SimTable({ sims, showCustomer, showSwap, onSwapClick, onActivateAndSwapClick, needsSwapIccids }: SimTableProps) {
+function getSystemStatus(sim: SimRow, inventoryMap: InventoryMap): SystemStatus {
+  if (!sim.iccid || !inventoryMap[sim.iccid]) return 'not_in_inventory';
+  const inv = inventoryMap[sim.iccid];
+  if (sim.status === 'available' && inv.status === 'rented') return 'needs_swap';
+  if (sim.status === 'rented' && inv.status === 'rented') return 'both_rented';
+  return 'match';
+}
+
+function SystemStatusBadge({ status }: { status: SystemStatus }) {
+  switch (status) {
+    case 'match':
+      return <span className="text-xs whitespace-nowrap">✅ תואם</span>;
+    case 'needs_swap':
+      return <span className="text-xs text-orange-600 font-medium whitespace-nowrap">⚠️ צריך החלפה</span>;
+    case 'not_in_inventory':
+      return <span className="text-xs text-muted-foreground whitespace-nowrap">❌ לא במלאי</span>;
+    case 'both_rented':
+      return <span className="text-xs whitespace-nowrap">🔄 מושכר</span>;
+  }
+}
+
+function SimTable({ sims, showCustomer, showSwap, showSystemStatus, inventoryMap, onSwapClick, onActivateAndSwapClick, needsSwapIccids }: SimTableProps) {
   if (sims.length === 0) {
     return <p className="text-center text-muted-foreground py-8">אין סימים להצגה</p>;
   }
@@ -81,6 +113,7 @@ function SimTable({ sims, showCustomer, showSwap, onSwapClick, onActivateAndSwap
             <TableHead>IL Number</TableHead>
             <TableHead>ICCID</TableHead>
             <TableHead>סטטוס</TableHead>
+            {showSystemStatus && <TableHead>מצב במערכת</TableHead>}
             <TableHead>תוקף</TableHead>
             <TableHead>חבילה</TableHead>
             {showCustomer && <TableHead>לקוח</TableHead>}
@@ -91,6 +124,7 @@ function SimTable({ sims, showCustomer, showSwap, onSwapClick, onActivateAndSwap
         <TableBody>
           {sims.map((sim) => {
             const needsSwap = needsSwapIccids?.has(sim.iccid || '');
+            const sysStatus = showSystemStatus && inventoryMap ? getSystemStatus(sim, inventoryMap) : null;
             return (
               <TableRow key={sim.id} className={needsSwap ? 'bg-yellow-50 dark:bg-yellow-950/10' : ''}>
                 <TableCell className="font-mono text-xs">{sim.sim_number || '-'}</TableCell>
@@ -103,6 +137,11 @@ function SimTable({ sims, showCustomer, showSwap, onSwapClick, onActivateAndSwap
                     {needsSwap && <AlertTriangle className="h-4 w-4 text-yellow-500" />}
                   </div>
                 </TableCell>
+                {showSystemStatus && (
+                  <TableCell>
+                    {sysStatus && <SystemStatusBadge status={sysStatus} />}
+                  </TableCell>
+                )}
                 <TableCell>{formatDate(sim.expiry_date)}</TableCell>
                 <TableCell>{sim.plan || '-'}</TableCell>
                 {showCustomer && <TableCell>{sim.customer_name || '-'}</TableCell>}
@@ -136,6 +175,22 @@ function SimTable({ sims, showCustomer, showSwap, onSwapClick, onActivateAndSwap
   );
 }
 
+// Overdue warning types
+interface OverdueSwapItem {
+  customerName: string;
+  simNumber: string;
+  iccid: string;
+  daysOverdue: number;
+  rentalId: string;
+}
+
+interface OverdueNotReturnedItem {
+  customerName: string;
+  simNumber: string;
+  daysOverdue: number;
+  phone: string;
+}
+
 export default function CellStation() {
   const {
     simCards, isLoading, isSyncing, isSwapping,
@@ -147,32 +202,127 @@ export default function CellStation() {
   const [swapDialogSim, setSwapDialogSim] = useState<SimRow | null>(null);
   const [activateSwapSim, setActivateSwapSim] = useState<SimRow | null>(null);
 
-  // Get ICCIDs that need swap: SIM is "available" in cellstation_sims BUT "rented" in inventory
+  // Inventory map for cross-referencing
+  const [inventoryMap, setInventoryMap] = useState<InventoryMap>({});
+  // Needs swap ICCIDs
   const [needsSwapIccids, setNeedsSwapIccids] = useState<Set<string>>(new Set());
+  // Overdue warnings
+  const [overdueSwapItems, setOverdueSwapItems] = useState<OverdueSwapItem[]>([]);
+  const [overdueNotReturned, setOverdueNotReturned] = useState<OverdueNotReturnedItem[]>([]);
 
   useEffect(() => {
-    import('@/integrations/supabase/client').then(({ supabase }) => {
-      // Get inventory items that are currently rented and have a sim_number
-      supabase
+    async function loadCrossReference() {
+      // 1. Load all inventory items with sim_number
+      const { data: invData } = await supabase
         .from('inventory' as any)
-        .select('sim_number')
-        .eq('status', 'rented')
-        .not('sim_number', 'is', null)
-        .then(({ data }) => {
-          if (data) {
-            // Set of ICCIDs that are rented in our inventory
-            const rentedIccids = new Set((data as any[]).map(d => d.sim_number).filter(Boolean));
-            // Cross-reference: SIM is "available" in cellstation_sims but "rented" in inventory
-            const swapNeeded = new Set<string>();
-            for (const sim of simCards) {
-              if (sim.status === 'available' && sim.iccid && rentedIccids.has(sim.iccid)) {
-                swapNeeded.add(sim.iccid);
-              }
+        .select('id, sim_number, status')
+        .not('sim_number', 'is', null);
+
+      const map: InventoryMap = {};
+      const rentedIccids = new Set<string>();
+      if (invData) {
+        for (const item of invData as any[]) {
+          if (item.sim_number) {
+            map[item.sim_number] = { status: item.status, id: item.id };
+            if (item.status === 'rented') {
+              rentedIccids.add(item.sim_number);
             }
-            setNeedsSwapIccids(swapNeeded);
           }
-        });
-    });
+        }
+      }
+      setInventoryMap(map);
+
+      // 2. Compute needs_swap: available in cellstation but rented in inventory
+      const swapNeeded = new Set<string>();
+      for (const sim of simCards) {
+        if (sim.status === 'available' && sim.iccid && rentedIccids.has(sim.iccid)) {
+          swapNeeded.add(sim.iccid);
+        }
+      }
+      setNeedsSwapIccids(swapNeeded);
+
+      // 3. Load overdue rentals and cross-reference
+      const { data: overdueRentals } = await supabase
+        .from('rentals')
+        .select('id, customer_name, end_date, customer_id')
+        .eq('status', 'overdue');
+
+      if (overdueRentals && overdueRentals.length > 0) {
+        // Get rental items for overdue rentals
+        const rentalIds = overdueRentals.map(r => r.id);
+        const { data: rentalItems } = await supabase
+          .from('rental_items')
+          .select('rental_id, inventory_item_id')
+          .in('rental_id', rentalIds);
+
+        // Get inventory items for those rental items
+        const invItemIds = (rentalItems || []).map(ri => ri.inventory_item_id).filter(Boolean);
+        const { data: invItems } = await supabase
+          .from('inventory' as any)
+          .select('id, sim_number')
+          .in('id', invItemIds.length > 0 ? invItemIds : ['none']);
+
+        // Get customer phones
+        const customerIds = overdueRentals.map(r => r.customer_id).filter(Boolean);
+        const { data: customersData } = await supabase
+          .from('customers')
+          .select('id, phone')
+          .in('id', customerIds.length > 0 ? customerIds : ['none']);
+
+        const customerPhoneMap: Record<string, string> = {};
+        (customersData || []).forEach(c => { customerPhoneMap[c.id] = c.phone; });
+
+        const invSimMap: Record<string, string> = {};
+        ((invItems as any[]) || []).forEach(i => { invSimMap[i.id] = i.sim_number; });
+
+        const swapItems: OverdueSwapItem[] = [];
+        const notReturnedItems: OverdueNotReturnedItem[] = [];
+
+        for (const rental of overdueRentals) {
+          const items = (rentalItems || []).filter(ri => ri.rental_id === rental.id);
+          const daysOverdue = differenceInDays(new Date(), new Date(rental.end_date));
+
+          for (const item of items) {
+            if (!item.inventory_item_id) continue;
+            const simNumber = invSimMap[item.inventory_item_id];
+            if (!simNumber) continue;
+
+            // Find matching cellstation SIM
+            const csSim = simCards.find(s => s.iccid === simNumber);
+            if (!csSim) continue;
+
+            if (csSim.status === 'available') {
+              // CellStation released it but still rented in our system
+              swapItems.push({
+                customerName: rental.customer_name,
+                simNumber: csSim.uk_number || csSim.il_number || simNumber,
+                iccid: simNumber,
+                daysOverdue,
+                rentalId: rental.id,
+              });
+            } else if (csSim.status === 'rented') {
+              // Customer still has it
+              notReturnedItems.push({
+                customerName: rental.customer_name,
+                simNumber: csSim.uk_number || csSim.il_number || simNumber,
+                daysOverdue,
+                phone: customerPhoneMap[rental.customer_id || ''] || '',
+              });
+            }
+          }
+        }
+
+        setOverdueSwapItems(swapItems);
+        setOverdueNotReturned(notReturnedItems);
+      } else {
+        setOverdueSwapItems([]);
+        setOverdueNotReturned([]);
+      }
+    }
+
+    if (simCards.length > 0) {
+      loadCrossReference();
+    }
   }, [simCards]);
 
   const filtered = useMemo(() => {
@@ -197,6 +347,88 @@ export default function CellStation() {
           {isSyncing ? 'מסנכרן...' : 'סנכרון'}
         </Button>
       </div>
+
+      {/* Overdue Warning Cards */}
+      {overdueSwapItems.length > 0 && (
+        <Card className="border-red-300 bg-red-50 dark:bg-red-950/20">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+              <h3 className="font-bold text-red-700 dark:text-red-400">
+                ⚠️ סימים שדורשים החלפה ({overdueSwapItems.length} סימים)
+              </h3>
+            </div>
+            <div className="space-y-2">
+              {overdueSwapItems.map((item, i) => (
+                <div key={i} className="flex items-center justify-between p-2 rounded-md bg-white/60 dark:bg-black/20">
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="gap-1"
+                    onClick={() => {
+                      const sim = simCards.find(s => s.iccid === item.iccid);
+                      if (sim) setActivateSwapSim(sim);
+                    }}
+                  >
+                    <Zap className="h-3 w-3" /> החלף עכשיו
+                  </Button>
+                  <div className="text-right text-sm">
+                    <span className="font-medium">{item.customerName}</span>
+                    <span className="mx-2 text-muted-foreground">|</span>
+                    <span className="font-mono text-xs">{item.simNumber}</span>
+                    <span className="mx-2 text-muted-foreground">|</span>
+                    <span className="text-red-600 font-medium">{item.daysOverdue} ימים באיחור</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {overdueNotReturned.length > 0 && (
+        <Card className="border-orange-300 bg-orange-50 dark:bg-orange-950/20">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Clock className="h-5 w-5 text-orange-600" />
+              <h3 className="font-bold text-orange-700 dark:text-orange-400">
+                ⏰ סימים באיחור - הלקוח טרם החזיר ({overdueNotReturned.length} סימים)
+              </h3>
+            </div>
+            <div className="space-y-2">
+              {overdueNotReturned.map((item, i) => (
+                <div key={i} className="flex items-center justify-between p-2 rounded-md bg-white/60 dark:bg-black/20">
+                  {item.phone && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1"
+                      asChild
+                    >
+                      <a href={`tel:${item.phone}`}>
+                        <Phone className="h-3 w-3" /> התקשר ללקוח
+                      </a>
+                    </Button>
+                  )}
+                  <div className="text-right text-sm">
+                    <span className="font-medium">{item.customerName}</span>
+                    <span className="mx-2 text-muted-foreground">|</span>
+                    <span className="font-mono text-xs">{item.simNumber}</span>
+                    <span className="mx-2 text-muted-foreground">|</span>
+                    <span className="text-orange-600 font-medium">{item.daysOverdue} ימים באיחור</span>
+                    {item.phone && (
+                      <>
+                        <span className="mx-2 text-muted-foreground">|</span>
+                        <span dir="ltr" className="text-xs">{item.phone}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -237,6 +469,8 @@ export default function CellStation() {
               <TabsContent value="all" className="m-0">
                 <SimTable
                   sims={filtered}
+                  showSystemStatus
+                  inventoryMap={inventoryMap}
                   needsSwapIccids={needsSwapIccids}
                   onActivateAndSwapClick={sim => setActivateSwapSim(sim)}
                 />
@@ -261,6 +495,7 @@ export default function CellStation() {
                 <ActivationTab
                   availableSims={simCards}
                   onActivate={activateSim}
+                  onActivateAndSwap={activateAndSwap}
                   isActivating={false}
                 />
               </TabsContent>

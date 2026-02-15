@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { cn } from '@/lib/utils';
 import { format, differenceInDays } from 'date-fns';
 import { he } from 'date-fns/locale';
-import { CalendarIcon, Search, UserPlus, Loader2, Zap, AlertTriangle } from 'lucide-react';
+import { CalendarIcon, Search, UserPlus, Loader2, Zap, AlertTriangle, CheckCircle } from 'lucide-react';
 import { calculateRentalPrice } from '@/lib/pricing';
 import { useRental } from '@/hooks/useRental';
 import { useToast } from '@/hooks/use-toast';
@@ -26,17 +26,19 @@ interface CellStationSim {
   status_detail: string | null;
   expiry_date: string | null;
   plan: string | null;
+  customer_name: string | null;
 }
 
 interface ActivationTabProps {
   availableSims: CellStationSim[];
   onActivate: (params: any) => Promise<any>;
+  onActivateAndSwap: (params: any, onProgress?: (step: string, percent: number) => void) => Promise<any>;
   isActivating: boolean;
 }
 
 const NOTE_TEMPLATES = ['VIP', 'עסקי', 'משפחה', 'חוזר'];
 
-export function ActivationTab({ availableSims, onActivate, isActivating }: ActivationTabProps) {
+export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, isActivating }: ActivationTabProps) {
   const { customers, addCustomer, addRental, inventory } = useRental();
   const { toast } = useToast();
 
@@ -52,6 +54,11 @@ export function ActivationTab({ availableSims, onActivate, isActivating }: Activ
   const [quickName, setQuickName] = useState('');
   const [quickPhone, setQuickPhone] = useState('');
   const [simSearch, setSimSearch] = useState('');
+
+  // Old SIM selection for activate+swap
+  const [oldSimSearch, setOldSimSearch] = useState('');
+  const [selectedOldSimId, setSelectedOldSimId] = useState('');
+  const [showOldSimSection, setShowOldSimSection] = useState(false);
 
   const filteredCustomers = useMemo(() => {
     if (!customerSearch.trim()) return customers.slice(0, 10);
@@ -71,14 +78,25 @@ export function ActivationTab({ availableSims, onActivate, isActivating }: Activ
     );
   }, [availableSims, simSearch]);
 
+  // Old SIMs = currently rented SIMs (for swap)
+  const filteredOldSims = useMemo(() => {
+    const rented = availableSims.filter(s => s.status === 'rented');
+    if (!oldSimSearch.trim()) return rented;
+    const q = oldSimSearch.toLowerCase();
+    return rented.filter(s =>
+      [s.sim_number, s.uk_number, s.il_number, s.iccid, s.customer_name]
+        .some(v => v?.toLowerCase().includes(q))
+    );
+  }, [availableSims, oldSimSearch]);
+
   const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
   const selectedSim = availableSims.find(s => s.id === selectedSimId);
+  const selectedOldSim = availableSims.find(s => s.id === selectedOldSimId);
 
   const pricePreview = useMemo(() => {
     if (!startDate || !endDate) return null;
     const start = format(startDate, 'yyyy-MM-dd');
     const end = format(endDate, 'yyyy-MM-dd');
-    // Default to European SIM pricing
     return calculateRentalPrice(
       [{ category: 'sim_european' }],
       start, end
@@ -98,7 +116,7 @@ export function ActivationTab({ availableSims, onActivate, isActivating }: Activ
     }
   };
 
-  const handleActivate = async () => {
+  const handleSimpleActivate = async () => {
     if (!selectedCustomer || !selectedSim || !startDate || !endDate) {
       toast({ title: 'יש למלא את כל השדות', variant: 'destructive' });
       return;
@@ -109,7 +127,6 @@ export function ActivationTab({ availableSims, onActivate, isActivating }: Activ
     const days = differenceInDays(endDate, startDate) + 1;
 
     try {
-      // 1. Activate on CellStation portal
       await onActivate({
         product: selectedSim.plan || '',
         start_rental: format(startDate, 'dd/MM/yyyy'),
@@ -119,10 +136,8 @@ export function ActivationTab({ availableSims, onActivate, isActivating }: Activ
         note: `${selectedCustomer.name} ${selectedCustomer.phone} ${notes}`.trim(),
       });
 
-      // 2. Find matching inventory item by ICCID
       const matchingItem = inventory.find(i => i.simNumber === selectedSim.iccid);
 
-      // 3. Create rental
       await addRental({
         customerId: selectedCustomer.id,
         customerName: selectedCustomer.name,
@@ -142,15 +157,50 @@ export function ActivationTab({ availableSims, onActivate, isActivating }: Activ
       });
 
       toast({ title: 'הסים הופעל והשכרה נוצרה בהצלחה!' });
-      // Reset form
-      setSelectedCustomerId('');
-      setSelectedSimId('');
-      setStartDate(undefined);
-      setEndDate(undefined);
-      setNotes('');
+      resetForm();
     } catch (e: any) {
       toast({ title: 'שגיאה', description: e.message, variant: 'destructive' });
     }
+  };
+
+  const handleActivateAndSwap = async () => {
+    if (!selectedCustomer || !selectedSim || !selectedOldSim || !startDate || !endDate) {
+      toast({ title: 'יש למלא את כל השדות כולל סים ישן', variant: 'destructive' });
+      return;
+    }
+
+    const days = differenceInDays(endDate, startDate) + 1;
+
+    try {
+      await onActivateAndSwap(
+        {
+          product: selectedSim.plan || '',
+          start_rental: format(startDate, 'dd/MM/yyyy'),
+          end_rental: format(endDate, 'dd/MM/yyyy'),
+          price: pricePreview?.total?.toString() || '0',
+          note: `${selectedCustomer.name} ${selectedCustomer.phone} ${notes}`.trim(),
+          rental_id: '',
+          current_sim: selectedOldSim.sim_number || '',
+          swap_msisdn: selectedSim.uk_number || '',
+          swap_iccid: selectedSim.iccid || '',
+        }
+      );
+
+      toast({ title: 'הפעלה והחלפה הושלמו בהצלחה!' });
+      resetForm();
+    } catch (e: any) {
+      toast({ title: 'שגיאה', description: e.message, variant: 'destructive' });
+    }
+  };
+
+  const resetForm = () => {
+    setSelectedCustomerId('');
+    setSelectedSimId('');
+    setSelectedOldSimId('');
+    setStartDate(undefined);
+    setEndDate(undefined);
+    setNotes('');
+    setShowOldSimSection(false);
   };
 
   const getSimBorderColor = (sim: CellStationSim) => {
@@ -161,6 +211,9 @@ export function ActivationTab({ availableSims, onActivate, isActivating }: Activ
       default: return 'border-border';
     }
   };
+
+  const canActivate = selectedCustomerId && selectedSimId && startDate && endDate;
+  const canActivateAndSwap = canActivate && selectedOldSimId;
 
   return (
     <div className="p-4 space-y-6">
@@ -206,10 +259,10 @@ export function ActivationTab({ availableSims, onActivate, isActivating }: Activ
           </CardContent>
         </Card>
 
-        {/* SIM Selection */}
+        {/* SIM Selection (new SIM to activate) */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">בחירת סים</CardTitle>
+            <CardTitle className="text-base">בחירת סים חדש להפעלה</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="relative">
@@ -335,19 +388,99 @@ export function ActivationTab({ availableSims, onActivate, isActivating }: Activ
         />
       </div>
 
-      {/* Activate Button */}
-      <Button
-        size="lg"
-        className="w-full gap-2"
-        onClick={handleActivate}
-        disabled={isActivating || !selectedCustomerId || !selectedSimId || !startDate || !endDate}
-      >
-        {isActivating ? (
-          <><Loader2 className="h-4 w-4 animate-spin" /> מפעיל...</>
-        ) : (
-          <><Zap className="h-4 w-4" /> הפעל סים</>
+      {/* Old SIM Section (for activate+swap) */}
+      {!showOldSimSection ? (
+        <Button
+          variant="outline"
+          className="w-full text-sm"
+          onClick={() => setShowOldSimSection(true)}
+        >
+          + בחר סים ישן להחלפה (אופציונלי - הפעלה + החלפה)
+        </Button>
+      ) : (
+        <Card className="border-orange-200 dark:border-orange-800">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-orange-500" />
+                בחירת סים ישן להחלפה
+              </span>
+              <Button size="sm" variant="ghost" onClick={() => { setShowOldSimSection(false); setSelectedOldSimId(''); }}>
+                ביטול
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="relative">
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="חיפוש סים מושכר..."
+                value={oldSimSearch}
+                onChange={e => setOldSimSearch(e.target.value)}
+                className="pr-10"
+              />
+            </div>
+            <div className="max-h-32 overflow-y-auto space-y-1">
+              {filteredOldSims.map(sim => (
+                <button
+                  key={sim.id}
+                  onClick={() => setSelectedOldSimId(sim.id)}
+                  className={cn(
+                    'w-full text-right p-2 rounded-md text-sm border transition-colors',
+                    selectedOldSimId === sim.id
+                      ? 'bg-orange-100 dark:bg-orange-950/30 border-orange-400 ring-1 ring-orange-400'
+                      : 'border-border hover:bg-muted'
+                  )}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">{sim.customer_name || ''}</span>
+                    <div>
+                      <span className="font-mono text-xs">{sim.uk_number || sim.il_number || '---'}</span>
+                      <span className="text-[10px] mr-2 text-muted-foreground">...{sim.iccid?.slice(-6)}</span>
+                    </div>
+                  </div>
+                </button>
+              ))}
+              {filteredOldSims.length === 0 && (
+                <p className="text-center text-muted-foreground text-sm py-4">אין סימים מושכרים</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Action Buttons */}
+      <div className="flex gap-3">
+        {/* Simple Activate */}
+        <Button
+          size="lg"
+          className="flex-1 gap-2 bg-green-600 hover:bg-green-700 text-white"
+          onClick={handleSimpleActivate}
+          disabled={isActivating || !canActivate}
+        >
+          {isActivating ? (
+            <><Loader2 className="h-4 w-4 animate-spin" /> מפעיל...</>
+          ) : (
+            <><CheckCircle className="h-4 w-4" /> הפעל סים</>
+          )}
+        </Button>
+
+        {/* Activate + Swap (only when old SIM selected) */}
+        {showOldSimSection && selectedOldSimId && (
+          <Button
+            size="lg"
+            className="flex-1 gap-2 bg-orange-600 hover:bg-orange-700 text-white"
+            onClick={handleActivateAndSwap}
+            disabled={isActivating || !canActivateAndSwap}
+          >
+            {isActivating ? (
+              <><Loader2 className="h-4 w-4 animate-spin" /> מפעיל...</>
+            ) : (
+              <><Zap className="h-4 w-4" /> הפעל + החלף סים</>
+            )}
+          </Button>
         )}
-      </Button>
+      </div>
 
       {/* Quick Add Customer Dialog */}
       <Dialog open={quickAddOpen} onOpenChange={setQuickAddOpen}>
