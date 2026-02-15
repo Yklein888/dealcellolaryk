@@ -217,8 +217,105 @@ serve(async (req) => {
         result = { success: true, action: "check_sim_status", html_length: html.length, raw_html: html };
         break;
       }
+      case "discover_activation_page": {
+        // Step 1: GET the bh/index page to see the activation form
+        console.log('=== DISCOVER ACTIVATION PAGE ===');
+        const pageResponse = await session.get("index.php?page=bh/index");
+        const pageHtml = await pageResponse.text();
+        console.log('Page status:', pageResponse.status);
+        console.log('Page length:', pageHtml.length);
+        
+        // Extract all forms and their actions
+        const forms = pageHtml.match(/<form[^>]*>/gi);
+        console.log('Forms found:', JSON.stringify(forms));
+        
+        // Extract all input/select fields with names
+        const inputs = pageHtml.match(/<(?:input|select|textarea)[^>]*name=["']([^"']+)["'][^>]*>/gi);
+        console.log('Input fields:', JSON.stringify(inputs));
+        
+        // Extract all buttons
+        const buttons = pageHtml.match(/<button[^>]*>([^<]*)<\/button>/gi);
+        console.log('Buttons:', JSON.stringify(buttons));
+        
+        // Extract all links with "bh" in href
+        const bhLinks = pageHtml.match(/href=["'][^"']*bh[^"']*["']/gi);
+        console.log('BH links:', JSON.stringify(bhLinks));
+        
+        // Extract all links with "activate" or "הפעל" 
+        const activateLinks = pageHtml.match(/(?:activate|הפעל|rental|שכירות)[^<]*/gi);
+        console.log('Activation-related text:', JSON.stringify(activateLinks?.slice(0, 20)));
+        
+        // Log larger chunks of the page
+        console.log('Page first 2000 chars:', pageHtml.substring(0, 2000));
+        console.log('Page 2000-4000:', pageHtml.substring(2000, 4000));
+        console.log('Page 4000-6000:', pageHtml.substring(4000, 6000));
+        
+        result = { 
+          success: true, 
+          action: "discover_activation_page",
+          page_length: pageHtml.length,
+          forms: forms,
+          inputs: inputs,
+          buttons: buttons,
+          bh_links: bhLinks,
+        };
+        break;
+      }
       case "activate_sim": {
+        // The portal uses AJAX flow:
+        // 1. GET bh/index page (establishes context/session)
+        // 2. GET rentals/fetch_BHsim_details.php?zehut=ICCID (loads the activation form)
+        // 3. POST dynamic/submit.php with form data (submits the form)
+        console.log('=== ACTIVATE SIM START ===');
+        console.log('Params received:', JSON.stringify(params, null, 2));
+        
+        // Step 1: Visit the bh/index page to establish session context
+        const bhPage = await session.get("index.php?page=bh/index");
+        const bhText = await bhPage.text();
+        console.log('Step 1 - BH page loaded, length:', bhText.length);
+        
+        // Step 2: Fetch SIM details form (this is what fillSearchBox triggers)
+        const iccid = params.iccid || params.swap_iccid || "";
+        console.log('Step 2 - Fetching SIM details for ICCID:', iccid);
+        const detailsResponse = await session.get("content/rentals/fetch_BHsim_details.php?zehut=" + encodeURIComponent(iccid));
+        const detailsHtml = await detailsResponse.text();
+        console.log('SIM details response status:', detailsResponse.status);
+        console.log('SIM details response length:', detailsHtml.length);
+        console.log('SIM details HTML:', detailsHtml.substring(0, 3000));
+        
+        // Extract form fields from the details form
+        const detailFields = detailsHtml.match(/name=["']([^"']+)["']/g);
+        console.log('Detail form fields:', JSON.stringify(detailFields));
+        
+        // Extract hidden fields and their values
+        const hiddenFields = detailsHtml.match(/<input[^>]*type=["']hidden["'][^>]*>/gi);
+        console.log('Hidden fields:', JSON.stringify(hiddenFields));
+        
+        // Extract select options
+        const selectFields = detailsHtml.match(/<select[^>]*name=["']([^"']+)["'][^>]*>[\s\S]*?<\/select>/gi);
+        console.log('Select fields:', JSON.stringify(selectFields?.slice(0, 5)));
+        
+        // Check if there's a form with action
+        const formMatch = detailsHtml.match(/<form[^>]*(?:action=["']([^"']+)["'])?[^>]*class=["'][^"']*FormSubmit[^"']*["'][^>]*>/i);
+        console.log('Form match:', formMatch ? formMatch[0] : 'No FormSubmit form found');
+        
+        // Build form data from discovered fields + user params
+        // Parse hidden field values
+        const hiddenFieldValues: Record<string, string> = {};
+        if (hiddenFields) {
+          for (const field of hiddenFields) {
+            const nameMatch = field.match(/name=["']([^"']+)["']/);
+            const valueMatch = field.match(/value=["']([^"']+)["']/);
+            if (nameMatch) {
+              hiddenFieldValues[nameMatch[1]] = valueMatch ? valueMatch[1] : "";
+            }
+          }
+        }
+        console.log('Hidden field values:', JSON.stringify(hiddenFieldValues));
+        
+        // Step 3: POST to dynamic/submit.php with combined form data
         const formData: Record<string, string> = {
+          ...hiddenFieldValues,
           product: params.product || "",
           start_rental: params.start_rental,
           end_rental: params.end_rental,
@@ -226,62 +323,32 @@ serve(async (req) => {
           calculated_days_input: params.days || "",
           note: params.note || "",
         };
+        console.log('Step 3 - Submitting to dynamic/submit.php with data:', JSON.stringify(formData, null, 2));
         
-        console.log('=== ACTIVATE SIM START ===');
-        console.log('Params received:', JSON.stringify(params, null, 2));
-        console.log('Form data being sent:', JSON.stringify(formData, null, 2));
-
-        const response = await session.post("index.php?page=bh/index", formData);
-        const html = await response.text();
-        console.log('Activation response status:', response.status);
-        console.log('Activation response length:', html.length);
+        const submitResponse = await session.post("dynamic/submit.php", formData);
+        const submitHtml = await submitResponse.text();
+        console.log('Submit response status:', submitResponse.status);
+        console.log('Submit response length:', submitHtml.length);
+        console.log('Submit response:', submitHtml.substring(0, 2000));
         
-        const htmlNoScript = html.replace(/<script[\s\S]*?<\/script>/gi, '');
+        const hasSuccess = submitHtml.includes('נשמר בהצלחה') || submitHtml.includes('alert-success') || submitHtml.includes('הופעל');
+        const hasError = submitHtml.includes('שגיאה') || submitHtml.includes('alert-danger') || submitHtml.includes('error');
         
-        // Extract all form fields from the page to understand what the portal expects
-        const formFields = htmlNoScript.match(/name=["']([^"']+)["']/g);
-        console.log('Form fields found on page:', JSON.stringify(formFields));
-        
-        // Look for select options (product dropdown values)
-        const selectOptions = htmlNoScript.match(/<option[^>]*value=["']([^"']*)["'][^>]*>([^<]*)</g);
-        console.log('Select options on page:', JSON.stringify(selectOptions?.slice(0, 20)));
-        
-        // Check for alerts/messages
-        const alerts = htmlNoScript.match(/class=["'][^"']*alert[^"']*["'][^>]*>([^<]*)/g);
-        console.log('Alert messages:', JSON.stringify(alerts));
-        
-        // Check for specific Hebrew messages
-        const hebrewMessages = ['הופעל בהצלחה', 'נשמר בהצלחה', 'שגיאה', 'alert-success', 'alert-danger', 'alert-warning', 'alert-info'];
-        const foundMessages: Record<string, boolean> = {};
-        hebrewMessages.forEach(msg => { foundMessages[msg] = htmlNoScript.includes(msg); });
-        console.log('Message checks:', JSON.stringify(foundMessages));
-        
-        // Log more of the response to understand the page structure
-        console.log('Response first 1000 chars:', htmlNoScript.substring(0, 1000));
-        console.log('Response last 500 chars:', htmlNoScript.substring(Math.max(0, htmlNoScript.length - 500)));
-        
-        const debugInfo = {
-          hasSuccessMessage: foundMessages['הופעל בהצלחה'] || foundMessages['נשמר בהצלחה'] || foundMessages['alert-success'],
-          hasErrorMessage: foundMessages['שגיאה'] || foundMessages['alert-danger'],
-          hasWarning: foundMessages['alert-warning'],
-          hasInfo: foundMessages['alert-info'],
-          isLoginPage: htmlNoScript.includes('process_login.php') || htmlNoScript.includes('login_form'),
-          responseLength: html.length,
-          responseStatus: response.status,
-          formFieldsFound: formFields,
-          alertsFound: alerts,
-          first1000chars: htmlNoScript.substring(0, 1000),
-          last500chars: htmlNoScript.substring(Math.max(0, htmlNoScript.length - 500)),
-        };
         console.log('=== ACTIVATE SIM END ===');
+        console.log('Success:', hasSuccess, 'Error:', hasError);
 
         result = { 
-          success: !debugInfo.isLoginPage, 
+          success: !hasError && submitResponse.status === 200, 
           action: "activate_sim", 
-          html_length: html.length, 
-          debug: debugInfo,
-          error: debugInfo.isLoginPage ? "Authentication failed - still on login page" : 
-                 debugInfo.hasErrorMessage ? "Portal returned error" : undefined,
+          debug: {
+            detailFields,
+            hiddenFieldValues,
+            formDataSent: formData,
+            submitResponsePreview: submitHtml.substring(0, 1000),
+            hasSuccess,
+            hasError,
+          },
+          error: hasError ? "Portal returned error: " + submitHtml.substring(0, 500) : undefined,
         };
         break;
       }
@@ -303,14 +370,46 @@ serve(async (req) => {
         break;
       }
       case "activate_and_swap": {
-        const actResponse = await session.post("index.php?page=bh/index", {
+        // Same AJAX flow as activate_sim
+        console.log('=== ACTIVATE AND SWAP START ===');
+        
+        // Step 1: Visit bh/index
+        const bhPageAS = await session.get("index.php?page=bh/index");
+        await bhPageAS.text();
+        
+        // Step 2: Fetch SIM details
+        const iccidAS = params.iccid || params.swap_iccid || "";
+        const detailsAS = await session.get("content/rentals/fetch_BHsim_details.php?zehut=" + encodeURIComponent(iccidAS));
+        const detailsHtmlAS = await detailsAS.text();
+        
+        // Parse hidden fields
+        const hiddenAS = detailsHtmlAS.match(/<input[^>]*type=["']hidden["'][^>]*>/gi) || [];
+        const hiddenValsAS: Record<string, string> = {};
+        for (const field of hiddenAS) {
+          const n = field.match(/name=["']([^"']+)["']/);
+          const v = field.match(/value=["']([^"']+)["']/);
+          if (n) hiddenValsAS[n[1]] = v ? v[1] : "";
+        }
+        
+        // Step 3: Submit activation
+        const actFormData: Record<string, string> = {
+          ...hiddenValsAS,
           product: params.product || "",
           start_rental: params.start_rental,
           end_rental: params.end_rental,
           deler4cus_price: params.price || "",
           note: params.note || "",
-        });
+        };
+        
+        const actSubmit = await session.post("dynamic/submit.php", actFormData);
+        const actResult = await actSubmit.text();
+        console.log('Activation submit result:', actResult.substring(0, 500));
+        
+        // Wait 60 seconds for portal processing
+        console.log('Waiting 60 seconds...');
         await new Promise(r => setTimeout(r, 60000));
+        
+        // Step 4: Swap SIM
         const swapResponse = await session.post(
           "index.php?page=/dashboard/rentals/rental_details&id=" + params.rental_id,
           {
@@ -319,6 +418,7 @@ serve(async (req) => {
             swap_iccid: params.swap_iccid,
           }
         );
+        console.log('=== ACTIVATE AND SWAP END ===');
         result = { success: true, action: "activate_and_swap" };
         break;
       }
@@ -326,7 +426,7 @@ serve(async (req) => {
         result = {
           success: false,
           error: "Unknown action: " + action,
-          available: ["sync_csv", "check_sim_status", "activate_sim", "swap_sim", "activate_and_swap"],
+          available: ["sync_csv", "check_sim_status", "activate_sim", "swap_sim", "activate_and_swap", "discover_activation_page"],
         };
     }
 
