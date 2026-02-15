@@ -218,8 +218,6 @@ serve(async (req) => {
         break;
       }
       case "activate_sim": {
-        // Post directly to activation endpoint - same approach as sync_csv
-        // fetchAuthenticated handles re-auth automatically if session expired
         const formData: Record<string, string> = {
           product: params.product || "",
           start_rental: params.start_rental,
@@ -229,27 +227,61 @@ serve(async (req) => {
           note: params.note || "",
         };
         
-        console.log('Activating SIM with data:', JSON.stringify(formData, null, 2));
+        console.log('=== ACTIVATE SIM START ===');
+        console.log('Params received:', JSON.stringify(params, null, 2));
+        console.log('Form data being sent:', JSON.stringify(formData, null, 2));
 
         const response = await session.post("index.php?page=bh/index", formData);
         const html = await response.text();
+        console.log('Activation response status:', response.status);
+        console.log('Activation response length:', html.length);
+        
         const htmlNoScript = html.replace(/<script[\s\S]*?<\/script>/gi, '');
         
+        // Extract all form fields from the page to understand what the portal expects
+        const formFields = htmlNoScript.match(/name=["']([^"']+)["']/g);
+        console.log('Form fields found on page:', JSON.stringify(formFields));
+        
+        // Look for select options (product dropdown values)
+        const selectOptions = htmlNoScript.match(/<option[^>]*value=["']([^"']*)["'][^>]*>([^<]*)</g);
+        console.log('Select options on page:', JSON.stringify(selectOptions?.slice(0, 20)));
+        
+        // Check for alerts/messages
+        const alerts = htmlNoScript.match(/class=["'][^"']*alert[^"']*["'][^>]*>([^<]*)/g);
+        console.log('Alert messages:', JSON.stringify(alerts));
+        
+        // Check for specific Hebrew messages
+        const hebrewMessages = ['הופעל בהצלחה', 'נשמר בהצלחה', 'שגיאה', 'alert-success', 'alert-danger', 'alert-warning', 'alert-info'];
+        const foundMessages: Record<string, boolean> = {};
+        hebrewMessages.forEach(msg => { foundMessages[msg] = htmlNoScript.includes(msg); });
+        console.log('Message checks:', JSON.stringify(foundMessages));
+        
+        // Log more of the response to understand the page structure
+        console.log('Response first 1000 chars:', htmlNoScript.substring(0, 1000));
+        console.log('Response last 500 chars:', htmlNoScript.substring(Math.max(0, htmlNoScript.length - 500)));
+        
         const debugInfo = {
-          hasSuccessMessage: htmlNoScript.includes('הופעל בהצלחה') || htmlNoScript.includes('activated successfully') || htmlNoScript.includes('נשמר בהצלחה') || htmlNoScript.includes('alert-success'),
-          hasErrorMessage: htmlNoScript.includes('שגיאה') || htmlNoScript.includes('alert-danger'),
+          hasSuccessMessage: foundMessages['הופעל בהצלחה'] || foundMessages['נשמר בהצלחה'] || foundMessages['alert-success'],
+          hasErrorMessage: foundMessages['שגיאה'] || foundMessages['alert-danger'],
+          hasWarning: foundMessages['alert-warning'],
+          hasInfo: foundMessages['alert-info'],
           isLoginPage: htmlNoScript.includes('process_login.php') || htmlNoScript.includes('login_form'),
           responseLength: html.length,
-          first500chars: htmlNoScript.substring(0, 500),
+          responseStatus: response.status,
+          formFieldsFound: formFields,
+          alertsFound: alerts,
+          first1000chars: htmlNoScript.substring(0, 1000),
+          last500chars: htmlNoScript.substring(Math.max(0, htmlNoScript.length - 500)),
         };
-        console.log('Activation response:', JSON.stringify(debugInfo, null, 2));
+        console.log('=== ACTIVATE SIM END ===');
 
         result = { 
           success: !debugInfo.isLoginPage, 
           action: "activate_sim", 
           html_length: html.length, 
           debug: debugInfo,
-          error: debugInfo.isLoginPage ? "Authentication failed - still on login page" : undefined,
+          error: debugInfo.isLoginPage ? "Authentication failed - still on login page" : 
+                 debugInfo.hasErrorMessage ? "Portal returned error" : undefined,
         };
         break;
       }
