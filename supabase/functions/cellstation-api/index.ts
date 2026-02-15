@@ -323,10 +323,21 @@ serve(async (req) => {
         // Step 3: POST to dynamic/submit.php with combined form data
         // Hidden fields already contain: product, country, phone_id, number, account_name, 
         // il_number, sim_card, mor_id, c_nu, store_id, command (243), submitted (1)
+        // Convert dates from dd/MM/yyyy to yyyy-MM-dd (portal JS uses new Date() which expects ISO format)
+        let startRental = params.start_rental || "";
+        let endRental = params.end_rental || "";
+        // If dates are in dd/MM/yyyy format, convert to yyyy-MM-dd
+        const ddmmyyyyRegex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+        const startMatch = startRental.match(ddmmyyyyRegex);
+        if (startMatch) startRental = `${startMatch[3]}-${startMatch[2]}-${startMatch[1]}`;
+        const endMatch = endRental.match(ddmmyyyyRegex);
+        if (endMatch) endRental = `${endMatch[3]}-${endMatch[2]}-${endMatch[1]}`;
+        console.log('Converted dates:', startRental, endRental);
+        
         const formData: Record<string, string> = {
           ...discoveredFields,
-          start_rental: params.start_rental,
-          end_rental: params.end_rental,
+          start_rental: startRental,
+          end_rental: endRental,
           deler4cus_price: params.price || "",
           calculated_days_input: params.days || "",
           note: params.note || "",
