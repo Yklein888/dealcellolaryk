@@ -10,6 +10,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { Checkbox } from '@/components/ui/checkbox';
 import { format, differenceInDays } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { CalendarIcon, Search, UserPlus, Loader2, Zap, AlertTriangle, CheckCircle } from 'lucide-react';
@@ -55,6 +56,7 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
   const [quickName, setQuickName] = useState('');
   const [quickPhone, setQuickPhone] = useState('');
   const [simSearch, setSimSearch] = useState('');
+  const [includeDevice, setIncludeDevice] = useState(false);
 
   // Old SIM selection for activate+swap
   const [oldSimSearch, setOldSimSearch] = useState('');
@@ -99,10 +101,10 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
     const start = format(startDate, 'yyyy-MM-dd');
     const end = format(endDate, 'yyyy-MM-dd');
     return calculateRentalPrice(
-      [{ category: 'sim_european' }],
+      [{ category: 'sim_european', includeEuropeanDevice: includeDevice }],
       start, end
     );
-  }, [startDate, endDate]);
+  }, [startDate, endDate, includeDevice]);
 
   const handleQuickAdd = async () => {
     if (!quickName || !quickPhone) return;
@@ -188,16 +190,29 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
         }
       }
 
+      const rentalItems: any[] = [{
+        inventoryItemId,
+        itemCategory: 'sim_european' as const,
+        itemName: `סים ${selectedSim.uk_number || selectedSim.il_number || selectedSim.iccid}`,
+        hasIsraeliNumber: !!selectedSim.il_number,
+        isGeneric: false,
+      }];
+
+      // Add bundled device if selected
+      if (includeDevice) {
+        rentalItems.push({
+          inventoryItemId: '',
+          itemCategory: 'device_simple' as const,
+          itemName: 'מכשיר פשוט (באנדל)',
+          isGeneric: true,
+          pricePerDay: 5,
+        });
+      }
+
       await addRental({
         customerId: selectedCustomer.id,
         customerName: selectedCustomer.name,
-        items: [{
-          inventoryItemId,
-          itemCategory: 'sim_european',
-          itemName: `סים ${selectedSim.uk_number || selectedSim.il_number || selectedSim.iccid}`,
-          hasIsraeliNumber: !!selectedSim.il_number,
-          isGeneric: false,
-        }],
+        items: rentalItems,
         startDate: startStr,
         endDate: endStr,
         totalPrice: pricePreview?.total || 0,
@@ -263,6 +278,7 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
     setEndDate(undefined);
     setNotes('');
     setShowOldSimSection(false);
+    setIncludeDevice(false);
   };
 
   const getSimBorderColor = (sim: CellStationSim) => {
@@ -425,6 +441,42 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
           </div>
         </div>
       </div>
+
+      {/* European Bundle - Include Device */}
+      <div className="flex items-center gap-3 p-3 rounded-md border bg-muted/30">
+        <Checkbox
+          id="include-device"
+          checked={includeDevice}
+          onCheckedChange={(checked) => setIncludeDevice(checked === true)}
+        />
+        <Label htmlFor="include-device" className="cursor-pointer flex-1">
+          <span className="font-medium">הוסף מכשיר פשוט (באנדל)</span>
+          <span className="text-xs text-muted-foreground block">
+            ₪5 ליום עסקים · חיוב מהיום הבא
+          </span>
+        </Label>
+        {includeDevice && pricePreview && pricePreview.breakdown.length > 1 && (
+          <span className="text-sm font-medium text-primary">
+            +₪{pricePreview.breakdown[1]?.price || 0}
+          </span>
+        )}
+      </div>
+
+      {/* Price breakdown when device included */}
+      {includeDevice && pricePreview && pricePreview.breakdown.length > 1 && (
+        <div className="text-xs text-muted-foreground space-y-1 px-1">
+          {pricePreview.breakdown.map((b, i) => (
+            <div key={i} className="flex justify-between">
+              <span>{b.currency}{b.price}</span>
+              <span>{b.item} {b.details ? `(${b.details})` : ''}</span>
+            </div>
+          ))}
+          <div className="flex justify-between font-medium text-foreground border-t pt-1">
+            <span>₪{pricePreview.total}</span>
+            <span>סה״כ</span>
+          </div>
+        </div>
+      )}
 
       {/* Notes */}
       <div className="space-y-2">
