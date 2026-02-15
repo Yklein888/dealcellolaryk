@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Calendar, ArrowLeft, Package2 } from 'lucide-react';
 import { Rental } from '@/types/rental';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -9,11 +10,11 @@ interface UpcomingReturnsCardProps {
   upcomingReturns: Rental[];
 }
 
-export function UpcomingReturnsCard({ upcomingReturns }: UpcomingReturnsCardProps) {
+export const UpcomingReturnsCard = memo(function UpcomingReturnsCard({ upcomingReturns }: UpcomingReturnsCardProps) {
   const today = new Date();
 
   return (
-    <div className="stat-card animate-slide-up" style={{ animationDelay: '400ms' }}>
+    <div className="stat-card">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
           <Calendar className="h-5 w-5 text-primary" />
@@ -35,13 +36,12 @@ export function UpcomingReturnsCard({ upcomingReturns }: UpcomingReturnsCardProp
         </div>
       ) : (
         <div className="space-y-3">
-          {upcomingReturns.slice(0, 5).map((rental, index) => {
+          {upcomingReturns.slice(0, 5).map((rental) => {
             const isOverdue = isBefore(parseISO(rental.endDate), today);
             return (
               <div 
                 key={rental.id}
                 className="flex items-center justify-between p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-all duration-200 hover:scale-[1.01]"
-                style={{ animationDelay: `${450 + index * 50}ms` }}
               >
                 <div className="flex items-center gap-3">
                   <div className={`w-1 h-10 rounded-full ${isOverdue ? 'bg-destructive' : 'bg-primary'}`} />
@@ -68,4 +68,4 @@ export function UpcomingReturnsCard({ upcomingReturns }: UpcomingReturnsCardProp
       )}
     </div>
   );
-}
+});

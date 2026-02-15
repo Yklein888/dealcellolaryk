@@ -1,5 +1,5 @@
+import { memo, useMemo } from 'react';
 import { 
-  TrendingUp, 
   Calendar, 
   Activity,
   Bell,
@@ -16,18 +16,18 @@ interface QuickStatsRowProps {
   isSubscribed: boolean;
 }
 
-export function QuickStatsRow({ 
+export const QuickStatsRow = memo(function QuickStatsRow({ 
   rentals, 
   repairs, 
   readyRepairs, 
   isSupported, 
   isSubscribed 
 }: QuickStatsRowProps) {
-  const today = new Date();
-  const upcomingReturns = rentals.filter(r => r.status === 'active');
-  const todayReturns = upcomingReturns.filter(r => 
-    format(parseISO(r.endDate), 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')
-  ).length;
+  const todayReturns = useMemo(() => {
+    const today = new Date();
+    const todayStr = format(today, 'yyyy-MM-dd');
+    return rentals.filter(r => r.status === 'active' && format(parseISO(r.endDate), 'yyyy-MM-dd') === todayStr).length;
+  }, [rentals]);
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
@@ -76,4 +76,4 @@ export function QuickStatsRow({
       )}
     </div>
   );
-}
+});

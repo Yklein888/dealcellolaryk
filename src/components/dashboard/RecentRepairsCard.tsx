@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Wrench, ArrowLeft, Settings } from 'lucide-react';
 import { Repair, repairStatusLabels } from '@/types/rental';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -7,9 +8,9 @@ interface RecentRepairsCardProps {
   pendingRepairs: Repair[];
 }
 
-export function RecentRepairsCard({ pendingRepairs }: RecentRepairsCardProps) {
+export const RecentRepairsCard = memo(function RecentRepairsCard({ pendingRepairs }: RecentRepairsCardProps) {
   return (
-    <div className="stat-card animate-slide-up" style={{ animationDelay: '450ms' }}>
+    <div className="stat-card">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
           <Wrench className="h-5 w-5 text-warning" />
@@ -31,11 +32,10 @@ export function RecentRepairsCard({ pendingRepairs }: RecentRepairsCardProps) {
         </div>
       ) : (
         <div className="space-y-3">
-          {pendingRepairs.slice(0, 5).map((repair, index) => (
+          {pendingRepairs.slice(0, 5).map((repair) => (
             <div 
               key={repair.id}
               className="flex items-center justify-between p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-all duration-200 hover:scale-[1.01]"
-              style={{ animationDelay: `${500 + index * 50}ms` }}
             >
               <div className="flex items-center gap-3">
                 <div className={`flex h-10 w-10 items-center justify-center rounded-xl font-bold text-sm ${
@@ -63,4 +63,4 @@ export function RecentRepairsCard({ pendingRepairs }: RecentRepairsCardProps) {
       )}
     </div>
   );
-}
+});
