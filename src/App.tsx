@@ -20,7 +20,7 @@ import PaymentError from "./pages/PaymentError";
 import PaymentHistory from "./pages/PaymentHistory";
 import Invoices from "./pages/Invoices";
 import POS from "./pages/POS";
-import CellStationTest from "./pages/CellStationTest";
+import CellStation from "./pages/CellStation";
 
 import NotFound from "./pages/NotFound";
 import Install from "./pages/Install";
@@ -39,7 +39,7 @@ const App = () => (
               <Routes>
                 {/* Install page - accessible without auth */}
                 <Route path="/install" element={<Install />} />
-                <Route path="/test-cellstation" element={<CellStationTest />} />
+                
                 {/* Protected routes */}
                 <Route path="/*" element={
                   <ProtectedRoute>
@@ -55,6 +55,7 @@ const App = () => (
                         <Route path="/payments" element={<PaymentHistory />} />
                         <Route path="/invoices" element={<Invoices />} />
                         <Route path="/pos" element={<POS />} />
+                        <Route path="/cellstation" element={<CellStation />} />
                         
                         <Route path="/payment-success" element={<PaymentSuccess />} />
                         <Route path="/payment-error" element={<PaymentError />} />
