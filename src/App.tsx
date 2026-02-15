@@ -20,6 +20,7 @@ import PaymentError from "./pages/PaymentError";
 import PaymentHistory from "./pages/PaymentHistory";
 import Invoices from "./pages/Invoices";
 import POS from "./pages/POS";
+import CellStationTest from "./pages/CellStationTest";
 
 import NotFound from "./pages/NotFound";
 import Install from "./pages/Install";
@@ -38,7 +39,7 @@ const App = () => (
               <Routes>
                 {/* Install page - accessible without auth */}
                 <Route path="/install" element={<Install />} />
-                
+                <Route path="/test-cellstation" element={<CellStationTest />} />
                 {/* Protected routes */}
                 <Route path="/*" element={
                   <ProtectedRoute>
