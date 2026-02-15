@@ -195,7 +195,7 @@ export default function CellStation() {
   const {
     simCards, isLoading, isSyncing, isSwapping,
     syncSims, activateSim, swapSim, activateAndSwap,
-    stats, fetchSims,
+    stats, fetchSims, isActivating,
   } = useCellStation();
 
   const [search, setSearch] = useState('');
@@ -607,7 +607,7 @@ export default function CellStation() {
                   availableSims={simCards}
                   onActivate={activateSim}
                   onActivateAndSwap={activateAndSwap}
-                  isActivating={false}
+                  isActivating={isActivating}
                 />
               </TabsContent>
             </Tabs>
