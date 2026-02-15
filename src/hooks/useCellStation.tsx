@@ -81,10 +81,15 @@ export function useCellStation() {
   const syncSims = useCallback(async () => {
     setIsSyncing(true);
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('cellstation-api', {
+      const response = await supabase.functions.invoke('cellstation-api', {
         body: { action: 'sync_csv', params: {} },
       });
-      if (fnError) throw fnError;
+      const data = response.data;
+      const fnError = response.error;
+      if (fnError) {
+        const msg = typeof fnError === 'object' && (fnError as any)?.message ? (fnError as any).message : String(fnError);
+        throw new Error(msg);
+      }
       if (!data?.success) throw new Error(data?.error || 'Sync failed');
 
       const sims = data.sims || [];
@@ -163,10 +168,15 @@ export function useCellStation() {
   }) => {
     setIsActivating(true);
     try {
-      const { data, error } = await supabase.functions.invoke('cellstation-api', {
+      const response = await supabase.functions.invoke('cellstation-api', {
         body: { action: 'activate_sim', params },
       });
-      if (error) throw error;
+      const data = response.data;
+      const error = response.error;
+      if (error) {
+        const msg = typeof error === 'object' && error?.message ? error.message : String(error);
+        throw new Error(msg);
+      }
       if (!data?.success) throw new Error(data?.error || 'Activation failed');
       toast({ title: 'הסים הופעל בהצלחה' });
       return data;
@@ -186,10 +196,15 @@ export function useCellStation() {
   }) => {
     setIsSwapping(true);
     try {
-      const { data, error } = await supabase.functions.invoke('cellstation-api', {
+      const response = await supabase.functions.invoke('cellstation-api', {
         body: { action: 'swap_sim', params },
       });
-      if (error) throw error;
+      const data = response.data;
+      const error = response.error;
+      if (error) {
+        const msg = typeof error === 'object' && error?.message ? error.message : String(error);
+        throw new Error(msg);
+      }
       if (!data?.success) throw new Error(data?.error || 'Swap failed');
       toast({ title: 'הסים הוחלף בהצלחה' });
       return data;
@@ -216,9 +231,11 @@ export function useCellStation() {
       onProgress?.('מפעיל סים...', 10);
       setActivateAndSwapProgress('מפעיל סים...');
       
-      const { data, error } = await supabase.functions.invoke('cellstation-api', {
+      const response = await supabase.functions.invoke('cellstation-api', {
         body: { action: 'activate_and_swap', params },
       });
+      const data = response.data;
+      const error = response.error;
 
       // The edge function handles the 60s wait internally
       // We simulate progress on the client side
