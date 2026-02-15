@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useCellStation } from '@/hooks/useCellStation';
 import { supabase } from '@/integrations/supabase/client';
 import { PageHeader } from '@/components/PageHeader';
@@ -195,12 +195,13 @@ export default function CellStation() {
   const {
     simCards, isLoading, isSyncing, isSwapping,
     syncSims, activateSim, swapSim, activateAndSwap,
-    stats,
+    stats, fetchSims,
   } = useCellStation();
 
   const [search, setSearch] = useState('');
   const [swapDialogSim, setSwapDialogSim] = useState<SimRow | null>(null);
   const [activateSwapSim, setActivateSwapSim] = useState<SimRow | null>(null);
+  const [swapRentalId, setSwapRentalId] = useState<string>('');
 
   // Inventory map for cross-referencing
   const [inventoryMap, setInventoryMap] = useState<InventoryMap>({});
@@ -324,6 +325,116 @@ export default function CellStation() {
       loadCrossReference();
     }
   }, [simCards]);
+
+  // Find rental ID for a rented SIM
+  const openSwapForSim = useCallback(async (sim: SimRow) => {
+    setSwapDialogSim(sim);
+    // Find the rental linked to this SIM via inventory
+    const { data: invItem } = await supabase
+      .from('inventory')
+      .select('id')
+      .eq('sim_number', sim.iccid || '')
+      .single();
+    if (invItem) {
+      const { data: rentalItem } = await supabase
+        .from('rental_items')
+        .select('rental_id')
+        .eq('inventory_item_id', invItem.id)
+        .limit(1)
+        .maybeSingle();
+      // Only use rental_id from active/overdue rentals
+      if (rentalItem?.rental_id) {
+        const { data: rental } = await supabase
+          .from('rentals')
+          .select('id')
+          .eq('id', rentalItem.rental_id)
+          .in('status', ['active', 'overdue'])
+          .maybeSingle();
+        setSwapRentalId(rental?.id || '');
+      }
+    }
+  }, []);
+
+  // Enhanced swap handler with DB updates
+  const handleSwapWithUpdates = useCallback(async (params: {
+    rental_id: string;
+    current_sim: string;
+    swap_msisdn: string;
+    swap_iccid: string;
+  }) => {
+    const result = await swapSim(params);
+
+    // After edge function succeeds, update local DB
+    const oldIccid = swapDialogSim?.iccid;
+    const newIccid = params.swap_iccid;
+
+    // 1. Update old SIM to available in cellstation_sims
+    if (oldIccid) {
+      await supabase.from('cellstation_sims')
+        .update({ status: 'available', status_detail: 'valid', customer_name: null })
+        .eq('iccid', oldIccid);
+    }
+
+    // 2. Update new SIM to rented in cellstation_sims
+    if (newIccid) {
+      await supabase.from('cellstation_sims')
+        .update({ status: 'rented', status_detail: 'active', customer_name: swapDialogSim?.customer_name })
+        .eq('iccid', newIccid);
+    }
+
+    // 3. Update old inventory item to available
+    if (oldIccid) {
+      await supabase.from('inventory')
+        .update({ status: 'available', needs_swap: false })
+        .eq('sim_number', oldIccid);
+    }
+
+    // 4. Ensure new inventory item exists and mark as rented
+    const { data: newInvItem } = await supabase
+      .from('inventory')
+      .select('id')
+      .eq('sim_number', newIccid)
+      .maybeSingle();
+
+    let newInventoryId: string;
+    if (!newInvItem) {
+      const newSimData = simCards.find(s => s.iccid === newIccid);
+      const { data: created } = await supabase.from('inventory').insert({
+        name: `סים גלישה`,
+        category: 'sim_european',
+        sim_number: newIccid,
+        local_number: newSimData?.uk_number || params.swap_msisdn || null,
+        israeli_number: newSimData?.il_number || null,
+        expiry_date: newSimData?.expiry_date || null,
+        status: 'rented',
+      }).select('id').single();
+      newInventoryId = created!.id;
+    } else {
+      newInventoryId = newInvItem.id;
+      await supabase.from('inventory')
+        .update({ status: 'rented' })
+        .eq('id', newInventoryId);
+    }
+
+    // 5. Update rental_items to point to new inventory item
+    if (params.rental_id && oldIccid) {
+      const { data: oldInv } = await supabase
+        .from('inventory')
+        .select('id')
+        .eq('sim_number', oldIccid)
+        .maybeSingle();
+      if (oldInv) {
+        await supabase.from('rental_items')
+          .update({ inventory_item_id: newInventoryId })
+          .eq('rental_id', params.rental_id)
+          .eq('inventory_item_id', oldInv.id);
+      }
+    }
+
+    // Refresh data
+    await fetchSims();
+    return result;
+  }, [swapSim, swapDialogSim, simCards, fetchSims]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return simCards;
@@ -483,13 +594,13 @@ export default function CellStation() {
               </TabsContent>
               <TabsContent value="rented" className="m-0">
                 <SimTable
-                  sims={rented}
-                  showCustomer
-                  showSwap
-                  onSwapClick={sim => setSwapDialogSim(sim)}
-                  needsSwapIccids={needsSwapIccids}
-                  onActivateAndSwapClick={sim => setActivateSwapSim(sim)}
-                />
+                   sims={rented}
+                   showCustomer
+                   showSwap
+                   onSwapClick={sim => openSwapForSim(sim)}
+                   needsSwapIccids={needsSwapIccids}
+                   onActivateAndSwapClick={sim => setActivateSwapSim(sim)}
+                 />
               </TabsContent>
               <TabsContent value="activate" className="m-0">
                 <ActivationTab
@@ -511,8 +622,9 @@ export default function CellStation() {
           onOpenChange={open => !open && setSwapDialogSim(null)}
           currentSim={swapDialogSim}
           availableSims={simCards}
-          onSwap={swapSim}
+          onSwap={handleSwapWithUpdates}
           isSwapping={isSwapping}
+          rentalId={swapRentalId}
         />
       )}
 
