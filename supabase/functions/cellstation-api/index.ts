@@ -331,10 +331,11 @@ serve(async (req) => {
           calculated_days_input: params.days || "",
           note: params.note || "",
         };
-        // Only override product if explicitly provided (hidden field has correct default)
-        if (params.product) formData.product = params.product;
-        // exp field comes from the form too - use it if provided
-        if (params.exp) formData.exp = params.exp;
+        // IMPORTANT: Do NOT override 'product' - the portal expects the numeric ID (e.g. "4")
+        // from the form, not the display name (e.g. "10 גיגה גלישה") from our params.
+        // Same for 'exp' - use the portal's value unless we have a specific override reason.
+        // Do NOT override: product, exp, country, phone_id, number, account_name, 
+        // il_number, sim_card, mor_id, c_nu, store_id, command, submitted
         console.log('Step 3 - Submitting to dynamic/submit.php with data:', JSON.stringify(formData, null, 2));
         
         const submitResponse = await session.post("dynamic/submit.php", formData);
