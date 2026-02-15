@@ -67,8 +67,8 @@ export function ActivateAndSwapDialog({
       await onActivateAndSwap(
         {
           product: selectedSim.plan || '',
-          start_rental: new Date().toLocaleDateString('en-GB'),
-          end_rental: new Date(Date.now() + 30 * 86400000).toLocaleDateString('en-GB'),
+          start_rental: new Date().toISOString().split('T')[0],
+          end_rental: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
           price: '',
           note: '',
           rental_id: rentalId,
