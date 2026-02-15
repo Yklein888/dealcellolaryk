@@ -136,10 +136,21 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
         days: days.toString(),
         note: `${selectedCustomer.name} ${selectedCustomer.phone} ${notes}`.trim(),
       };
-      console.log('Activation params:', JSON.stringify(activationParams, null, 2));
-      
+
+      console.log('=== CELL STATION ACTIVATION DEBUG ===');
+      console.log('Customer:', selectedCustomer.name, selectedCustomer.phone);
+      console.log('Selected SIM:', JSON.stringify(selectedSim, null, 2));
+      console.log('Params being sent to Edge Function:', JSON.stringify({
+        action: 'activate_sim',
+        params: activationParams,
+      }, null, 2));
+
       const activationResult = await onActivate(activationParams);
-      console.log('Activation response:', JSON.stringify(activationResult, null, 2));
+
+      console.log('=== EDGE FUNCTION RESPONSE ===');
+      console.log('Full response:', JSON.stringify(activationResult, null, 2));
+      console.log('Response success:', activationResult?.success);
+      console.log('Response HTML length:', activationResult?.html_length);
 
       // Find or create inventory item, ensure it's 'available' for addRental
       const { data: existingItem } = await supabase
