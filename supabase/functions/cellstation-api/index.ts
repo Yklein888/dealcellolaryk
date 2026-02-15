@@ -145,9 +145,18 @@ serve(async (req) => {
           calculated_days_input: params.days || "",
           note: params.note || "",
         };
-        console.log('=== CELL STATION ACTIVATE REQUEST DEBUG ===');
-        console.log('URL: index.php?page=bh/index');
-        console.log('Form data being sent:', JSON.stringify(formData, null, 2));
+        
+        console.log('=== URL AND FORM DEBUG ===');
+        console.log('Target URL:', CELLSTATION_BASE + '/index.php?page=bh/index');
+        console.log('Form data object before encoding:', JSON.stringify({
+          product: params.product,
+          start_rental: params.start_rental,
+          end_rental: params.end_rental,
+          price: params.price,
+          days: params.days,
+          note: params.note,
+        }, null, 2));
+        console.log('Encoded form data:', new URLSearchParams(formData).toString());
 
         const response = await session.post("index.php?page=bh/index", formData);
 
@@ -169,9 +178,15 @@ serve(async (req) => {
         };
         console.log('Response analysis:', JSON.stringify(debugInfo, null, 2));
 
-        // For now, trust the HTTP status and check for real error indicators
-        // The portal page always contains JS with "error" strings - that's not an actual error
-        result = { success: true, action: "activate_sim", html_length: html.length, debug: debugInfo };
+        const pageCheck = {
+          hasActivationForm: htmlNoScript.includes('form') && htmlNoScript.includes('product'),
+          hasExpectedFields: htmlNoScript.includes('start_rental') || htmlNoScript.includes('end_rental'),
+          currentPageTitle: htmlNoScript.match(/<title[^>]*>([^<]+)<\/title>/)?.[1] || null,
+          isActivationPage: htmlNoScript.includes('activation') || htmlNoScript.includes('הפעלה'),
+        };
+        console.log('Page validation:', JSON.stringify(pageCheck, null, 2));
+
+        result = { success: true, action: "activate_sim", html_length: html.length, debug: debugInfo, pageCheck };
         break;
       }
       case "swap_sim": {
