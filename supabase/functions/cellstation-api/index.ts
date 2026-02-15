@@ -60,8 +60,17 @@ class CellStationSession {
     if (!this.isLoggedIn) await this.login();
     return fetch(url, {
       ...options,
-      headers: { ...options.headers, "Cookie": this.cookies, "Referer": CELLSTATION_BASE + "/index.php" },
+      headers: {
+        ...options.headers,
+        "Cookie": this.cookies,
+        "Referer": CELLSTATION_BASE + "/index.php",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      },
     });
+  }
+
+  getCookies(): string {
+    return this.cookies;
   }
 
   async get(path: string): Promise<Response> {
@@ -137,7 +146,39 @@ serve(async (req) => {
         break;
       }
       case "activate_sim": {
-        const formData = {
+        // Step 1: Navigate to the activation page to discover form structure
+        console.log('=== STEP 1: FETCHING ACTIVATION PAGE ===');
+        const activationPage = await session.get("index.php?page=bh/index");
+        const activationHtml = await activationPage.text();
+        
+        // Extract all form actions and input field names from the page
+        const formActions = [...activationHtml.matchAll(/<form[^>]*action="([^"]*)"[^>]*>/gi)].map(m => m[1]);
+        const inputFields = [...activationHtml.matchAll(/<input[^>]*name="([^"]*)"[^>]*/gi)].map(m => m[1]);
+        const selectFields = [...activationHtml.matchAll(/<select[^>]*name="([^"]*)"[^>]*/gi)].map(m => m[1]);
+        const textareaFields = [...activationHtml.matchAll(/<textarea[^>]*name="([^"]*)"[^>]*/gi)].map(m => m[1]);
+        
+        const discoveredForm = {
+          formActions,
+          inputFields,
+          selectFields,
+          textareaFields,
+          allFields: [...new Set([...inputFields, ...selectFields, ...textareaFields])],
+          pageTitle: activationHtml.match(/<title[^>]*>([^<]+)<\/title>/)?.[1] || null,
+          hasForm: activationHtml.includes('<form'),
+          pageLength: activationHtml.length,
+        };
+        console.log('Discovered form structure:', JSON.stringify(discoveredForm, null, 2));
+        
+        // Log a snippet of the page around form elements for manual inspection
+        const formSnippetMatch = activationHtml.match(/<form[\s\S]{0,3000}<\/form>/i);
+        if (formSnippetMatch) {
+          console.log('Form HTML snippet (first form):', formSnippetMatch[0].substring(0, 2000));
+        } else {
+          console.log('No <form> tag found. Page snippet:', activationHtml.substring(0, 2000));
+        }
+
+        // Step 2: Build form data using discovered field names
+        const formData: Record<string, string> = {
           product: params.product || "",
           start_rental: params.start_rental,
           end_rental: params.end_rental,
@@ -146,27 +187,22 @@ serve(async (req) => {
           note: params.note || "",
         };
         
-        console.log('=== URL AND FORM DEBUG ===');
-        console.log('Target URL:', CELLSTATION_BASE + '/index.php?page=bh/index');
-        console.log('Form data object before encoding:', JSON.stringify({
-          product: params.product,
-          start_rental: params.start_rental,
-          end_rental: params.end_rental,
-          price: params.price,
-          days: params.days,
-          note: params.note,
-        }, null, 2));
-        console.log('Encoded form data:', new URLSearchParams(formData).toString());
+        console.log('=== STEP 2: SUBMITTING ACTIVATION ===');
+        console.log('Form data being sent:', JSON.stringify(formData, null, 2));
 
-        const response = await session.post("index.php?page=bh/index", formData);
+        // Determine the correct POST URL from discovered form actions
+        const postPath = formActions.length > 0 ? formActions[0] : "index.php?page=bh/index";
+        console.log('Posting to:', postPath);
 
-        console.log('=== CELL STATION ACTIVATE RESPONSE DEBUG ===');
+        const response = await session.post(
+          postPath.startsWith('http') ? postPath.replace(CELLSTATION_BASE + '/', '') : postPath,
+          formData
+        );
+
+        console.log('=== STEP 3: RESPONSE ANALYSIS ===');
         console.log('Response status:', response.status);
-        console.log('Response headers:', JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2));
 
         const html = await response.text();
-        
-        // Strip <script> tags to avoid false positives from JS code
         const htmlNoScript = html.replace(/<script[\s\S]*?<\/script>/gi, '');
         
         const debugInfo = {
@@ -178,15 +214,14 @@ serve(async (req) => {
         };
         console.log('Response analysis:', JSON.stringify(debugInfo, null, 2));
 
-        const pageCheck = {
-          hasActivationForm: htmlNoScript.includes('form') && htmlNoScript.includes('product'),
-          hasExpectedFields: htmlNoScript.includes('start_rental') || htmlNoScript.includes('end_rental'),
-          currentPageTitle: htmlNoScript.match(/<title[^>]*>([^<]+)<\/title>/)?.[1] || null,
-          isActivationPage: htmlNoScript.includes('activation') || htmlNoScript.includes('הפעלה'),
+        result = { 
+          success: true, 
+          action: "activate_sim", 
+          html_length: html.length, 
+          debug: debugInfo, 
+          discoveredForm,
+          postPath,
         };
-        console.log('Page validation:', JSON.stringify(pageCheck, null, 2));
-
-        result = { success: true, action: "activate_sim", html_length: html.length, debug: debugInfo, pageCheck };
         break;
       }
       case "swap_sim": {
