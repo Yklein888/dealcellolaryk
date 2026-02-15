@@ -45,7 +45,8 @@ export function SwapSimDialog({
 }: SwapSimDialogProps) {
   const [search, setSearch] = useState('');
   const [selectedSimId, setSelectedSimId] = useState('');
-  const [newIccid, setNewIccid] = useState('');
+  const [manualIccid, setManualIccid] = useState('');
+  const [useManual, setUseManual] = useState(false);
 
   const filtered = useMemo(() => {
     const avail = availableSims.filter(s => s.status === 'available' && s.status_detail === 'valid');
@@ -58,22 +59,24 @@ export function SwapSimDialog({
 
   const selectedSim = availableSims.find(s => s.id === selectedSimId);
 
+  // Determine which ICCID to use
+  const effectiveIccid = useManual ? manualIccid : (selectedSim?.iccid || '');
+  const isIccidValid = effectiveIccid.length >= 19 && effectiveIccid.length <= 20 && /^\d+$/.test(effectiveIccid);
+
   const handleSwap = async () => {
-    const iccid = newIccid || selectedSim?.iccid;
-    if (!iccid || iccid.length < 19 || iccid.length > 20) {
-      return;
-    }
+    if (!isIccidValid) return;
 
     await onSwap({
       rental_id: rentalId || '',
       current_sim: currentSim.sim_number || '',
-      swap_msisdn: selectedSim?.uk_number || '',
-      swap_iccid: iccid,
+      swap_msisdn: useManual ? '' : (selectedSim?.uk_number || ''),
+      swap_iccid: effectiveIccid,
     });
 
     onOpenChange(false);
     setSelectedSimId('');
-    setNewIccid('');
+    setManualIccid('');
+    setUseManual(false);
   };
 
   return (
@@ -107,9 +110,9 @@ export function SwapSimDialog({
             )}
           </div>
 
-          {/* New SIM Selection */}
+          {/* New SIM Selection - Dropdown */}
           <div className="space-y-2">
-            <Label>בחר סים חדש</Label>
+            <Label>בחר סים חדש מהרשימה</Label>
             <div className="relative">
               <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -117,6 +120,7 @@ export function SwapSimDialog({
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 className="pr-10"
+                onFocus={() => setUseManual(false)}
               />
             </div>
             <div className="max-h-32 overflow-y-auto space-y-1">
@@ -125,11 +129,12 @@ export function SwapSimDialog({
                   key={sim.id}
                   onClick={() => {
                     setSelectedSimId(sim.id);
-                    setNewIccid(sim.iccid || '');
+                    setUseManual(false);
+                    setManualIccid('');
                   }}
                   className={cn(
                     'w-full text-right p-2 rounded-md text-sm border transition-colors',
-                    selectedSimId === sim.id
+                    selectedSimId === sim.id && !useManual
                       ? 'bg-primary/10 border-primary ring-1 ring-primary'
                       : 'border-border hover:bg-muted'
                   )}
@@ -141,24 +146,42 @@ export function SwapSimDialog({
             </div>
           </div>
 
-          {/* ICCID Input */}
+          {/* Divider */}
+          <div className="flex items-center gap-2">
+            <div className="flex-1 border-t" />
+            <span className="text-xs text-muted-foreground">או</span>
+            <div className="flex-1 border-t" />
+          </div>
+
+          {/* Manual ICCID Input */}
           <div className="space-y-2">
-            <Label>ICCID חדש (19-20 ספרות)</Label>
+            <Label>הכנס ICCID ידנית (19-20 ספרות)</Label>
             <Input
-              value={newIccid}
-              onChange={e => setNewIccid(e.target.value)}
+              value={manualIccid}
+              onChange={e => {
+                const val = e.target.value.replace(/\D/g, '');
+                setManualIccid(val);
+                if (val) {
+                  setUseManual(true);
+                  setSelectedSimId('');
+                }
+              }}
               placeholder="89..."
               dir="ltr"
-              className="font-mono"
+              className={cn(
+                "font-mono",
+                useManual && manualIccid ? 'ring-1 ring-primary border-primary' : ''
+              )}
+              maxLength={20}
             />
-            {newIccid && (newIccid.length < 19 || newIccid.length > 20) && (
-              <p className="text-xs text-red-500">ICCID חייב להיות 19-20 ספרות</p>
+            {manualIccid && !isIccidValid && useManual && (
+              <p className="text-xs text-destructive">ICCID חייב להיות 19-20 ספרות</p>
             )}
           </div>
 
           <Button
             onClick={handleSwap}
-            disabled={isSwapping || !newIccid || newIccid.length < 19 || newIccid.length > 20}
+            disabled={isSwapping || !isIccidValid}
             className="w-full gap-2"
           >
             {isSwapping ? (
