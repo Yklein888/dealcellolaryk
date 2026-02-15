@@ -71,6 +71,60 @@ export type Database = {
           },
         ]
       }
+      cellstation_sims: {
+        Row: {
+          created_at: string | null
+          customer_name: string | null
+          end_date: string | null
+          expiry_date: string | null
+          iccid: string | null
+          id: string
+          il_number: string | null
+          last_sync: string | null
+          note: string | null
+          plan: string | null
+          sim_number: string | null
+          start_date: string | null
+          status: string | null
+          status_detail: string | null
+          uk_number: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          customer_name?: string | null
+          end_date?: string | null
+          expiry_date?: string | null
+          iccid?: string | null
+          id?: string
+          il_number?: string | null
+          last_sync?: string | null
+          note?: string | null
+          plan?: string | null
+          sim_number?: string | null
+          start_date?: string | null
+          status?: string | null
+          status_detail?: string | null
+          uk_number?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          customer_name?: string | null
+          end_date?: string | null
+          expiry_date?: string | null
+          iccid?: string | null
+          id?: string
+          il_number?: string | null
+          last_sync?: string | null
+          note?: string | null
+          plan?: string | null
+          sim_number?: string | null
+          start_date?: string | null
+          status?: string | null
+          status_detail?: string | null
+          uk_number?: string | null
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           address: string | null
