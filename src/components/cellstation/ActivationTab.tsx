@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -39,7 +40,7 @@ interface ActivationTabProps {
 const NOTE_TEMPLATES = ['VIP', 'עסקי', 'משפחה', 'חוזר'];
 
 export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, isActivating }: ActivationTabProps) {
-  const { customers, addCustomer, addRental, inventory } = useRental();
+  const { customers, addCustomer, addRental, addInventoryItem, inventory } = useRental();
   const { toast } = useToast();
 
   const [customerSearch, setCustomerSearch] = useState('');
@@ -140,17 +141,43 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
       const activationResult = await onActivate(activationParams);
       console.log('Activation response:', JSON.stringify(activationResult, null, 2));
 
-      const matchingItem = inventory.find(i => i.simNumber === selectedSim.iccid);
+      // Find or create inventory item
+      let matchingItem = inventory.find(i => i.simNumber === selectedSim.iccid);
+      let inventoryItemId: string;
+
+      if (matchingItem) {
+        inventoryItemId = matchingItem.id;
+      } else {
+        // Auto-create inventory item from cellstation SIM data
+        console.log('No inventory item found for ICCID:', selectedSim.iccid, '- creating one automatically');
+        const newItem = {
+          category: 'sim_european' as const,
+          name: selectedSim.sim_number || `סים ${selectedSim.iccid?.slice(-6)}`,
+          localNumber: selectedSim.uk_number || undefined,
+          israeliNumber: selectedSim.il_number || undefined,
+          simNumber: selectedSim.iccid || undefined,
+          status: 'rented' as const,
+          expiryDate: selectedSim.expiry_date || undefined,
+        };
+        await addInventoryItem(newItem);
+        // Re-fetch to get the new item's ID
+        const { data: newItems } = await supabase
+          .from('inventory')
+          .select('id')
+          .eq('sim_number', selectedSim.iccid)
+          .limit(1);
+        inventoryItemId = newItems?.[0]?.id || selectedSim.id;
+      }
 
       await addRental({
         customerId: selectedCustomer.id,
         customerName: selectedCustomer.name,
         items: [{
-          inventoryItemId: matchingItem?.id || selectedSim.id,
+          inventoryItemId,
           itemCategory: 'sim_european',
           itemName: `סים ${selectedSim.uk_number || selectedSim.il_number || selectedSim.iccid}`,
           hasIsraeliNumber: !!selectedSim.il_number,
-          isGeneric: !matchingItem,
+          isGeneric: false,
         }],
         startDate: startStr,
         endDate: endStr,
@@ -159,6 +186,14 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
         status: 'active',
         notes: notes || undefined,
       });
+
+      // Update cellstation_sims status to rented
+      if (selectedSim.iccid) {
+        await supabase
+          .from('cellstation_sims')
+          .update({ status: 'rented', customer_name: selectedCustomer.name })
+          .eq('iccid', selectedSim.iccid);
+      }
 
       toast({ title: 'הסים הופעל והשכרה נוצרה בהצלחה!', description: `Response: ${JSON.stringify(activationResult, null, 2)}` });
       resetForm();
