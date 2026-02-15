@@ -357,16 +357,79 @@ serve(async (req) => {
           result = { success: false, error: "ICCID must be 19-20 digits" };
           break;
         }
-        const response = await session.post(
-          "index.php?page=/dashboard/rentals/rental_details&id=" + params.rental_id,
-          {
-            current_sim: params.current_sim || "",
-            swap_msisdn: params.swap_msisdn || "",
-            swap_iccid: params.swap_iccid,
-          }
-        );
-        const html = await response.text();
-        result = { success: true, action: "swap_sim", html_length: html.length };
+        console.log('=== SWAP SIM START ===');
+        console.log('Params:', JSON.stringify(params));
+        
+        // Step 1: Visit bh/index to establish session context
+        const swapBhPage = await session.get("index.php?page=bh/index");
+        await swapBhPage.text();
+        console.log('Step 1 - BH page loaded');
+        
+        // Step 2: Fetch current SIM details to get the swap form
+        const currentIccid = params.current_iccid || "";
+        console.log('Step 2 - Fetching details for current ICCID:', currentIccid);
+        const swapDetailsResp = await session.get("content/rentals/fetch_BHsim_details.php?zehut=" + encodeURIComponent(currentIccid));
+        const swapDetailsHtml = await swapDetailsResp.text();
+        console.log('Swap details response status:', swapDetailsResp.status);
+        console.log('Swap details length:', swapDetailsHtml.length);
+        console.log('Swap details HTML:', swapDetailsHtml.substring(0, 3000));
+        
+        // Extract hidden fields
+        const swapHiddenFields = swapDetailsHtml.match(/<input[^>]*type=["']hidden["'][^>]*>/gi) || [];
+        const swapHiddenVals: Record<string, string> = {};
+        for (const field of swapHiddenFields) {
+          const n = field.match(/name=["']([^"']+)["']/);
+          const v = field.match(/value=["']([^"']+)["']/);
+          if (n) swapHiddenVals[n[1]] = v ? v[1] : "";
+        }
+        console.log('Hidden fields found:', JSON.stringify(swapHiddenVals));
+        
+        // Look for swap-specific form fields or buttons
+        const swapForms = swapDetailsHtml.match(/<form[^>]*>/gi);
+        console.log('Forms found:', JSON.stringify(swapForms));
+        const swapButtons = swapDetailsHtml.match(/<button[^>]*>[\s\S]*?<\/button>/gi);
+        console.log('Buttons found:', JSON.stringify(swapButtons));
+        const swapInputFields = swapDetailsHtml.match(/name=["']([^"']+)["']/gi);
+        console.log('All named fields:', JSON.stringify(swapInputFields));
+        
+        // Look for swap-specific text/links 
+        const swapRelated = swapDetailsHtml.match(/(?:swap|replace|החלף|החלפ)[^<]*/gi);
+        console.log('Swap related text:', JSON.stringify(swapRelated));
+        
+        // Step 3: Try submitting swap via dynamic/submit.php (same pattern as activation)
+        const swapFormData: Record<string, string> = {
+          ...swapHiddenVals,
+          swap_iccid: params.swap_iccid,
+          swap_msisdn: params.swap_msisdn || "",
+          current_sim: params.current_sim || "",
+        };
+        console.log('Step 3 - Submitting swap with data:', JSON.stringify(swapFormData));
+        
+        const swapSubmitResp = await session.post("dynamic/submit.php", swapFormData);
+        const swapSubmitHtml = await swapSubmitResp.text();
+        console.log('Swap submit status:', swapSubmitResp.status);
+        console.log('Swap submit length:', swapSubmitHtml.length);
+        console.log('Swap submit response:', swapSubmitHtml.substring(0, 2000));
+        console.log('Swap submit tail:', swapSubmitHtml.substring(Math.max(0, swapSubmitHtml.length - 500)));
+        
+        const swapHasSuccess = swapSubmitHtml.includes('נשמר בהצלחה') || swapSubmitHtml.includes('alert-success') || swapSubmitHtml.includes('הוחלף') || swapSubmitHtml.includes('success');
+        const swapHasError = swapSubmitHtml.includes('שגיאה') || swapSubmitHtml.includes('alert-danger') || swapSubmitHtml.includes('error');
+        
+        console.log('=== SWAP SIM END ===');
+        console.log('Success:', swapHasSuccess, 'Error:', swapHasError);
+        
+        result = { 
+          success: !swapHasError && swapSubmitResp.status === 200, 
+          action: "swap_sim",
+          debug: {
+            hiddenFields: swapHiddenVals,
+            formDataSent: swapFormData,
+            submitResponsePreview: swapSubmitHtml.substring(0, 1000),
+            hasSuccess: swapHasSuccess,
+            hasError: swapHasError,
+          },
+          error: swapHasError ? "Portal returned error: " + swapSubmitHtml.substring(0, 500) : undefined,
+        };
         break;
       }
       case "activate_and_swap": {

@@ -191,6 +191,7 @@ export function useCellStation() {
   const swapSim = useCallback(async (params: {
     rental_id: string;
     current_sim: string;
+    current_iccid: string;
     swap_msisdn: string;
     swap_iccid: string;
   }) => {
