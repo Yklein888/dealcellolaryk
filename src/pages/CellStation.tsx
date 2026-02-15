@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useCellStation } from '@/hooks/useCellStation';
 import { supabase } from '@/integrations/supabase/client';
 import { PageHeader } from '@/components/PageHeader';
@@ -14,7 +14,49 @@ import { ActivationTab } from '@/components/cellstation/ActivationTab';
 import { SwapSimDialog } from '@/components/cellstation/SwapSimDialog';
 import { ActivateAndSwapDialog } from '@/components/cellstation/ActivateAndSwapDialog';
 import { RefreshCw, Search, Signal, CheckCircle, XCircle, Clock, ArrowLeftRight, Zap, AlertTriangle, Phone } from 'lucide-react';
-import { differenceInDays } from 'date-fns';
+import { differenceInDays, formatDistanceToNow } from 'date-fns';
+import { he } from 'date-fns/locale';
+
+const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const LAST_SYNC_KEY = 'dealcell_cellstation_last_sync';
+const LAST_SIM_COUNT_KEY = 'dealcell_cellstation_sim_count';
+
+type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
+
+function SyncStatusIndicator({ status, lastSyncTime, simCountDelta }: {
+  status: SyncStatus;
+  lastSyncTime: Date | null;
+  simCountDelta: number | null;
+}) {
+  const getDisplay = () => {
+    if (status === 'syncing') {
+      return { emoji: '🔄', text: 'מסנכרן...', className: 'text-blue-600 dark:text-blue-400' };
+    }
+    if (status === 'error') {
+      return { emoji: '❌', text: 'סנכרון נכשל', className: 'text-destructive' };
+    }
+    if (lastSyncTime) {
+      const timeAgo = formatDistanceToNow(lastSyncTime, { locale: he, addSuffix: true });
+      return { emoji: '✅', text: `עודכן ${timeAgo}`, className: 'text-green-600 dark:text-green-400' };
+    }
+    return { emoji: '⏳', text: 'טרם סונכרן', className: 'text-muted-foreground' };
+  };
+
+  const { emoji, text, className } = getDisplay();
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className={`text-sm font-medium ${className}`}>
+        {emoji} {text}
+      </span>
+      {simCountDelta !== null && simCountDelta !== 0 && status === 'success' && (
+        <span className={`text-xs font-medium ${simCountDelta > 0 ? 'text-green-600' : 'text-orange-600'}`}>
+          ({simCountDelta > 0 ? '+' : ''}{simCountDelta} סימים)
+        </span>
+      )}
+    </div>
+  );
+}
 
 function StatusBadge({ status, detail }: { status: string | null; detail: string | null }) {
   if (status === 'rented') {
@@ -203,11 +245,65 @@ export default function CellStation() {
   const [activateSwapSim, setActivateSwapSim] = useState<SimRow | null>(null);
   const [swapRentalId, setSwapRentalId] = useState<string>('');
 
+  // Auto-sync state
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(() => {
+    const stored = localStorage.getItem(LAST_SYNC_KEY);
+    return stored ? new Date(stored) : null;
+  });
+  const [simCountDelta, setSimCountDelta] = useState<number | null>(null);
+  const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [, setTick] = useState(0); // Force re-render for "time ago"
+
+  // Auto-sync function
+  const runAutoSync = useCallback(async () => {
+    if (isSyncing) return;
+    setSyncStatus('syncing');
+    setSimCountDelta(null);
+    const prevCount = parseInt(localStorage.getItem(LAST_SIM_COUNT_KEY) || '0', 10);
+    
+    try {
+      await syncSims();
+      const now = new Date();
+      setLastSyncTime(now);
+      localStorage.setItem(LAST_SYNC_KEY, now.toISOString());
+      setSyncStatus('success');
+    } catch {
+      setSyncStatus('error');
+    }
+  }, [syncSims, isSyncing]);
+
+  // Update sim count delta after simCards changes
+  useEffect(() => {
+    if (simCards.length > 0 && syncStatus === 'success') {
+      const prevCount = parseInt(localStorage.getItem(LAST_SIM_COUNT_KEY) || '0', 10);
+      if (prevCount > 0) {
+        setSimCountDelta(simCards.length - prevCount);
+      }
+      localStorage.setItem(LAST_SIM_COUNT_KEY, String(simCards.length));
+    }
+  }, [simCards.length, syncStatus]);
+
+  // Auto-sync interval
+  useEffect(() => {
+    syncIntervalRef.current = setInterval(() => {
+      runAutoSync();
+    }, SYNC_INTERVAL_MS);
+
+    return () => {
+      if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
+    };
+  }, [runAutoSync]);
+
+  // Refresh "time ago" every 30s
+  useEffect(() => {
+    const ticker = setInterval(() => setTick(t => t + 1), 30000);
+    return () => clearInterval(ticker);
+  }, []);
+
   // Inventory map for cross-referencing
   const [inventoryMap, setInventoryMap] = useState<InventoryMap>({});
-  // Needs swap ICCIDs
   const [needsSwapIccids, setNeedsSwapIccids] = useState<Set<string>>(new Set());
-  // Overdue warnings
   const [overdueSwapItems, setOverdueSwapItems] = useState<OverdueSwapItem[]>([]);
   const [overdueNotReturned, setOverdueNotReturned] = useState<OverdueNotReturnedItem[]>([]);
 
@@ -456,10 +552,23 @@ export default function CellStation() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <PageHeader title="ניהול סימים" description="סנכרון וניהול כרטיסי SIM מ-CellStation" />
-        <Button onClick={syncSims} disabled={isSyncing} className="gap-2">
-          <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
-          {isSyncing ? 'מסנכרן...' : 'סנכרון'}
-        </Button>
+        <div className="flex items-center gap-3">
+          <SyncStatusIndicator
+            status={syncStatus}
+            lastSyncTime={lastSyncTime}
+            simCountDelta={simCountDelta}
+          />
+          <Button
+            onClick={runAutoSync}
+            disabled={isSyncing}
+            variant="outline"
+            size="sm"
+            className="gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+            רענן עכשיו
+          </Button>
+        </div>
       </div>
 
       {/* Overdue Warning Cards */}
