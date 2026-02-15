@@ -485,11 +485,129 @@ serve(async (req) => {
         result = { success: true, action: "activate_and_swap" };
         break;
       }
+      case "inspect_activation_page": {
+        console.log('=== INSPECT ACTIVATION PAGE ===');
+        
+        // Try multiple candidate URLs for the activation form
+        const pagesToInspect = [
+          { name: 'bh/activation', url: 'index.php?page=bh/activation' },
+          { name: 'bh/index', url: 'index.php?page=bh/index' },
+          { name: 'bh/new_rental', url: 'index.php?page=bh/new_rental' },
+          { name: 'rentals/new', url: 'index.php?page=rentals/new' },
+        ];
+        
+        const inspectedPages: any[] = [];
+        
+        for (const pg of pagesToInspect) {
+          try {
+            const pgResp = await session.get(pg.url);
+            const pgHtml = await pgResp.text();
+            console.log(`Page ${pg.name}: status=${pgResp.status}, length=${pgHtml.length}`);
+            
+            // Extract all forms
+            const formRegex = /<form[^>]*>([\s\S]*?)<\/form>/gi;
+            const pageForms: any[] = [];
+            let fMatch;
+            while ((fMatch = formRegex.exec(pgHtml)) !== null) {
+              const formTag = fMatch[0];
+              const actionMatch = formTag.match(/action=["']([^"']*)["']/i);
+              const classMatch = formTag.match(/class=["']([^"']*)["']/i);
+              const idMatch = formTag.match(/id=["']([^"']*)["']/i);
+              const inputs: any[] = [];
+              const inputRegex = /<(?:input|select|textarea)[^>]*>/gi;
+              let iMatch;
+              while ((iMatch = inputRegex.exec(formTag)) !== null) {
+                const el = iMatch[0];
+                const nameM = el.match(/name=["']([^"']*)["']/i);
+                const typeM = el.match(/type=["']([^"']*)["']/i);
+                const valueM = el.match(/value=["']([^"']*)["']/i);
+                const idM = el.match(/id=["']([^"']*)["']/i);
+                if (nameM) {
+                  inputs.push({
+                    name: nameM[1],
+                    type: typeM?.[1] || 'text',
+                    value: valueM?.[1] || '',
+                    id: idM?.[1] || '',
+                  });
+                }
+              }
+              pageForms.push({
+                action: actionMatch?.[1] || '',
+                class: classMatch?.[1] || '',
+                id: idMatch?.[1] || '',
+                inputs,
+              });
+            }
+            
+            // Extract AJAX/JS calls that load forms dynamically
+            const ajaxCalls = pgHtml.match(/(?:fetch|ajax|load|getJSON|\.get|\.post)\s*\([^)]*\)/gi);
+            const scriptBlocks = pgHtml.match(/<script[^>]*>([\s\S]*?)<\/script>/gi);
+            const jsSnippets = scriptBlocks?.map((s: string) => s.substring(0, 500)) || [];
+            
+            inspectedPages.push({
+              name: pg.name,
+              url: pg.url,
+              status: pgResp.status,
+              length: pgHtml.length,
+              forms: pageForms,
+              ajaxCalls: ajaxCalls?.slice(0, 10) || [],
+              jsSnippetCount: scriptBlocks?.length || 0,
+              jsSnippets: jsSnippets.slice(0, 5),
+              htmlPreview: pgHtml.substring(0, 3000),
+            });
+          } catch (e) {
+            inspectedPages.push({ name: pg.name, url: pg.url, error: String(e) });
+          }
+        }
+        
+        // Also inspect the AJAX endpoint that loads activation details
+        const testIccid = params?.iccid || '0000000000000000000';
+        try {
+          const ajaxResp = await session.get("content/rentals/fetch_BHsim_details.php?zehut=" + encodeURIComponent(testIccid));
+          const ajaxHtml = await ajaxResp.text();
+          
+          const ajaxFormRegex = /<form[^>]*>([\s\S]*?)<\/form>/gi;
+          const ajaxForms: any[] = [];
+          let afMatch;
+          while ((afMatch = ajaxFormRegex.exec(ajaxHtml)) !== null) {
+            const formTag = afMatch[0];
+            const actionMatch = formTag.match(/action=["']([^"']*)["']/i);
+            const classMatch = formTag.match(/class=["']([^"']*)["']/i);
+            const inputs: any[] = [];
+            const inputRegex = /<(?:input|select|textarea)[^>]*>/gi;
+            let iMatch;
+            while ((iMatch = inputRegex.exec(formTag)) !== null) {
+              const el = iMatch[0];
+              const nameM = el.match(/name=["']([^"']*)["']/i);
+              const typeM = el.match(/type=["']([^"']*)["']/i);
+              const valueM = el.match(/value=["']([^"']*)["']/i);
+              if (nameM) {
+                inputs.push({ name: nameM[1], type: typeM?.[1] || 'text', value: valueM?.[1] || '' });
+              }
+            }
+            ajaxForms.push({ action: actionMatch?.[1] || '', class: classMatch?.[1] || '', inputs });
+          }
+          
+          inspectedPages.push({
+            name: 'fetch_BHsim_details (AJAX)',
+            url: 'content/rentals/fetch_BHsim_details.php?zehut=' + testIccid,
+            status: ajaxResp.status,
+            length: ajaxHtml.length,
+            forms: ajaxForms,
+            htmlFull: ajaxHtml.substring(0, 5000),
+          });
+        } catch (e) {
+          inspectedPages.push({ name: 'fetch_BHsim_details', error: String(e) });
+        }
+        
+        result = { success: true, action: 'inspect_activation_page', pages: inspectedPages };
+        break;
+      }
       default:
         result = {
           success: false,
           error: "Unknown action: " + action,
-          available: ["sync_csv", "check_sim_status", "activate_sim", "swap_sim", "activate_and_swap", "discover_activation_page"],
+          available: ["sync_csv", "check_sim_status", "activate_sim", "swap_sim", "activate_and_swap", "discover_activation_page", "inspect_activation_page"],
         };
     }
 
