@@ -183,38 +183,8 @@ serve(async (req) => {
         break;
       }
       case "activate_sim": {
-        // Step 1: Navigate to the activation page to discover form structure
-        console.log('=== STEP 1: FETCHING ACTIVATION PAGE ===');
-        const activationPage = await session.get("index.php?page=bh/index");
-        const activationHtml = await activationPage.text();
-        
-        // Extract all form actions and input field names from the page
-        const formActions = [...activationHtml.matchAll(/<form[^>]*action="([^"]*)"[^>]*>/gi)].map(m => m[1]);
-        const inputFields = [...activationHtml.matchAll(/<input[^>]*name="([^"]*)"[^>]*/gi)].map(m => m[1]);
-        const selectFields = [...activationHtml.matchAll(/<select[^>]*name="([^"]*)"[^>]*/gi)].map(m => m[1]);
-        const textareaFields = [...activationHtml.matchAll(/<textarea[^>]*name="([^"]*)"[^>]*/gi)].map(m => m[1]);
-        
-        const discoveredForm = {
-          formActions,
-          inputFields,
-          selectFields,
-          textareaFields,
-          allFields: [...new Set([...inputFields, ...selectFields, ...textareaFields])],
-          pageTitle: activationHtml.match(/<title[^>]*>([^<]+)<\/title>/)?.[1] || null,
-          hasForm: activationHtml.includes('<form'),
-          pageLength: activationHtml.length,
-        };
-        console.log('Discovered form structure:', JSON.stringify(discoveredForm, null, 2));
-        
-        // Log a snippet of the page around form elements for manual inspection
-        const formSnippetMatch = activationHtml.match(/<form[\s\S]{0,3000}<\/form>/i);
-        if (formSnippetMatch) {
-          console.log('Form HTML snippet (first form):', formSnippetMatch[0].substring(0, 2000));
-        } else {
-          console.log('No <form> tag found. Page snippet:', activationHtml.substring(0, 2000));
-        }
-
-        // Step 2: Build form data using discovered field names
+        // Post directly to activation endpoint - same approach as sync_csv
+        // fetchAuthenticated handles re-auth automatically if session expired
         const formData: Record<string, string> = {
           product: params.product || "",
           start_rental: params.start_rental,
@@ -224,40 +194,27 @@ serve(async (req) => {
           note: params.note || "",
         };
         
-        console.log('=== STEP 2: SUBMITTING ACTIVATION ===');
-        console.log('Form data being sent:', JSON.stringify(formData, null, 2));
+        console.log('Activating SIM with data:', JSON.stringify(formData, null, 2));
 
-        // Determine the correct POST URL from discovered form actions
-        const postPath = formActions.length > 0 ? formActions[0] : "index.php?page=bh/index";
-        console.log('Posting to:', postPath);
-
-        const response = await session.post(
-          postPath.startsWith('http') ? postPath.replace(CELLSTATION_BASE + '/', '') : postPath,
-          formData
-        );
-
-        console.log('=== STEP 3: RESPONSE ANALYSIS ===');
-        console.log('Response status:', response.status);
-
+        const response = await session.post("index.php?page=bh/index", formData);
         const html = await response.text();
         const htmlNoScript = html.replace(/<script[\s\S]*?<\/script>/gi, '');
         
         const debugInfo = {
           hasSuccessMessage: htmlNoScript.includes('הופעל בהצלחה') || htmlNoScript.includes('activated successfully') || htmlNoScript.includes('נשמר בהצלחה') || htmlNoScript.includes('alert-success'),
           hasErrorMessage: htmlNoScript.includes('שגיאה') || htmlNoScript.includes('alert-danger'),
-          isLoginPage: htmlNoScript.includes('התחברות') || htmlNoScript.includes('login'),
+          isLoginPage: htmlNoScript.includes('process_login.php') || htmlNoScript.includes('login_form'),
           responseLength: html.length,
           first500chars: htmlNoScript.substring(0, 500),
         };
-        console.log('Response analysis:', JSON.stringify(debugInfo, null, 2));
+        console.log('Activation response:', JSON.stringify(debugInfo, null, 2));
 
         result = { 
-          success: true, 
+          success: !debugInfo.isLoginPage, 
           action: "activate_sim", 
           html_length: html.length, 
-          debug: debugInfo, 
-          discoveredForm,
-          postPath,
+          debug: debugInfo,
+          error: debugInfo.isLoginPage ? "Authentication failed - still on login page" : undefined,
         };
         break;
       }
