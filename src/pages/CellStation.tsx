@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useCellStation } from '@/hooks/useCellStation';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatCard } from '@/components/StatCard';
-import { RefreshCw, Search, Signal, AlertTriangle, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { ActivationTab } from '@/components/cellstation/ActivationTab';
+import { SwapSimDialog } from '@/components/cellstation/SwapSimDialog';
+import { ActivateAndSwapDialog } from '@/components/cellstation/ActivateAndSwapDialog';
+import { RefreshCw, Search, Signal, CheckCircle, XCircle, Clock, ArrowLeftRight, Zap, AlertTriangle } from 'lucide-react';
 
 function StatusBadge({ status, detail }: { status: string | null; detail: string | null }) {
   if (status === 'rented') {
@@ -55,7 +58,16 @@ interface SimRow {
   customer_name: string | null;
 }
 
-function SimTable({ sims, showCustomer }: { sims: SimRow[]; showCustomer?: boolean }) {
+interface SimTableProps {
+  sims: SimRow[];
+  showCustomer?: boolean;
+  showSwap?: boolean;
+  onSwapClick?: (sim: SimRow) => void;
+  onActivateAndSwapClick?: (sim: SimRow) => void;
+  needsSwapIccids?: Set<string>;
+}
+
+function SimTable({ sims, showCustomer, showSwap, onSwapClick, onActivateAndSwapClick, needsSwapIccids }: SimTableProps) {
   if (sims.length === 0) {
     return <p className="text-center text-muted-foreground py-8">אין סימים להצגה</p>;
   }
@@ -73,26 +85,51 @@ function SimTable({ sims, showCustomer }: { sims: SimRow[]; showCustomer?: boole
             <TableHead>חבילה</TableHead>
             {showCustomer && <TableHead>לקוח</TableHead>}
             {showCustomer && <TableHead>תקופה</TableHead>}
+            {(showSwap || needsSwapIccids) && <TableHead>פעולות</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
-          {sims.map((sim) => (
-            <TableRow key={sim.id}>
-              <TableCell className="font-mono text-xs">{sim.sim_number || '-'}</TableCell>
-              <TableCell dir="ltr">{sim.uk_number || '-'}</TableCell>
-              <TableCell dir="ltr">{sim.il_number || '-'}</TableCell>
-              <TableCell className="font-mono text-xs">{shortIccid(sim.iccid)}</TableCell>
-              <TableCell><StatusBadge status={sim.status} detail={sim.status_detail} /></TableCell>
-              <TableCell>{formatDate(sim.expiry_date)}</TableCell>
-              <TableCell>{sim.plan || '-'}</TableCell>
-              {showCustomer && <TableCell>{sim.customer_name || '-'}</TableCell>}
-              {showCustomer && (
-                <TableCell className="text-xs">
-                  {sim.start_date ? `${formatDate(sim.start_date)} - ${formatDate(sim.end_date)}` : '-'}
+          {sims.map((sim) => {
+            const needsSwap = needsSwapIccids?.has(sim.iccid || '');
+            return (
+              <TableRow key={sim.id} className={needsSwap ? 'bg-yellow-50 dark:bg-yellow-950/10' : ''}>
+                <TableCell className="font-mono text-xs">{sim.sim_number || '-'}</TableCell>
+                <TableCell dir="ltr">{sim.uk_number || '-'}</TableCell>
+                <TableCell dir="ltr">{sim.il_number || '-'}</TableCell>
+                <TableCell className="font-mono text-xs">{shortIccid(sim.iccid)}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-1">
+                    <StatusBadge status={sim.status} detail={sim.status_detail} />
+                    {needsSwap && <AlertTriangle className="h-4 w-4 text-yellow-500" />}
+                  </div>
                 </TableCell>
-              )}
-            </TableRow>
-          ))}
+                <TableCell>{formatDate(sim.expiry_date)}</TableCell>
+                <TableCell>{sim.plan || '-'}</TableCell>
+                {showCustomer && <TableCell>{sim.customer_name || '-'}</TableCell>}
+                {showCustomer && (
+                  <TableCell className="text-xs">
+                    {sim.start_date ? `${formatDate(sim.start_date)} - ${formatDate(sim.end_date)}` : '-'}
+                  </TableCell>
+                )}
+                {(showSwap || needsSwapIccids) && (
+                  <TableCell>
+                    <div className="flex gap-1">
+                      {showSwap && onSwapClick && (
+                        <Button size="sm" variant="outline" onClick={() => onSwapClick(sim)} className="gap-1 text-xs">
+                          <ArrowLeftRight className="h-3 w-3" /> החלף
+                        </Button>
+                      )}
+                      {needsSwap && onActivateAndSwapClick && (
+                        <Button size="sm" variant="default" onClick={() => onActivateAndSwapClick(sim)} className="gap-1 text-xs">
+                          <Zap className="h-3 w-3" /> הפעל+החלף
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
+                )}
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </div>
@@ -100,8 +137,33 @@ function SimTable({ sims, showCustomer }: { sims: SimRow[]; showCustomer?: boole
 }
 
 export default function CellStation() {
-  const { simCards, isLoading, isSyncing, syncSims, stats } = useCellStation();
+  const {
+    simCards, isLoading, isSyncing, isSwapping,
+    syncSims, activateSim, swapSim, activateAndSwap,
+    stats,
+  } = useCellStation();
+
   const [search, setSearch] = useState('');
+  const [swapDialogSim, setSwapDialogSim] = useState<SimRow | null>(null);
+  const [activateSwapSim, setActivateSwapSim] = useState<SimRow | null>(null);
+
+  // Get inventory items that need swap
+  const [needsSwapIccids, setNeedsSwapIccids] = useState<Set<string>>(new Set());
+
+  // Load needs_swap inventory items
+  useEffect(() => {
+    import('@/integrations/supabase/client').then(({ supabase }) => {
+      supabase
+        .from('inventory' as any)
+        .select('sim_number')
+        .eq('needs_swap', true)
+        .then(({ data }) => {
+          if (data) {
+            setNeedsSwapIccids(new Set((data as any[]).map(d => d.sim_number).filter(Boolean)));
+          }
+        });
+    });
+  }, [simCards]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return simCards;
@@ -153,16 +215,21 @@ export default function CellStation() {
         <Card>
           <CardContent className="p-0">
             <Tabs defaultValue="all" dir="rtl">
-              <div className="border-b px-4 pt-4">
+              <div className="border-b px-4 pt-4 overflow-x-auto">
                 <TabsList>
                   <TabsTrigger value="all">כל הסימים ({filtered.length})</TabsTrigger>
                   <TabsTrigger value="available">זמינים ({available.length})</TabsTrigger>
                   <TabsTrigger value="expired">פגי תוקף ({expired.length})</TabsTrigger>
                   <TabsTrigger value="rented">מושכרים ({rented.length})</TabsTrigger>
+                  <TabsTrigger value="activate">הפעלה</TabsTrigger>
                 </TabsList>
               </div>
               <TabsContent value="all" className="m-0">
-                <SimTable sims={filtered} />
+                <SimTable
+                  sims={filtered}
+                  needsSwapIccids={needsSwapIccids}
+                  onActivateAndSwapClick={sim => setActivateSwapSim(sim)}
+                />
               </TabsContent>
               <TabsContent value="available" className="m-0">
                 <SimTable sims={available} />
@@ -171,11 +238,49 @@ export default function CellStation() {
                 <SimTable sims={expired} />
               </TabsContent>
               <TabsContent value="rented" className="m-0">
-                <SimTable sims={rented} showCustomer />
+                <SimTable
+                  sims={rented}
+                  showCustomer
+                  showSwap
+                  onSwapClick={sim => setSwapDialogSim(sim)}
+                  needsSwapIccids={needsSwapIccids}
+                  onActivateAndSwapClick={sim => setActivateSwapSim(sim)}
+                />
+              </TabsContent>
+              <TabsContent value="activate" className="m-0">
+                <ActivationTab
+                  availableSims={simCards}
+                  onActivate={activateSim}
+                  isActivating={false}
+                />
               </TabsContent>
             </Tabs>
           </CardContent>
         </Card>
+      )}
+
+      {/* Swap Dialog */}
+      {swapDialogSim && (
+        <SwapSimDialog
+          open={!!swapDialogSim}
+          onOpenChange={open => !open && setSwapDialogSim(null)}
+          currentSim={swapDialogSim}
+          availableSims={simCards}
+          onSwap={swapSim}
+          isSwapping={isSwapping}
+        />
+      )}
+
+      {/* Activate + Swap Dialog */}
+      {activateSwapSim && (
+        <ActivateAndSwapDialog
+          open={!!activateSwapSim}
+          onOpenChange={open => !open && setActivateSwapSim(null)}
+          oldSim={activateSwapSim}
+          availableSims={simCards}
+          onActivateAndSwap={activateAndSwap}
+          rentalId=""
+        />
       )}
     </div>
   );
