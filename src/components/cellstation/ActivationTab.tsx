@@ -127,14 +127,18 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
     const days = differenceInDays(endDate, startDate) + 1;
 
     try {
-      await onActivate({
+      const activationParams = {
         product: selectedSim.plan || '',
         start_rental: format(startDate, 'dd/MM/yyyy'),
         end_rental: format(endDate, 'dd/MM/yyyy'),
         price: pricePreview?.total?.toString() || '0',
         days: days.toString(),
         note: `${selectedCustomer.name} ${selectedCustomer.phone} ${notes}`.trim(),
-      });
+      };
+      console.log('Activation params:', JSON.stringify(activationParams, null, 2));
+      
+      const activationResult = await onActivate(activationParams);
+      console.log('Activation response:', JSON.stringify(activationResult, null, 2));
 
       const matchingItem = inventory.find(i => i.simNumber === selectedSim.iccid);
 
@@ -156,10 +160,11 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
         notes: notes || undefined,
       });
 
-      toast({ title: 'הסים הופעל והשכרה נוצרה בהצלחה!' });
+      toast({ title: 'הסים הופעל והשכרה נוצרה בהצלחה!', description: `Response: ${JSON.stringify(activationResult, null, 2)}` });
       resetForm();
     } catch (e: any) {
-      toast({ title: 'שגיאה', description: e.message, variant: 'destructive' });
+      console.error('Activation error:', e);
+      toast({ title: 'שגיאה', description: `${e.message}\n\nFull error: ${JSON.stringify(e, null, 2)}`, variant: 'destructive' });
     }
   };
 
@@ -172,24 +177,27 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
     const days = differenceInDays(endDate, startDate) + 1;
 
     try {
-      await onActivateAndSwap(
-        {
-          product: selectedSim.plan || '',
-          start_rental: format(startDate, 'dd/MM/yyyy'),
-          end_rental: format(endDate, 'dd/MM/yyyy'),
-          price: pricePreview?.total?.toString() || '0',
-          note: `${selectedCustomer.name} ${selectedCustomer.phone} ${notes}`.trim(),
-          rental_id: '',
-          current_sim: selectedOldSim.sim_number || '',
-          swap_msisdn: selectedSim.uk_number || '',
-          swap_iccid: selectedSim.iccid || '',
-        }
-      );
+      const swapParams = {
+        product: selectedSim.plan || '',
+        start_rental: format(startDate, 'dd/MM/yyyy'),
+        end_rental: format(endDate, 'dd/MM/yyyy'),
+        price: pricePreview?.total?.toString() || '0',
+        note: `${selectedCustomer.name} ${selectedCustomer.phone} ${notes}`.trim(),
+        rental_id: '',
+        current_sim: selectedOldSim.sim_number || '',
+        swap_msisdn: selectedSim.uk_number || '',
+        swap_iccid: selectedSim.iccid || '',
+      };
+      console.log('Activate+Swap params:', JSON.stringify(swapParams, null, 2));
 
-      toast({ title: 'הפעלה והחלפה הושלמו בהצלחה!' });
+      const swapResult = await onActivateAndSwap(swapParams);
+      console.log('Activate+Swap response:', JSON.stringify(swapResult, null, 2));
+
+      toast({ title: 'הפעלה והחלפה הושלמו בהצלחה!', description: `Response: ${JSON.stringify(swapResult, null, 2)}` });
       resetForm();
     } catch (e: any) {
-      toast({ title: 'שגיאה', description: e.message, variant: 'destructive' });
+      console.error('Activate+Swap error:', e);
+      toast({ title: 'שגיאה', description: `${e.message}\n\nFull error: ${JSON.stringify(e, null, 2)}`, variant: 'destructive' });
     }
   };
 
