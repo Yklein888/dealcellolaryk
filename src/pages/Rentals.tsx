@@ -44,9 +44,12 @@ import {
   CheckCircle,
   Package,
   CalendarPlus,
+  Zap,
 } from 'lucide-react';
 import { printCallingInstructions, downloadCallingInstructions } from '@/lib/callingInstructions';
 import { supabase } from '@/integrations/supabase/client';
+import { useCellStation } from '@/hooks/useCellStation';
+import { ActivateAndSwapDialog } from '@/components/cellstation/ActivateAndSwapDialog';
 import { 
   Rental, 
   RentalItem, 
@@ -108,6 +111,10 @@ export default function Rentals() {
   const [extendingRental, setExtendingRental] = useState<Rental | null>(null);
   const [extendNewEndDate, setExtendNewEndDate] = useState<Date | null>(null);
   const [isExtending, setIsExtending] = useState(false);
+
+  // Activate + Swap state
+  const { simCards, activateAndSwap } = useCellStation();
+  const [activateSwapRental, setActivateSwapRental] = useState<{ rentalId: string; sim: any } | null>(null);
 
   // Notify customer about rental return reminder
   const notifyRentalCustomer = async (rental: Rental) => {
@@ -872,6 +879,36 @@ export default function Rentals() {
                               </Button>
                             </div>
                           )}
+
+                          {/* Activate + Swap button for active/overdue SIM rentals */}
+                          {(rental.status === 'active' || rental.status === 'overdue') && isEuropeanSim && inventoryItem?.simNumber && (
+                            <div className="flex justify-center">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  const csSim = simCards.find(s => s.iccid === inventoryItem.simNumber);
+                                  setActivateSwapRental({
+                                    rentalId: rental.id,
+                                    sim: csSim || {
+                                      id: inventoryItem.id,
+                                      sim_number: inventoryItem.simNumber,
+                                      uk_number: inventoryItem.localNumber || null,
+                                      il_number: inventoryItem.israeliNumber || null,
+                                      iccid: inventoryItem.simNumber,
+                                      status: null,
+                                      status_detail: null,
+                                      plan: null,
+                                    },
+                                  });
+                                }}
+                                className="gap-1 text-xs w-full border-yellow-300 text-yellow-700 hover:bg-yellow-50 dark:text-yellow-400 dark:hover:bg-yellow-950/30"
+                              >
+                                <Zap className="h-3 w-3" />
+                                הפעל+החלף סים
+                              </Button>
+                            </div>
+                          )}
                           
                         </div>
                       );
@@ -1254,6 +1291,18 @@ export default function Rentals() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Activate + Swap Dialog (from rental cards) */}
+      {activateSwapRental && (
+        <ActivateAndSwapDialog
+          open={!!activateSwapRental}
+          onOpenChange={open => !open && setActivateSwapRental(null)}
+          oldSim={activateSwapRental.sim}
+          availableSims={simCards}
+          onActivateAndSwap={activateAndSwap}
+          rentalId={activateSwapRental.rentalId}
+        />
+      )}
 
     </div>
   );
