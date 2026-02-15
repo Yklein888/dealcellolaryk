@@ -137,16 +137,35 @@ serve(async (req) => {
         break;
       }
       case "activate_sim": {
-        const response = await session.post("index.php?page=bh/index", {
+        const formData = {
           product: params.product || "",
           start_rental: params.start_rental,
           end_rental: params.end_rental,
           deler4cus_price: params.price || "",
           calculated_days_input: params.days || "",
           note: params.note || "",
-        });
+        };
+        console.log('=== CELL STATION ACTIVATE REQUEST DEBUG ===');
+        console.log('URL: index.php?page=bh/index');
+        console.log('Form data being sent:', JSON.stringify(formData, null, 2));
+
+        const response = await session.post("index.php?page=bh/index", formData);
+
+        console.log('=== CELL STATION ACTIVATE RESPONSE DEBUG ===');
+        console.log('Response status:', response.status);
+        console.log('Response headers:', JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2));
+
         const html = await response.text();
-        result = { success: true, action: "activate_sim", html_length: html.length };
+        const debugInfo = {
+          hasSuccessMessage: html.includes('הופעל בהצלחה') || html.includes('activated successfully'),
+          hasErrorMessage: html.includes('שגיאה') || html.includes('error'),
+          isLoginPage: html.includes('התחברות') || html.includes('login'),
+          responseLength: html.length,
+          first500chars: html.substring(0, 500),
+        };
+        console.log('Response analysis:', JSON.stringify(debugInfo, null, 2));
+
+        result = { success: true, action: "activate_sim", html_length: html.length, debug: debugInfo };
         break;
       }
       case "swap_sim": {
