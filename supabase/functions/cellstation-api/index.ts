@@ -58,7 +58,7 @@ class CellStationSession {
 
   async fetchAuthenticated(url: string, options: RequestInit = {}): Promise<Response> {
     if (!this.isLoggedIn) await this.login();
-    return fetch(url, {
+    const response = await fetch(url, {
       ...options,
       headers: {
         ...options.headers,
@@ -66,6 +66,35 @@ class CellStationSession {
         "Referer": CELLSTATION_BASE + "/index.php",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
       },
+    });
+    // Check if we got redirected to login page - if so, re-login and retry
+    const cloned = response.clone();
+    const text = await cloned.text();
+    if (text.includes('process_login.php') || (text.includes('login_form') && text.length < 5000)) {
+      console.log('Session expired - re-authenticating...');
+      this.isLoggedIn = false;
+      this.cookies = "";
+      const loggedIn = await this.login();
+      if (!loggedIn) {
+        console.error('Re-authentication failed');
+        return response;
+      }
+      console.log('Re-authentication successful, retrying request...');
+      return fetch(url, {
+        ...options,
+        headers: {
+          ...options.headers,
+          "Cookie": this.cookies,
+          "Referer": CELLSTATION_BASE + "/index.php",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        },
+      });
+    }
+    // Return a new response with the text we already consumed
+    return new Response(text, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
     });
   }
 
