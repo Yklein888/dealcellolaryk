@@ -128,7 +128,11 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
     const days = differenceInDays(endDate, startDate) + 1;
 
     try {
+      const cleanIccid = selectedSim.iccid?.replace(/\D/g, '') || '';
+      console.log('Clean ICCID:', cleanIccid, 'Length:', cleanIccid.length);
+
       const activationParams = {
+        iccid: cleanIccid,
         product: selectedSim.plan || '',
         start_rental: format(startDate, 'dd/MM/yyyy'),
         end_rental: format(endDate, 'dd/MM/yyyy'),
@@ -236,7 +240,7 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
         rental_id: '',
         current_sim: selectedOldSim.sim_number || '',
         swap_msisdn: selectedSim.uk_number || '',
-        swap_iccid: selectedSim.iccid || '',
+        swap_iccid: selectedSim.iccid?.replace(/\D/g, '') || '',
       };
       console.log('Activate+Swap params:', JSON.stringify(swapParams, null, 2));
 
@@ -356,8 +360,8 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
                     </div>
                     <div>
                       <span className="font-mono text-xs">{sim.uk_number || sim.il_number || '---'}</span>
-                      <span className="text-[10px] mr-2 text-muted-foreground">
-                        ...{sim.iccid?.slice(-6)}
+                      <span className="text-[10px] mr-2 text-muted-foreground font-mono">
+                        {sim.iccid || '---'}
                       </span>
                     </div>
                   </div>

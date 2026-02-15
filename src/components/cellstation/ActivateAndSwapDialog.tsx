@@ -74,7 +74,7 @@ export function ActivateAndSwapDialog({
           rental_id: rentalId,
           current_sim: oldSim.sim_number || '',
           swap_msisdn: selectedSim.uk_number || '',
-          swap_iccid: selectedSim.iccid,
+          swap_iccid: selectedSim.iccid?.replace(/\D/g, '') || '',
         },
         (stepName, percent) => {
           setProgressStep(stepName);

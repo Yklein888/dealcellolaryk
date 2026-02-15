@@ -159,6 +159,7 @@ export function useCellStation() {
   }, [fetchSims, toast]);
 
   const activateSim = useCallback(async (params: {
+    iccid: string;
     product: string;
     start_rental: string;
     end_rental: string;
