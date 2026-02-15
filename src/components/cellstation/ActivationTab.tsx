@@ -141,32 +141,36 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
       const activationResult = await onActivate(activationParams);
       console.log('Activation response:', JSON.stringify(activationResult, null, 2));
 
-      // Find or create inventory item
-      let matchingItem = inventory.find(i => i.simNumber === selectedSim.iccid);
+      // Find or create inventory item, ensure it's 'available' for addRental
+      const { data: existingItem } = await supabase
+        .from('inventory')
+        .select('*')
+        .eq('sim_number', selectedSim.iccid)
+        .single();
+
       let inventoryItemId: string;
 
-      if (matchingItem) {
-        inventoryItemId = matchingItem.id;
-      } else {
-        // Auto-create inventory item from cellstation SIM data
+      if (!existingItem) {
         console.log('No inventory item found for ICCID:', selectedSim.iccid, '- creating one automatically');
-        const newItem = {
-          category: 'sim_european' as const,
-          name: selectedSim.sim_number || `סים ${selectedSim.iccid?.slice(-6)}`,
-          localNumber: selectedSim.uk_number || undefined,
-          israeliNumber: selectedSim.il_number || undefined,
-          simNumber: selectedSim.iccid || undefined,
-          status: 'rented' as const,
-          expiryDate: selectedSim.expiry_date || undefined,
-        };
-        await addInventoryItem(newItem);
-        // Re-fetch to get the new item's ID
-        const { data: newItems } = await supabase
-          .from('inventory')
-          .select('id')
-          .eq('sim_number', selectedSim.iccid)
-          .limit(1);
-        inventoryItemId = newItems?.[0]?.id || selectedSim.id;
+        const { data: newItem, error: insertErr } = await supabase.from('inventory').insert({
+          name: `סים גלישה`,
+          category: 'sim_european',
+          sim_number: selectedSim.iccid,
+          local_number: selectedSim.uk_number || null,
+          israeli_number: selectedSim.il_number || null,
+          expiry_date: selectedSim.expiry_date || null,
+          status: 'available',
+        }).select('id').single();
+        if (insertErr) throw new Error(`Failed to create inventory item: ${insertErr.message}`);
+        inventoryItemId = newItem.id;
+      } else {
+        inventoryItemId = existingItem.id;
+        if (existingItem.status !== 'available') {
+          console.log('Inventory item exists but status is', existingItem.status, '- updating to available');
+          await supabase.from('inventory')
+            .update({ status: 'available' })
+            .eq('id', existingItem.id);
+        }
       }
 
       await addRental({
