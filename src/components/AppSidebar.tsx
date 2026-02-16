@@ -38,7 +38,7 @@ const navItems = [
   { path: '/inventory', label: 'מלאי', icon: Package, permission: 'view_inventory' as PermissionKey },
   
   { path: '/repairs', label: 'תיקונים', icon: Wrench, permission: 'view_repairs' as PermissionKey },
-  { path: '/cellstation', label: 'סימים', icon: Signal, permission: 'view_inventory' as PermissionKey },
+  { path: '/cellstation', label: 'סימים', icon: Signal, permission: 'view_sim_cards' as PermissionKey },
   { path: '/payments', label: 'תשלומים', icon: CreditCard, permission: 'view_payments' as PermissionKey },
   { path: '/invoices', label: 'חשבוניות', icon: FileText, permission: 'view_invoices' as PermissionKey },
 ];

@@ -10,10 +10,10 @@ export const AVAILABLE_PERMISSIONS = [
   { key: 'view_rentals', label: 'השכרות', description: 'צפייה וניהול השכרות' },
   { key: 'view_customers', label: 'לקוחות', description: 'צפייה וניהול לקוחות' },
   { key: 'view_inventory', label: 'מלאי', description: 'צפייה וניהול מלאי' },
+  { key: 'view_sim_cards', label: 'סימים', description: 'צפייה וניהול סימים' },
   { key: 'view_repairs', label: 'תיקונים', description: 'צפייה וניהול תיקונים' },
   { key: 'view_payments', label: 'תשלומים', description: 'צפייה בהיסטוריית תשלומים' },
   { key: 'view_invoices', label: 'חשבוניות', description: 'צפייה וניהול חשבוניות' },
-  
 ] as const;
 
 export type PermissionKey = typeof AVAILABLE_PERMISSIONS[number]['key'];
