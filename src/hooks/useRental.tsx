@@ -392,34 +392,68 @@ export function RentalProvider({ children }: { children: ReactNode }) {
     fetchData();
   }, []);
 
-  // Real-time subscriptions for live updates
+  // Real-time subscriptions with enhanced reconnection
   useEffect(() => {
-    const channel = supabase
-      .channel('realtime-sync')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'rentals' }, () => {
-        console.log('[Realtime] rentals changed');
+    let retryCount = 0;
+    const maxRetry = 10;
+
+    const setupChannel = () => {
+      const channel = supabase
+        .channel('realtime-sync')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'rentals' }, () => {
+          console.log('[Realtime] rentals changed');
+          debouncedFetchData();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'rental_items' }, () => {
+          console.log('[Realtime] rental_items changed');
+          debouncedFetchData();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, () => {
+          console.log('[Realtime] inventory changed');
+          debouncedFetchData();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, () => {
+          console.log('[Realtime] customers changed');
+          debouncedFetchData();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'repairs' }, () => {
+          console.log('[Realtime] repairs changed');
+          debouncedFetchData();
+        })
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            console.log('[Realtime] Connected successfully');
+            retryCount = 0;
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            console.warn('[Realtime] Connection issue, retrying...');
+            if (retryCount < maxRetry) {
+              const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
+              retryCount++;
+              setTimeout(() => {
+                supabase.removeChannel(channel);
+                setupChannel();
+              }, delay);
+            }
+          }
+        });
+
+      return channel;
+    };
+
+    const channel = setupChannel();
+
+    // Re-sync when tab becomes visible again
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('[Realtime] Tab visible, refreshing data');
         debouncedFetchData();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'rental_items' }, () => {
-        console.log('[Realtime] rental_items changed');
-        debouncedFetchData();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, () => {
-        console.log('[Realtime] inventory changed');
-        debouncedFetchData();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, () => {
-        console.log('[Realtime] customers changed');
-        debouncedFetchData();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'repairs' }, () => {
-        console.log('[Realtime] repairs changed');
-        debouncedFetchData();
-      })
-      .subscribe();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
       supabase.removeChannel(channel);
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [debouncedFetchData]);
 
