@@ -331,12 +331,7 @@ export function RentalProvider({ children }: { children: ReactNode }) {
         }
       } else {
         backgroundRetryRef.current = 0;
-        if (isBackgroundRetry) {
-          toast({
-            title: 'הסנכרון הושלם',
-            description: 'כל הנתונים עודכנו בהצלחה מהשרת.',
-          });
-        }
+        // Silent success - no toast needed for background sync
       }
     } catch (error) {
       console.error('Error fetching data:', error);
