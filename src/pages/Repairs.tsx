@@ -410,6 +410,14 @@ export default function Repairs() {
       title: 'סטטוס עודכן',
       description: `הסטטוס שונה ל-${repairStatusLabels[newStatus]}`,
     });
+
+    // Auto-call customer when repair is marked as ready
+    if (newStatus === 'ready') {
+      const repair = repairs.find(r => r.id === repairId);
+      if (repair) {
+        notifyCustomer(repair);
+      }
+    }
   };
 
   const handleDeleteRepair = (repairId: string, repairNumber: string) => {
