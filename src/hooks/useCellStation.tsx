@@ -224,9 +224,8 @@ export function useCellStation() {
     end_rental: string;
     price: string;
     note: string;
-    rental_id: string;
     current_sim: string;
-    swap_msisdn: string;
+    current_iccid: string;
     swap_iccid: string;
   }, onProgress?: (step: string, percent: number) => void) => {
     try {

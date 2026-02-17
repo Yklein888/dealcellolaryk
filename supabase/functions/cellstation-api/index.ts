@@ -329,18 +329,23 @@ serve(async (req) => {
         break;
       }
       case "activate_and_swap": {
-        const iccidAS = params.iccid || params.swap_iccid || "";
-        console.log(`activate_and_swap: ICCID=${iccidAS}`);
+        const iccidAS = params.swap_iccid || params.iccid || "";
+        const oldIccid = params.current_iccid || "";
+        console.log(`activate_and_swap: newICCID=${iccidAS}, oldICCID=${oldIccid}`);
         
         if (!iccidAS || iccidAS.length < 19 || iccidAS.length > 20 || !/^\d+$/.test(iccidAS)) {
-          result = { success: false, error: "Invalid ICCID format. Must be 19-20 digits.", action: "activate_and_swap" };
+          result = { success: false, error: "Invalid new ICCID format. Must be 19-20 digits.", action: "activate_and_swap" };
+          break;
+        }
+        if (!oldIccid || oldIccid.length < 19 || oldIccid.length > 20) {
+          result = { success: false, error: "Invalid old ICCID format. Must be 19-20 digits.", action: "activate_and_swap" };
           break;
         }
         
         // Step 1: Visit bh/index
         await (await session.get("index.php?page=bh/index")).text();
         
-        // Step 2: Fetch SIM details
+        // Step 2: Fetch NEW SIM details for activation
         const detailsAS = await session.get("content/dashboard/rentals/fetch_BHsim_details.php?zehut=" + encodeURIComponent(iccidAS));
         const detailsHtmlAS = await detailsAS.text();
         
@@ -371,7 +376,7 @@ serve(async (req) => {
           exp: expAS,
         })).text();
         
-        // Step 3: Submit activation
+        // Step 3: Submit activation of new SIM
         const actFormData: Record<string, string> = {
           ...discoveredValsAS,
           start_rental: startRentalAS,
@@ -394,15 +399,36 @@ serve(async (req) => {
         console.log('Waiting 60 seconds for portal processing...');
         await new Promise(r => setTimeout(r, 60000));
         
-        // Step 4: Swap SIM
-        await session.post(
-          "index.php?page=/dashboard/rentals/rental_details&id=" + params.rental_id,
-          {
-            current_sim: params.current_sim || "",
-            swap_msisdn: params.swap_msisdn || "",
-            swap_iccid: params.swap_iccid,
-          }
-        );
+        // Step 4: Swap - fetch OLD SIM details and submit swap to new ICCID
+        await (await session.get("index.php?page=bh/index")).text();
+        
+        const swapDetailsAS = await session.get("content/dashboard/rentals/fetch_BHsim_details.php?zehut=" + encodeURIComponent(oldIccid));
+        const swapDetailsHtmlAS = await swapDetailsAS.text();
+        
+        const swapFieldsAS = swapDetailsHtmlAS.match(/<input[^>]*type=["']hidden["'][^>]*>/gi) || [];
+        const swapValsAS: Record<string, string> = {};
+        for (const field of swapFieldsAS) {
+          const n = field.match(/name=["']([^"']+)["']/);
+          const v = field.match(/value=["']([^"']+)["']/);
+          if (n) swapValsAS[n[1]] = v ? v[1] : "";
+        }
+        
+        const swapFormAS: Record<string, string> = {
+          ...swapValsAS,
+          swap_iccid: iccidAS,
+          swap_msisdn: "",
+          current_sim: params.current_sim || "",
+        };
+        
+        const swapSubmitAS = await session.post("dynamic/submit.php", swapFormAS);
+        const swapResultAS = await swapSubmitAS.text();
+        const swapSuccessAS = !swapResultAS.includes('שגיאה') && !swapResultAS.includes('alert-danger') && swapSubmitAS.status === 200;
+        console.log(`activate_and_swap swap: ${swapSuccessAS ? 'SUCCESS' : 'FAILED'}`);
+        
+        if (!swapSuccessAS) {
+          result = { success: false, action: "activate_and_swap", error: "Activation succeeded but swap failed: " + swapResultAS.substring(0, 500) };
+          break;
+        }
         
         console.log('activate_and_swap: COMPLETED');
         result = { success: true, action: "activate_and_swap" };

@@ -23,8 +23,6 @@ interface ActivateAndSwapDialogProps {
   oldSim: CellStationSim;
   availableSims: CellStationSim[];
   onActivateAndSwap: (params: any, onProgress?: (step: string, percent: number) => void) => Promise<any>;
-  rentalId: string;
-  inventoryItemId?: string;
 }
 
 export function ActivateAndSwapDialog({
@@ -33,8 +31,6 @@ export function ActivateAndSwapDialog({
   oldSim,
   availableSims,
   onActivateAndSwap,
-  rentalId,
-  inventoryItemId,
 }: ActivateAndSwapDialogProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [newIccid, setNewIccid] = useState('');
@@ -68,9 +64,8 @@ export function ActivateAndSwapDialog({
           end_rental: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
           price: '',
           note: '',
-          rental_id: rentalId,
           current_sim: oldSim.sim_number || '',
-          swap_msisdn: '',
+          current_iccid: oldSim.iccid || '',
           swap_iccid: cleanIccid,
         },
         (stepName, percent) => {
