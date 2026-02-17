@@ -748,7 +748,6 @@ export default function CellStation() {
           oldSim={activateSwapSim}
           availableSims={simCards}
           onActivateAndSwap={activateAndSwap}
-          rentalId=""
         />
       )}
     </div>
