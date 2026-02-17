@@ -46,7 +46,7 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
 
   const [customerSearch, setCustomerSearch] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
-  const [selectedSimId, setSelectedSimId] = useState('');
+  const [selectedSimIds, setSelectedSimIds] = useState<string[]>([]);
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const [notes, setNotes] = useState('');
@@ -95,18 +95,25 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
   }, [availableSims, oldSimSearch]);
 
   const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
-  const selectedSim = availableSims.find(s => s.id === selectedSimId);
+  const selectedSims = availableSims.filter(s => selectedSimIds.includes(s.id));
   const selectedOldSim = availableSims.find(s => s.id === selectedOldSimId);
 
+  const toggleSimSelection = (simId: string) => {
+    setSelectedSimIds(prev =>
+      prev.includes(simId) ? prev.filter(id => id !== simId) : [...prev, simId]
+    );
+  };
+
   const pricePreview = useMemo(() => {
-    if (!startDate || !endDate) return null;
+    if (!startDate || !endDate || selectedSimIds.length === 0) return null;
     const start = format(startDate, 'yyyy-MM-dd');
     const end = format(endDate, 'yyyy-MM-dd');
-    return calculateRentalPrice(
-      [{ category: 'sim_european', includeEuropeanDevice: includeDevice }],
-      start, end
-    );
-  }, [startDate, endDate, includeDevice]);
+    const simItems = selectedSimIds.map((_, i) => ({
+      category: 'sim_european' as const,
+      includeEuropeanDevice: includeDevice && i === 0,
+    }));
+    return calculateRentalPrice(simItems, start, end);
+  }, [startDate, endDate, includeDevice, selectedSimIds]);
 
   const handleQuickAdd = async () => {
     if (!quickName || !quickPhone) return;
@@ -122,7 +129,7 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
   };
 
   const handleSimpleActivate = async () => {
-    if (!selectedCustomer || !selectedSim || !startDate || !endDate) {
+    if (!selectedCustomer || selectedSimIds.length === 0 || !startDate || !endDate) {
       toast({ title: 'יש למלא את כל השדות', variant: 'destructive' });
       return;
     }
@@ -132,73 +139,71 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
     const days = differenceInDays(endDate, startDate) + 1;
 
     try {
-      const cleanIccid = selectedSim.iccid?.replace(/\D/g, '') || '';
-      console.log('Clean ICCID:', cleanIccid, 'Length:', cleanIccid.length);
+      const rentalItems: any[] = [];
 
-      const activationParams = {
-        iccid: cleanIccid,
-        product: selectedSim.plan || '',
-        start_rental: format(startDate, 'dd/MM/yyyy'),
-        end_rental: format(endDate, 'dd/MM/yyyy'),
-        price: pricePreview?.total?.toString() || '0',
-        days: days.toString(),
-        note: `${selectedCustomer.name} ${selectedCustomer.phone} ${notes}`.trim(),
-      };
+      for (const sim of selectedSims) {
+        const cleanIccid = sim.iccid?.replace(/\D/g, '') || '';
+        console.log('Activating SIM ICCID:', cleanIccid);
 
-      console.log('=== CELL STATION ACTIVATION DEBUG ===');
-      console.log('Customer:', selectedCustomer.name, selectedCustomer.phone);
-      console.log('Selected SIM:', JSON.stringify(selectedSim, null, 2));
-      console.log('Params being sent to Edge Function:', JSON.stringify({
-        action: 'activate_sim',
-        params: activationParams,
-      }, null, 2));
+        const activationParams = {
+          iccid: cleanIccid,
+          product: sim.plan || '',
+          start_rental: format(startDate, 'dd/MM/yyyy'),
+          end_rental: format(endDate, 'dd/MM/yyyy'),
+          price: '0',
+          days: days.toString(),
+          note: `${selectedCustomer.name} ${selectedCustomer.phone} ${notes}`.trim(),
+        };
 
-      const activationResult = await onActivate(activationParams);
+        const activationResult = await onActivate(activationParams);
+        console.log('Activation response for', cleanIccid, ':', activationResult?.success);
 
-      console.log('=== EDGE FUNCTION RESPONSE ===');
-      console.log('Full response:', JSON.stringify(activationResult, null, 2));
-      console.log('Response success:', activationResult?.success);
-      console.log('Response HTML length:', activationResult?.html_length);
+        // Find or create inventory item
+        const { data: existingItem } = await supabase
+          .from('inventory')
+          .select('*')
+          .eq('sim_number', sim.iccid)
+          .single();
 
-      // Find or create inventory item, ensure it's 'available' for addRental
-      const { data: existingItem } = await supabase
-        .from('inventory')
-        .select('*')
-        .eq('sim_number', selectedSim.iccid)
-        .single();
+        let inventoryItemId: string;
 
-      let inventoryItemId: string;
+        if (!existingItem) {
+          const { data: newItem, error: insertErr } = await supabase.from('inventory').insert({
+            name: `סים גלישה`,
+            category: 'sim_european',
+            sim_number: sim.iccid,
+            local_number: sim.uk_number || null,
+            israeli_number: sim.il_number || null,
+            expiry_date: sim.expiry_date || null,
+            status: 'available',
+          }).select('id').single();
+          if (insertErr) throw new Error(`Failed to create inventory item: ${insertErr.message}`);
+          inventoryItemId = newItem.id;
+        } else {
+          inventoryItemId = existingItem.id;
+          if (existingItem.status !== 'available') {
+            await supabase.from('inventory')
+              .update({ status: 'available' })
+              .eq('id', existingItem.id);
+          }
+        }
 
-      if (!existingItem) {
-        console.log('No inventory item found for ICCID:', selectedSim.iccid, '- creating one automatically');
-        const { data: newItem, error: insertErr } = await supabase.from('inventory').insert({
-          name: `סים גלישה`,
-          category: 'sim_european',
-          sim_number: selectedSim.iccid,
-          local_number: selectedSim.uk_number || null,
-          israeli_number: selectedSim.il_number || null,
-          expiry_date: selectedSim.expiry_date || null,
-          status: 'available',
-        }).select('id').single();
-        if (insertErr) throw new Error(`Failed to create inventory item: ${insertErr.message}`);
-        inventoryItemId = newItem.id;
-      } else {
-        inventoryItemId = existingItem.id;
-        if (existingItem.status !== 'available') {
-          console.log('Inventory item exists but status is', existingItem.status, '- updating to available');
-          await supabase.from('inventory')
-            .update({ status: 'available' })
-            .eq('id', existingItem.id);
+        rentalItems.push({
+          inventoryItemId,
+          itemCategory: 'sim_european' as const,
+          itemName: `סים ${sim.uk_number || sim.il_number || sim.iccid}`,
+          hasIsraeliNumber: !!sim.il_number,
+          isGeneric: false,
+        });
+
+        // Update cellstation_sims status
+        if (sim.iccid) {
+          await supabase
+            .from('cellstation_sims')
+            .update({ status: 'rented', customer_name: selectedCustomer.name })
+            .eq('iccid', sim.iccid);
         }
       }
-
-      const rentalItems: any[] = [{
-        inventoryItemId,
-        itemCategory: 'sim_european' as const,
-        itemName: `סים ${selectedSim.uk_number || selectedSim.il_number || selectedSim.iccid}`,
-        hasIsraeliNumber: !!selectedSim.il_number,
-        isGeneric: false,
-      }];
 
       // Add bundled device if selected
       if (includeDevice) {
@@ -223,40 +228,31 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
         notes: notes || undefined,
       });
 
-      // Update cellstation_sims status to rented
-      if (selectedSim.iccid) {
-        await supabase
-          .from('cellstation_sims')
-          .update({ status: 'rented', customer_name: selectedCustomer.name })
-          .eq('iccid', selectedSim.iccid);
-      }
-
-      toast({ title: 'הסים הופעל והשכרה נוצרה בהצלחה!', description: `Response: ${JSON.stringify(activationResult, null, 2)}` });
+      toast({ title: `${selectedSims.length} סימים הופעלו והשכרה נוצרה בהצלחה!` });
       resetForm();
     } catch (e: any) {
       console.error('Activation error:', e);
-      toast({ title: 'שגיאה', description: `${e.message}\n\nFull error: ${JSON.stringify(e, null, 2)}`, variant: 'destructive' });
+      toast({ title: 'שגיאה', description: e.message, variant: 'destructive' });
     }
   };
 
   const handleActivateAndSwap = async () => {
     const hasOldSim = useManualOldSim ? (manualOldIccid.replace(/\D/g, '').length >= 19) : !!selectedOldSimId;
-    if (!selectedCustomer || !selectedSim || !hasOldSim || !startDate || !endDate) {
+    if (!selectedCustomer || selectedSimIds.length === 0 || !hasOldSim || !startDate || !endDate) {
       toast({ title: 'יש למלא את כל השדות כולל סים ישן', variant: 'destructive' });
       return;
     }
 
-    const days = differenceInDays(endDate, startDate) + 1;
-
-    // Determine old SIM details
-    const oldIccid = useManualOldSim 
-      ? manualOldIccid.replace(/\D/g, '') 
+    const oldIccid = useManualOldSim
+      ? manualOldIccid.replace(/\D/g, '')
       : (selectedOldSim?.iccid?.replace(/\D/g, '') || '');
     const oldSimNumber = useManualOldSim ? '' : (selectedOldSim?.sim_number || '');
 
     try {
+      const activeSim = selectedSims[0];
+      if (!activeSim) return;
       const swapParams = {
-        product: selectedSim.plan || '',
+        product: activeSim.plan || '',
         start_rental: format(startDate, 'dd/MM/yyyy'),
         end_rental: format(endDate, 'dd/MM/yyyy'),
         price: pricePreview?.total?.toString() || '0',
@@ -264,25 +260,25 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
         rental_id: '',
         current_sim: oldSimNumber,
         current_iccid: oldIccid,
-        swap_msisdn: selectedSim.uk_number || '',
-        swap_iccid: selectedSim.iccid?.replace(/\D/g, '') || '',
+        swap_msisdn: activeSim.uk_number || '',
+        swap_iccid: activeSim.iccid?.replace(/\D/g, '') || '',
       };
       console.log('Activate+Swap params:', JSON.stringify(swapParams, null, 2));
 
       const swapResult = await onActivateAndSwap(swapParams);
       console.log('Activate+Swap response:', JSON.stringify(swapResult, null, 2));
 
-      toast({ title: 'הפעלה והחלפה הושלמו בהצלחה!', description: `Response: ${JSON.stringify(swapResult, null, 2)}` });
+      toast({ title: 'הפעלה והחלפה הושלמו בהצלחה!' });
       resetForm();
     } catch (e: any) {
       console.error('Activate+Swap error:', e);
-      toast({ title: 'שגיאה', description: `${e.message}\n\nFull error: ${JSON.stringify(e, null, 2)}`, variant: 'destructive' });
+      toast({ title: 'שגיאה', description: e.message, variant: 'destructive' });
     }
   };
 
   const resetForm = () => {
     setSelectedCustomerId('');
-    setSelectedSimId('');
+    setSelectedSimIds([]);
     setSelectedOldSimId('');
     setStartDate(undefined);
     setEndDate(undefined);
@@ -302,9 +298,9 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
     }
   };
 
-  const canActivate = selectedCustomerId && selectedSimId && startDate && endDate;
-  const hasValidOldSim = useManualOldSim 
-    ? (manualOldIccid.replace(/\D/g, '').length >= 19) 
+  const canActivate = selectedCustomerId && selectedSimIds.length > 0 && startDate && endDate;
+  const hasValidOldSim = useManualOldSim
+    ? (manualOldIccid.replace(/\D/g, '').length >= 19)
     : !!selectedOldSimId;
   const canActivateAndSwap = canActivate && hasValidOldSim;
 
@@ -352,10 +348,15 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
           </CardContent>
         </Card>
 
-        {/* SIM Selection (new SIM to activate) */}
+        {/* SIM Selection - Multi Select */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">בחירת סים חדש להפעלה</CardTitle>
+            <CardTitle className="text-base flex items-center justify-between">
+              <span>בחירת סימים להפעלה</span>
+              {selectedSimIds.length > 0 && (
+                <Badge variant="secondary">{selectedSimIds.length} נבחרו</Badge>
+              )}
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="relative">
@@ -367,42 +368,46 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
                 className="pr-10"
               />
             </div>
-            <div className="max-h-40 overflow-y-auto space-y-1">
-              {filteredSims.map(sim => (
-                <button
-                  key={sim.id}
-                  onClick={() => setSelectedSimId(sim.id)}
-                  className={cn(
-                    'w-full text-right p-2 rounded-md text-sm border-2 transition-colors',
-                    getSimBorderColor(sim),
-                    selectedSimId === sim.id
-                      ? 'bg-primary/10 ring-2 ring-primary'
-                      : 'hover:bg-muted'
-                  )}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {sim.status_detail === 'expired' && (
-                        <AlertTriangle className="h-3 w-3 text-red-500" />
-                      )}
-                      <Badge variant="outline" className="text-[10px]">
-                        {sim.plan || 'ללא חבילה'}
-                      </Badge>
+            <div className="max-h-48 overflow-y-auto space-y-1">
+              {filteredSims.map(sim => {
+                const isSelected = selectedSimIds.includes(sim.id);
+                return (
+                  <button
+                    key={sim.id}
+                    onClick={() => toggleSimSelection(sim.id)}
+                    className={cn(
+                      'w-full text-right p-2 rounded-md text-sm border-2 transition-colors',
+                      getSimBorderColor(sim),
+                      isSelected
+                        ? 'bg-primary/10 ring-2 ring-primary'
+                        : 'hover:bg-muted'
+                    )}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Checkbox checked={isSelected} className="pointer-events-none" />
+                        {sim.status_detail === 'expired' && (
+                          <AlertTriangle className="h-3 w-3 text-destructive" />
+                        )}
+                        <Badge variant="outline" className="text-[10px]">
+                          {sim.plan || 'ללא חבילה'}
+                        </Badge>
+                      </div>
+                      <div>
+                        <span className="font-mono text-xs">{sim.uk_number || sim.il_number || '---'}</span>
+                        <span className="text-[10px] mr-2 text-muted-foreground font-mono">
+                          {sim.iccid || '---'}
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="font-mono text-xs">{sim.uk_number || sim.il_number || '---'}</span>
-                      <span className="text-[10px] mr-2 text-muted-foreground font-mono">
-                        {sim.iccid || '---'}
-                      </span>
-                    </div>
-                  </div>
-                  {sim.status_detail === 'expired' && (
-                    <p className="text-[10px] text-red-500 mt-1">
-                      סים פג תוקף - יש להאריך לפני הפעלה
-                    </p>
-                  )}
-                </button>
-              ))}
+                    {sim.status_detail === 'expired' && (
+                      <p className="text-[10px] text-destructive mt-1">
+                        סים פג תוקף - יש להאריך לפני הפעלה
+                      </p>
+                    )}
+                  </button>
+                );
+              })}
               {filteredSims.length === 0 && (
                 <p className="text-center text-muted-foreground text-sm py-4">אין סימים זמינים</p>
               )}
@@ -449,9 +454,14 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
             {pricePreview ? (
               <span className="font-bold text-lg">
                 {pricePreview.currency === 'ILS' ? '₪' : '$'}{pricePreview.total}
+                {selectedSimIds.length > 1 && (
+                  <span className="text-xs font-normal text-muted-foreground mr-2">
+                    ({selectedSimIds.length} סימים)
+                  </span>
+                )}
               </span>
             ) : (
-              <span className="text-muted-foreground text-sm">בחר תאריכים</span>
+              <span className="text-muted-foreground text-sm">בחר תאריכים וסימים</span>
             )}
           </div>
         </div>
@@ -472,13 +482,13 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
         </Label>
         {includeDevice && pricePreview && pricePreview.breakdown.length > 1 && (
           <span className="text-sm font-medium text-primary">
-            +₪{pricePreview.breakdown[1]?.price || 0}
+            +₪{pricePreview.breakdown[pricePreview.breakdown.length - 1]?.price || 0}
           </span>
         )}
       </div>
 
-      {/* Price breakdown when device included */}
-      {includeDevice && pricePreview && pricePreview.breakdown.length > 1 && (
+      {/* Price breakdown */}
+      {pricePreview && pricePreview.breakdown.length > 1 && (
         <div className="text-xs text-muted-foreground space-y-1 px-1">
           {pricePreview.breakdown.map((b, i) => (
             <div key={i} className="flex justify-between">
@@ -631,7 +641,7 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
           {isActivating ? (
             <><Loader2 className="h-4 w-4 animate-spin" /> מפעיל...</>
           ) : (
-            <><CheckCircle className="h-4 w-4" /> הפעל סים</>
+            <><CheckCircle className="h-4 w-4" /> הפעל {selectedSimIds.length > 1 ? `${selectedSimIds.length} סימים` : 'סים'}</>
           )}
         </Button>
 
