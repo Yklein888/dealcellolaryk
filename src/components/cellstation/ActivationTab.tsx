@@ -62,6 +62,8 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
   const [oldSimSearch, setOldSimSearch] = useState('');
   const [selectedOldSimId, setSelectedOldSimId] = useState('');
   const [showOldSimSection, setShowOldSimSection] = useState(false);
+  const [manualOldIccid, setManualOldIccid] = useState('');
+  const [useManualOldSim, setUseManualOldSim] = useState(false);
 
   const filteredCustomers = useMemo(() => {
     if (!customerSearch.trim()) return customers.slice(0, 10);
@@ -238,12 +240,19 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
   };
 
   const handleActivateAndSwap = async () => {
-    if (!selectedCustomer || !selectedSim || !selectedOldSim || !startDate || !endDate) {
+    const hasOldSim = useManualOldSim ? (manualOldIccid.replace(/\D/g, '').length >= 19) : !!selectedOldSimId;
+    if (!selectedCustomer || !selectedSim || !hasOldSim || !startDate || !endDate) {
       toast({ title: 'יש למלא את כל השדות כולל סים ישן', variant: 'destructive' });
       return;
     }
 
     const days = differenceInDays(endDate, startDate) + 1;
+
+    // Determine old SIM details
+    const oldIccid = useManualOldSim 
+      ? manualOldIccid.replace(/\D/g, '') 
+      : (selectedOldSim?.iccid?.replace(/\D/g, '') || '');
+    const oldSimNumber = useManualOldSim ? '' : (selectedOldSim?.sim_number || '');
 
     try {
       const swapParams = {
@@ -253,7 +262,8 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
         price: pricePreview?.total?.toString() || '0',
         note: `${selectedCustomer.name} ${selectedCustomer.phone} ${notes}`.trim(),
         rental_id: '',
-        current_sim: selectedOldSim.sim_number || '',
+        current_sim: oldSimNumber,
+        current_iccid: oldIccid,
         swap_msisdn: selectedSim.uk_number || '',
         swap_iccid: selectedSim.iccid?.replace(/\D/g, '') || '',
       };
@@ -279,6 +289,8 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
     setNotes('');
     setShowOldSimSection(false);
     setIncludeDevice(false);
+    setManualOldIccid('');
+    setUseManualOldSim(false);
   };
 
   const getSimBorderColor = (sim: CellStationSim) => {
@@ -291,7 +303,10 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
   };
 
   const canActivate = selectedCustomerId && selectedSimId && startDate && endDate;
-  const canActivateAndSwap = canActivate && selectedOldSimId;
+  const hasValidOldSim = useManualOldSim 
+    ? (manualOldIccid.replace(/\D/g, '').length >= 19) 
+    : !!selectedOldSimId;
+  const canActivateAndSwap = canActivate && hasValidOldSim;
 
   return (
     <div className="p-4 space-y-6">
@@ -524,7 +539,7 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
               </Button>
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+           <CardContent className="space-y-3">
             <div className="relative">
               <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -532,16 +547,21 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
                 value={oldSimSearch}
                 onChange={e => setOldSimSearch(e.target.value)}
                 className="pr-10"
+                onFocus={() => setUseManualOldSim(false)}
               />
             </div>
             <div className="max-h-32 overflow-y-auto space-y-1">
               {filteredOldSims.map(sim => (
                 <button
                   key={sim.id}
-                  onClick={() => setSelectedOldSimId(sim.id)}
+                  onClick={() => {
+                    setSelectedOldSimId(sim.id);
+                    setUseManualOldSim(false);
+                    setManualOldIccid('');
+                  }}
                   className={cn(
                     'w-full text-right p-2 rounded-md text-sm border transition-colors',
-                    selectedOldSimId === sim.id
+                    selectedOldSimId === sim.id && !useManualOldSim
                       ? 'bg-orange-100 dark:bg-orange-950/30 border-orange-400 ring-1 ring-orange-400'
                       : 'border-border hover:bg-muted'
                   )}
@@ -557,6 +577,42 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
               ))}
               {filteredOldSims.length === 0 && (
                 <p className="text-center text-muted-foreground text-sm py-4">אין סימים מושכרים</p>
+              )}
+            </div>
+
+            {/* Divider */}
+            <div className="flex items-center gap-2">
+              <div className="flex-1 border-t" />
+              <span className="text-xs text-muted-foreground">או</span>
+              <div className="flex-1 border-t" />
+            </div>
+
+            {/* Manual ICCID Input */}
+            <div className="space-y-2">
+              <Label>הכנס ICCID ידנית (19-20 ספרות)</Label>
+              <Input
+                value={manualOldIccid}
+                onChange={e => {
+                  const val = e.target.value.replace(/\D/g, '');
+                  setManualOldIccid(val);
+                  if (val) {
+                    setUseManualOldSim(true);
+                    setSelectedOldSimId('');
+                  }
+                }}
+                placeholder="89..."
+                dir="ltr"
+                className={cn(
+                  "font-mono",
+                  useManualOldSim && manualOldIccid ? 'ring-1 ring-orange-400 border-orange-400' : ''
+                )}
+                maxLength={20}
+              />
+              {manualOldIccid && useManualOldSim && manualOldIccid.length < 19 && (
+                <p className="text-xs text-destructive">ICCID חייב להיות 19-20 ספרות</p>
+              )}
+              {manualOldIccid && useManualOldSim && manualOldIccid.length >= 19 && (
+                <p className="text-xs text-green-600">✓ ICCID תקין</p>
               )}
             </div>
           </CardContent>
@@ -580,7 +636,7 @@ export function ActivationTab({ availableSims, onActivate, onActivateAndSwap, is
         </Button>
 
         {/* Activate + Swap (only when old SIM selected) */}
-        {showOldSimSection && selectedOldSimId && (
+        {showOldSimSection && hasValidOldSim && (
           <Button
             size="lg"
             className="flex-1 gap-2 bg-orange-600 hover:bg-orange-700 text-white"
