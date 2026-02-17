@@ -13,7 +13,8 @@ import { StatCard } from '@/components/StatCard';
 import { ActivationTab } from '@/components/cellstation/ActivationTab';
 import { SwapSimDialog } from '@/components/cellstation/SwapSimDialog';
 import { ActivateAndSwapDialog } from '@/components/cellstation/ActivateAndSwapDialog';
-import { RefreshCw, Search, Signal, CheckCircle, XCircle, Clock, ArrowLeftRight, Zap, AlertTriangle, Phone } from 'lucide-react';
+import { SimCardGrid } from '@/components/cellstation/SimCardGrid';
+import { RefreshCw, Search, Signal, CheckCircle, XCircle, Clock, ArrowLeftRight, Zap, AlertTriangle, Phone, LayoutGrid, List } from 'lucide-react';
 import { differenceInDays, formatDistanceToNow } from 'date-fns';
 import { he } from 'date-fns/locale';
 
@@ -241,6 +242,7 @@ export default function CellStation() {
   } = useCellStation();
 
   const [search, setSearch] = useState('');
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [swapDialogSim, setSwapDialogSim] = useState<SimRow | null>(null);
   const [activateSwapSim, setActivateSwapSim] = useState<SimRow | null>(null);
   const [swapRentalId, setSwapRentalId] = useState<string>('');
@@ -661,15 +663,37 @@ export default function CellStation() {
         <StatCard title="פגי תוקף" value={stats.expired} icon={XCircle} />
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-md">
-        <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="חיפוש לפי מספר, ICCID, לקוח..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pr-10"
-        />
+      {/* Search + View Toggle */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="חיפוש לפי מספר, ICCID, לקוח..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pr-10"
+          />
+        </div>
+        <div className="flex items-center border rounded-lg overflow-hidden">
+          <Button
+            size="sm"
+            variant={viewMode === 'cards' ? 'default' : 'ghost'}
+            className="rounded-none gap-1.5 h-9"
+            onClick={() => setViewMode('cards')}
+          >
+            <LayoutGrid className="h-4 w-4" />
+            כרטיסים
+          </Button>
+          <Button
+            size="sm"
+            variant={viewMode === 'table' ? 'default' : 'ghost'}
+            className="rounded-none gap-1.5 h-9"
+            onClick={() => setViewMode('table')}
+          >
+            <List className="h-4 w-4" />
+            טבלה
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -690,29 +714,58 @@ export default function CellStation() {
                 </TabsList>
               </div>
               <TabsContent value="all" className="m-0">
-                <SimTable
-                  sims={filtered}
-                  showSystemStatus
-                  inventoryMap={inventoryMap}
-                  needsSwapIccids={needsSwapIccids}
-                  onActivateAndSwapClick={sim => setActivateSwapSim(sim)}
-                />
+                {viewMode === 'cards' ? (
+                  <SimCardGrid
+                    sims={filtered}
+                    showSystemStatus
+                    inventoryMap={inventoryMap}
+                    needsSwapIccids={needsSwapIccids}
+                    onActivateAndSwapClick={sim => setActivateSwapSim(sim)}
+                  />
+                ) : (
+                  <SimTable
+                    sims={filtered}
+                    showSystemStatus
+                    inventoryMap={inventoryMap}
+                    needsSwapIccids={needsSwapIccids}
+                    onActivateAndSwapClick={sim => setActivateSwapSim(sim)}
+                  />
+                )}
               </TabsContent>
               <TabsContent value="available" className="m-0">
-                <SimTable sims={available} />
+                {viewMode === 'cards' ? (
+                  <SimCardGrid sims={available} />
+                ) : (
+                  <SimTable sims={available} />
+                )}
               </TabsContent>
               <TabsContent value="expired" className="m-0">
-                <SimTable sims={expired} />
+                {viewMode === 'cards' ? (
+                  <SimCardGrid sims={expired} />
+                ) : (
+                  <SimTable sims={expired} />
+                )}
               </TabsContent>
               <TabsContent value="rented" className="m-0">
-                <SimTable
-                   sims={rented}
-                   showCustomer
-                   showSwap
-                   onSwapClick={sim => openSwapForSim(sim)}
-                   needsSwapIccids={needsSwapIccids}
-                   onActivateAndSwapClick={sim => setActivateSwapSim(sim)}
-                 />
+                {viewMode === 'cards' ? (
+                  <SimCardGrid
+                    sims={rented}
+                    showCustomer
+                    showSwap
+                    onSwapClick={sim => openSwapForSim(sim)}
+                    needsSwapIccids={needsSwapIccids}
+                    onActivateAndSwapClick={sim => setActivateSwapSim(sim)}
+                  />
+                ) : (
+                  <SimTable
+                    sims={rented}
+                    showCustomer
+                    showSwap
+                    onSwapClick={sim => openSwapForSim(sim)}
+                    needsSwapIccids={needsSwapIccids}
+                    onActivateAndSwapClick={sim => setActivateSwapSim(sim)}
+                  />
+                )}
               </TabsContent>
               <TabsContent value="activate" className="m-0">
                 <ActivationTab
