@@ -92,9 +92,9 @@ serve(async (req) => {
     
     const todayStr = today.toISOString().split('T')[0];
 
-    console.log('Processing overdue calls for rentals ending on:', yesterdayStr);
+    console.log('Processing overdue calls for all active rentals past end date, today:', todayStr);
 
-    // Find active rentals that ended yesterday (first day of being overdue)
+    // Find ALL active rentals that are past their end date (overdue)
     const { data: overdueRentals, error: rentalsError } = await supabase
       .from('rentals')
       .select(`
@@ -104,14 +104,14 @@ serve(async (req) => {
         end_date
       `)
       .eq('status', 'active')
-      .eq('end_date', yesterdayStr);
+      .lt('end_date', todayStr);
 
     if (rentalsError) {
       throw new Error(`Error fetching overdue rentals: ${rentalsError.message}`);
     }
 
     if (!overdueRentals || overdueRentals.length === 0) {
-      console.log('No rentals became overdue today');
+      console.log('No overdue active rentals found');
       return new Response(
         JSON.stringify({ 
           success: true, 
@@ -122,7 +122,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Found ${overdueRentals.length} rentals that became overdue today`);
+    console.log(`Found ${overdueRentals.length} overdue active rentals`);
 
     const results: { rentalId: string; success: boolean; error?: string }[] = [];
 
