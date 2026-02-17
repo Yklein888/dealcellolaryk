@@ -119,6 +119,16 @@ export function useCellStation() {
           .from('cellstation_sims')
           .upsert(records, { onConflict: 'iccid' });
         if (upsertError) throw upsertError;
+
+        // Delete stale records that no longer exist in the portal
+        const currentIccids = records.map((r: any) => r.iccid).filter(Boolean);
+        if (currentIccids.length > 0) {
+          const { error: deleteError } = await supabase
+            .from('cellstation_sims')
+            .delete()
+            .not('iccid', 'in', `(${currentIccids.join(',')})`);
+          if (deleteError) console.error('Failed to clean stale sims:', deleteError);
+        }
       }
 
       // Cross-reference with inventory
