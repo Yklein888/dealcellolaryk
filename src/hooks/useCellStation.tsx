@@ -242,43 +242,39 @@ export function useCellStation() {
       onProgress?.('מפעיל סים...', 10);
       setActivateAndSwapProgress('מפעיל סים...');
       
-      const response = await supabase.functions.invoke('cellstation-api', {
-        body: { action: 'activate_and_swap', params },
-      });
-      const data = response.data;
-      const error = response.error;
-
-      // The edge function handles the 60s wait internally
-      // We simulate progress on the client side
-      onProgress?.('ממתין להפעלה...', 30);
-      setActivateAndSwapProgress('ממתין להפעלה...');
-
-      // Poll progress visually (the actual wait is in the edge function)
+      // Run the edge function and progress polling in parallel
       const startTime = Date.now();
-      const totalWait = 70000; // ~70 seconds total
+      const totalWait = 80000; // ~80 seconds visual estimate
       
-      await new Promise<void>((resolve) => {
-        const interval = setInterval(() => {
-          const elapsed = Date.now() - startTime;
-          const percent = Math.min(90, Math.round((elapsed / totalWait) * 90));
-          
-          if (elapsed < 10000) {
-            onProgress?.('מפעיל סים...', percent);
-            setActivateAndSwapProgress('מפעיל סים...');
-          } else if (elapsed < 65000) {
-            onProgress?.('ממתין 60 שניות...', percent);
-            setActivateAndSwapProgress('ממתין 60 שניות...');
-          } else {
-            onProgress?.('מחליף סים...', percent);
-            setActivateAndSwapProgress('מחליף סים...');
-          }
-          
-          if (elapsed >= totalWait) {
-            clearInterval(interval);
-            resolve();
-          }
-        }, 1000);
-      });
+      // Start progress polling
+      const progressInterval = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        const percent = Math.min(90, Math.round((elapsed / totalWait) * 90));
+        
+        if (elapsed < 10000) {
+          onProgress?.('מפעיל סים...', percent);
+          setActivateAndSwapProgress('מפעיל סים...');
+        } else if (elapsed < 65000) {
+          onProgress?.('ממתין 60 שניות...', percent);
+          setActivateAndSwapProgress('ממתין 60 שניות...');
+        } else {
+          onProgress?.('מחליף סים...', percent);
+          setActivateAndSwapProgress('מחליף סים...');
+        }
+      }, 1000);
+
+      // Call edge function (this blocks for ~70s because it waits internally)
+      let data: any;
+      let error: any;
+      try {
+        const response = await supabase.functions.invoke('cellstation-api', {
+          body: { action: 'activate_and_swap', params },
+        });
+        data = response.data;
+        error = response.error;
+      } finally {
+        clearInterval(progressInterval);
+      }
 
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || 'Activate and swap failed');
