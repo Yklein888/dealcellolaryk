@@ -81,18 +81,37 @@ export function useCellStation() {
   const syncSims = useCallback(async () => {
     setIsSyncing(true);
     try {
+      console.log('🚀 Starting sync with CellStation...');
       const response = await supabase.functions.invoke('cellstation-api', {
         body: { action: 'sync_csv', params: {} },
       });
       const data = response.data;
       const fnError = response.error;
+      
+      console.log('📦 Edge Function Response:', { data, fnError });
+      
       if (fnError) {
         const msg = typeof fnError === 'object' && (fnError as any)?.message ? (fnError as any).message : String(fnError);
+        console.error('❌ Edge Function Error:', msg);
         throw new Error(msg);
       }
-      if (!data?.success) throw new Error(data?.error || 'Sync failed');
+      if (!data?.success) {
+        console.error('❌ Sync failed:', data?.error);
+        throw new Error(data?.error || 'Sync failed');
+      }
 
       const sims = data.sims || [];
+      console.log(`✅ Received ${sims.length} SIMs from CellStation`);
+      
+      if (sims.length === 0) {
+        console.warn('⚠️ No SIMs returned from CellStation! Check Edge Function logs.');
+        toast({
+          title: "אין סימים",
+          description: "לא התקבלו סימים מ-CellStation. בדוק את פרטי ההתחברות.",
+          variant: "destructive",
+        });
+      }
+      
       const now = new Date().toISOString();
 
       const records = sims.map((sim: any) => {
