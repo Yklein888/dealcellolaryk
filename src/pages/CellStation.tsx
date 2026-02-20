@@ -297,11 +297,95 @@ export default function CellStation() {
     };
   }, [runAutoSync]);
 
+  // ⚡ REAL-TIME SYNC - Updates appear instantly across all devices!
+  useEffect(() => {
+    console.log('🚀 Real-Time Sync activated - changes sync in real-time!');
+    
+    // Subscribe to cellstation_sims changes
+    const subscription = supabase
+      .channel('cellstation_sims_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'cellstation_sims'
+        },
+        (payload) => {
+          console.log('⚡ Real-time update received:', payload);
+          // Refresh SIMs data immediately
+          fetchSims();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('👋 Real-Time Sync disconnected');
+      subscription.unsubscribe();
+    };
+  }, [fetchSims]);
+
   // Refresh "time ago" every 30s
   useEffect(() => {
     const ticker = setInterval(() => setTick(t => t + 1), 30000);
     return () => clearInterval(ticker);
   }, []);
+
+  // ⚡ REAL-TIME SYNC for Inventory - instant updates!
+  useEffect(() => {
+    console.log('🚀 Real-Time Inventory Sync activated!');
+    
+    // Subscribe to inventory changes
+    const inventorySubscription = supabase
+      .channel('inventory_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'inventory'
+        },
+        (payload) => {
+          console.log('⚡ Inventory updated in real-time:', payload);
+          // Trigger cross-reference reload
+          if (simCards.length > 0) {
+            setTimeout(async () => {
+              const { data: invData } = await supabase
+                .from('inventory' as any)
+                .select('id, sim_number, status')
+                .not('sim_number', 'is', null);
+              
+              const map: InventoryMap = {};
+              const rentedIccids = new Set<string>();
+              if (invData) {
+                for (const item of invData as any[]) {
+                  if (item.sim_number) {
+                    map[item.sim_number] = { status: item.status, id: item.id };
+                    if (item.status === 'rented') {
+                      rentedIccids.add(item.sim_number);
+                    }
+                  }
+                }
+              }
+              setInventoryMap(map);
+              
+              const swapNeeded = new Set<string>();
+              for (const sim of simCards) {
+                if (sim.status === 'available' && sim.iccid && rentedIccids.has(sim.iccid)) {
+                  swapNeeded.add(sim.iccid);
+                }
+              }
+              setNeedsSwapIccids(swapNeeded);
+            }, 500);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      inventorySubscription.unsubscribe();
+    };
+  }, [simCards]);
 
   // Inventory map for cross-referencing
   const [inventoryMap, setInventoryMap] = useState<InventoryMap>({});

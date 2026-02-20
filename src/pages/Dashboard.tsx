@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRental } from '@/hooks/useRental';
+import { supabase } from '@/integrations/supabase/client';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { GlobalSearch } from '@/components/GlobalSearch';
@@ -76,6 +77,70 @@ export default function Dashboard() {
     const interval = setInterval(checkDueRentals, 60 * 60 * 1000);
     return () => clearInterval(interval);
   }, [isSubscribed, rentals, notifyRentalDue]);
+
+  // ⚡ REAL-TIME SYNC - Dashboard updates instantly!
+  useEffect(() => {
+    console.log('🚀 Dashboard Real-Time Sync activated!');
+    
+    // Subscribe to rentals changes
+    const rentalsChannel = supabase
+      .channel('rentals_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'rentals'
+        },
+        (payload) => {
+          console.log('⚡ Rentals updated in real-time:', payload);
+          // The useRental hook will automatically fetch updated data
+          window.location.reload(); // Temporary - will be replaced with query invalidation
+        }
+      )
+      .subscribe();
+
+    // Subscribe to inventory changes
+    const inventoryChannel = supabase
+      .channel('inventory_dashboard_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'inventory'
+        },
+        (payload) => {
+          console.log('⚡ Inventory updated in real-time:', payload);
+          window.location.reload(); // Temporary - will be replaced with query invalidation
+        }
+      )
+      .subscribe();
+
+    // Subscribe to repairs changes
+    const repairsChannel = supabase
+      .channel('repairs_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'repairs'
+        },
+        (payload) => {
+          console.log('⚡ Repairs updated in real-time:', payload);
+          window.location.reload(); // Temporary - will be replaced with query invalidation
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('👋 Dashboard Real-Time Sync disconnected');
+      rentalsChannel.unsubscribe();
+      inventoryChannel.unsubscribe();
+      repairsChannel.unsubscribe();
+    };
+  }, []);
 
   const upcomingReturns = useMemo(() => getUpcomingReturns(), [getUpcomingReturns, rentals]);
 
