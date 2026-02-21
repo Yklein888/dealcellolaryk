@@ -141,20 +141,21 @@ export function useCellStation() {
       }).filter((r: any) => r.iccid);
 
       if (records.length > 0) {
-        const { error: upsertError } = await supabase
+        // Step 1: Delete ALL existing records and re-insert fresh from portal
+        // This handles ICCID changes when SIMs are physically swapped
+        const { error: deleteAllError } = await cellstationSupabase
           .from('cellstation_sims')
-          .upsert(records, { onConflict: 'iccid' });
-        if (upsertError) throw upsertError;
+          .delete()
+          .not('id', 'is', null);
+        if (deleteAllError) console.error('Failed to clear sims:', deleteAllError);
 
-        // Delete stale records that no longer exist in the portal
-        const currentIccids = records.map((r: any) => r.iccid).filter(Boolean);
-        if (currentIccids.length > 0) {
-          const { error: deleteError } = await supabase
-            .from('cellstation_sims')
-            .delete()
-            .not('iccid', 'in', `(${currentIccids.join(',')})`);
-          if (deleteError) console.error('Failed to clean stale sims:', deleteError);
-        }
+        // Step 2: Insert all fresh records from portal
+        // Remove note field as it doesn't exist in DB schema
+        const cleanRecords = records.map(({ note, ...r }: any) => r);
+        const { error: insertError } = await cellstationSupabase
+          .from('cellstation_sims')
+          .insert(cleanRecords);
+        if (insertError) throw insertError;
       }
 
       // Cross-reference with inventory
