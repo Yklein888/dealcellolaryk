@@ -142,7 +142,7 @@ function SystemStatusBadge({ status }: { status: SystemStatus }) {
   }
 }
 
-function SimTable({ sims, showCustomer, showSwap, showSystemStatus, inventoryMap, onSwapClick, onActivateAndSwapClick, needsSwapIccids }: SimTableProps) {
+function SimTable({ sims, showCustomer, showSwap, showSystemStatus, inventoryMap, onSwapClick, onActivateAndSwapClick, onRentalClick, needsSwapIccids }: SimTableProps) {
   if (sims.length === 0) {
     return <p className="text-center text-muted-foreground py-8">אין סימים להצגה</p>;
   }
