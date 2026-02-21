@@ -35,6 +35,7 @@ interface SimCardGridProps {
   onSwapClick?: (sim: SimRow) => void;
   onActivateAndSwapClick?: (sim: SimRow) => void;
   needsSwapIccids?: Set<string>;
+  onRentalClick?: (sim: SimRow) => void;
 }
 
 function getSystemStatus(sim: SimRow, inventoryMap: InventoryMap): SystemStatus {
@@ -110,6 +111,7 @@ export function SimCardGrid({
   onSwapClick,
   onActivateAndSwapClick,
   needsSwapIccids,
+  onRentalClick,
 }: SimCardGridProps) {
   const { toast } = useToast();
   const [printingId, setPrintingId] = useState<string | null>(null);
@@ -184,16 +186,16 @@ export function SimCardGrid({
 
             {/* Phone Numbers */}
             <div className="space-y-1">
-              {sim.uk_number && (
-                <div className="flex items-center gap-2 text-sm" dir="ltr">
-                  <span className="text-base">🇬🇧</span>
-                  <span className="font-mono font-medium">{sim.uk_number}</span>
-                </div>
-              )}
               {sim.il_number && (
                 <div className="flex items-center gap-2 text-sm" dir="ltr">
                   <span className="text-base">🇮🇱</span>
-                  <span className="font-mono font-medium">{sim.il_number}</span>
+                  <span className="font-mono font-bold text-foreground">{sim.il_number}</span>
+                </div>
+              )}
+              {sim.uk_number && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground" dir="ltr">
+                  <span className="text-base">🇬🇧</span>
+                  <span className="font-mono">{sim.uk_number}</span>
                 </div>
               )}
               <div className="text-xs text-muted-foreground font-mono">
@@ -243,8 +245,13 @@ export function SimCardGrid({
             )}
 
             {/* Action buttons */}
-            {(showSwap || needsSwap) && (
+            {(showSwap || needsSwap || onRentalClick) && (
               <div className="flex gap-2 mt-auto pt-1">
+                {onRentalClick && sim.status === 'rented' && (
+                  <Button size="sm" variant="outline" onClick={() => onRentalClick(sim)} className="gap-1 text-xs flex-1">
+                    🔗 השכרה
+                  </Button>
+                )}
                 {showSwap && onSwapClick && (
                   <Button size="sm" variant="outline" onClick={() => onSwapClick(sim)} className="gap-1 text-xs flex-1">
                     <ArrowLeftRight className="h-3 w-3" /> החלף
