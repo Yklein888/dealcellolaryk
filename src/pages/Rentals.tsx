@@ -364,7 +364,8 @@ export default function Rentals() {
     // Handle special filter statuses
     let matchesStatus = true;
     if (filterStatus === 'all') {
-      matchesStatus = true;
+      // ב-all מסתירים returned - מוצג רק כשלוחצים על 'הוחזרו'
+      matchesStatus = rental.status !== 'returned';
     } else if (filterStatus === 'ending_today') {
       // Rentals ending exactly today
       const today = new Date();
