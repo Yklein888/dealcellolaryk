@@ -240,7 +240,6 @@ export default function CellStation() {
   } = useCellStation();
 
   const [search, setSearch] = useState('');
-  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [swapDialogSim, setSwapDialogSim] = useState<SimRow | null>(null);
   const [activateSwapSim, setActivateSwapSim] = useState<SimRow | null>(null);
   const [swapRentalId, setSwapRentalId] = useState<string>('');
