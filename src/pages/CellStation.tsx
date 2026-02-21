@@ -118,6 +118,7 @@ interface SimTableProps {
   inventoryMap?: InventoryMap;
   onSwapClick?: (sim: SimRow) => void;
   onActivateAndSwapClick?: (sim: SimRow) => void;
+  onRentalClick?: (sim: SimRow) => void;
   needsSwapIccids?: Set<string>;
 }
 
