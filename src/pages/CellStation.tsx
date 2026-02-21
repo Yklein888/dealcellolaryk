@@ -650,58 +650,75 @@ export default function CellStation() {
   }), [simCards]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4" dir="rtl">
+      {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <PageHeader title="ניהול סימים" description="סנכרון וניהול כרטיסי SIM מ-CellStation" />
-        <div className="flex items-center gap-3">
-          <SyncStatusIndicator
-            status={syncStatus}
-            lastSyncTime={lastSyncTime}
-            simCountDelta={simCountDelta}
-          />
-          <Button
-            onClick={runAutoSync}
-            disabled={isSyncing}
-            variant="outline"
-            size="sm"
-            className="gap-2"
-          >
+        <div>
+          <h1 className="text-2xl font-bold">📶 ניהול סימים</h1>
+          <p className="text-sm text-muted-foreground">כרטיסי SIM מ-CellStation</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <SyncStatusIndicator status={syncStatus} lastSyncTime={lastSyncTime} simCountDelta={simCountDelta} />
+          <Button onClick={runAutoSync} disabled={isSyncing} variant="outline" size="sm" className="gap-2">
             <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
-            רענן עכשיו
+            רענן
           </Button>
         </div>
       </div>
 
-      {/* Overdue Warning Cards */}
+      {/* Stats - כרטיסים גדולים וקליקביליים */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <button
+          onClick={() => setActiveTab('available')}
+          className={`rounded-xl p-4 text-right border-2 transition-all ${activeTab === 'available' ? 'border-green-500 bg-green-50 dark:bg-green-950/30' : 'border-transparent bg-green-100/60 dark:bg-green-950/20 hover:border-green-300'}`}
+        >
+          <div className="text-3xl font-bold text-green-700 dark:text-green-400">{stats.available}</div>
+          <div className="text-sm font-medium text-green-800 dark:text-green-300">✅ זמינים</div>
+        </button>
+        <button
+          onClick={() => setActiveTab('rented')}
+          className={`rounded-xl p-4 text-right border-2 transition-all ${activeTab === 'rented' ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30' : 'border-transparent bg-blue-100/60 dark:bg-blue-950/20 hover:border-blue-300'}`}
+        >
+          <div className="text-3xl font-bold text-blue-700 dark:text-blue-400">{stats.rented}</div>
+          <div className="text-sm font-medium text-blue-800 dark:text-blue-300">📤 מושכרים</div>
+        </button>
+        <button
+          onClick={() => setActiveTab('expired')}
+          className={`rounded-xl p-4 text-right border-2 transition-all ${activeTab === 'expired' ? 'border-red-500 bg-red-50 dark:bg-red-950/30' : 'border-transparent bg-red-100/60 dark:bg-red-950/20 hover:border-red-300'}`}
+        >
+          <div className="text-3xl font-bold text-red-700 dark:text-red-400">{stats.expired}</div>
+          <div className="text-sm font-medium text-red-800 dark:text-red-300">❌ פגי תוקף</div>
+        </button>
+        <button
+          onClick={() => setActiveTab('all')}
+          className={`rounded-xl p-4 text-right border-2 transition-all ${activeTab === 'all' ? 'border-gray-500 bg-gray-100 dark:bg-gray-800' : 'border-transparent bg-gray-100/60 dark:bg-gray-800/40 hover:border-gray-300'}`}
+        >
+          <div className="text-3xl font-bold text-gray-700 dark:text-gray-300">{stats.total}</div>
+          <div className="text-sm font-medium text-gray-600 dark:text-gray-400">📊 סה״כ</div>
+        </button>
+      </div>
+
+      {/* התראות */}
       {overdueSwapItems.length > 0 && (
         <Card className="border-red-300 bg-red-50 dark:bg-red-950/20">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <AlertTriangle className="h-5 w-5 text-red-600" />
-              <h3 className="font-bold text-red-700 dark:text-red-400">
-                ⚠️ סימים שדורשים החלפה ({overdueSwapItems.length} סימים)
-              </h3>
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertTriangle className="h-4 w-4 text-red-600" />
+              <span className="font-bold text-red-700 text-sm">⚠️ סימים שדורשים החלפה ({overdueSwapItems.length})</span>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1">
               {overdueSwapItems.map((item, i) => (
-                <div key={i} className="flex items-center justify-between p-2 rounded-md bg-white/60 dark:bg-black/20">
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    className="gap-1"
-                    onClick={() => {
-                      const sim = simCards.find(s => s.iccid === item.iccid);
-                      if (sim) setActivateSwapSim(sim);
-                    }}
-                  >
+                <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-white/70 dark:bg-black/20">
+                  <Button size="sm" variant="destructive" className="gap-1 h-7 text-xs"
+                    onClick={() => { const sim = simCards.find(s => s.iccid === item.iccid); if (sim) setActivateSwapSim(sim); }}>
                     <Zap className="h-3 w-3" /> החלף עכשיו
                   </Button>
                   <div className="text-right text-sm">
-                    <span className="font-medium">{item.customerName}</span>
-                    <span className="mx-2 text-muted-foreground">|</span>
+                    <span className="font-semibold">{item.customerName}</span>
+                    <span className="mx-2 text-muted-foreground">·</span>
                     <span className="font-mono text-xs">{item.simNumber}</span>
-                    <span className="mx-2 text-muted-foreground">|</span>
-                    <span className="text-red-600 font-medium">{item.daysOverdue} ימים באיחור</span>
+                    <span className="mx-2 text-muted-foreground">·</span>
+                    <span className="text-red-600 font-bold">{item.daysOverdue} ימים</span>
                   </div>
                 </div>
               ))}
@@ -712,40 +729,25 @@ export default function CellStation() {
 
       {overdueNotReturned.length > 0 && (
         <Card className="border-orange-300 bg-orange-50 dark:bg-orange-950/20">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Clock className="h-5 w-5 text-orange-600" />
-              <h3 className="font-bold text-orange-700 dark:text-orange-400">
-                ⏰ סימים באיחור - הלקוח טרם החזיר ({overdueNotReturned.length} סימים)
-              </h3>
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Clock className="h-4 w-4 text-orange-600" />
+              <span className="font-bold text-orange-700 text-sm">⏰ לקוחות לא החזירו ({overdueNotReturned.length})</span>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1">
               {overdueNotReturned.map((item, i) => (
-                <div key={i} className="flex items-center justify-between p-2 rounded-md bg-white/60 dark:bg-black/20">
-                  {item.phone && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1"
-                      asChild
-                    >
-                      <a href={`tel:${item.phone}`}>
-                        <Phone className="h-3 w-3" /> התקשר ללקוח
-                      </a>
+                <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-white/70 dark:bg-black/20">
+                  {item.phone ? (
+                    <Button size="sm" variant="outline" className="gap-1 h-7 text-xs" asChild>
+                      <a href={`tel:${item.phone}`}><Phone className="h-3 w-3" /> התקשר</a>
                     </Button>
-                  )}
+                  ) : <div />}
                   <div className="text-right text-sm">
-                    <span className="font-medium">{item.customerName}</span>
-                    <span className="mx-2 text-muted-foreground">|</span>
+                    <span className="font-semibold">{item.customerName}</span>
+                    <span className="mx-2 text-muted-foreground">·</span>
                     <span className="font-mono text-xs">{item.simNumber}</span>
-                    <span className="mx-2 text-muted-foreground">|</span>
-                    <span className="text-orange-600 font-medium">{item.daysOverdue} ימים באיחור</span>
-                    {item.phone && (
-                      <>
-                        <span className="mx-2 text-muted-foreground">|</span>
-                        <span dir="ltr" className="text-xs">{item.phone}</span>
-                      </>
-                    )}
+                    <span className="mx-2 text-muted-foreground">·</span>
+                    <span className="text-orange-600 font-bold">{item.daysOverdue} ימים באיחור</span>
                   </div>
                 </div>
               ))}
@@ -754,35 +756,25 @@ export default function CellStation() {
         </Card>
       )}
 
-      {/* Expiring Soon Warning */}
       {expiringSoon.length > 0 && (
         <Card className="border-yellow-300 bg-yellow-50 dark:bg-yellow-950/20">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <AlertTriangle className="h-5 w-5 text-yellow-600" />
-              <h3 className="font-bold text-yellow-700 dark:text-yellow-400">
-                ⚡ סימים שפגי תוקפם בעוד 7 ימים ({expiringSoon.length} סימים)
-              </h3>
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertTriangle className="h-4 w-4 text-yellow-600" />
+              <span className="font-bold text-yellow-700 text-sm">⚡ פג תוקף בעוד 7 ימים ({expiringSoon.length})</span>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1">
               {expiringSoon.map((sim, i) => {
                 const daysLeft = differenceInDays(new Date(sim.expiry_date!), new Date());
                 return (
-                  <div key={i} className="flex items-center justify-between p-2 rounded-md bg-white/60 dark:bg-black/20">
-                    <div className="text-right text-sm">
-                      <span className="font-mono text-xs">{sim.sim_number}</span>
-                      {sim.customer_name && (
-                        <>
-                          <span className="mx-2 text-muted-foreground">|</span>
-                          <span className="font-medium">{sim.customer_name}</span>
-                        </>
-                      )}
-                      <span className="mx-2 text-muted-foreground">|</span>
-                      <span dir="ltr" className="text-xs text-muted-foreground">{sim.il_number || sim.uk_number}</span>
-                    </div>
+                  <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-white/70 dark:bg-black/20">
                     <span className={`font-bold text-sm ${daysLeft === 0 ? 'text-red-600' : 'text-yellow-600'}`}>
                       {daysLeft === 0 ? 'פג היום!' : `${daysLeft} ימים`}
                     </span>
+                    <div className="text-right text-sm">
+                      {sim.customer_name && <span className="font-semibold">{sim.customer_name} · </span>}
+                      <span dir="ltr" className="font-mono text-xs">{sim.il_number || sim.uk_number}</span>
+                    </div>
                   </div>
                 );
               })}
@@ -791,154 +783,71 @@ export default function CellStation() {
         </Card>
       )}
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard title="סה״כ" value={stats.total} icon={Signal} />
-        <StatCard title="זמינים" value={stats.available} icon={CheckCircle} />
-        <StatCard title="מושכרים" value={stats.rented} icon={Clock} />
-        <StatCard title="פגי תוקף" value={stats.expired} icon={XCircle} />
+      {/* חיפוש */}
+      <div className="relative">
+        <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="חיפוש לפי מספר, לקוח, ICCID..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pr-10 h-11 text-base"
+        />
       </div>
 
-      {/* Search + View Toggle */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="חיפוש לפי מספר, ICCID, לקוח..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pr-10"
-          />
-        </div>
-        <div className="flex items-center border rounded-lg overflow-hidden">
-          <Button
-            size="sm"
-            variant={viewMode === 'cards' ? 'default' : 'ghost'}
-            className="rounded-none gap-1.5 h-9"
-            onClick={() => setViewMode('cards')}
-          >
-            <LayoutGrid className="h-4 w-4" />
-            כרטיסים
-          </Button>
-          <Button
-            size="sm"
-            variant={viewMode === 'table' ? 'default' : 'ghost'}
-            className="rounded-none gap-1.5 h-9"
-            onClick={() => setViewMode('table')}
-          >
-            <List className="h-4 w-4" />
-            טבלה
-          </Button>
-        </div>
-      </div>
+      {/* לשוניות */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} dir="rtl">
+        <TabsList className="w-full grid grid-cols-5 h-11">
+          <TabsTrigger value="all" className="text-xs">כל ({filtered.length})</TabsTrigger>
+          <TabsTrigger value="available" className="text-xs">זמינים ({available.length})</TabsTrigger>
+          <TabsTrigger value="rented" className="text-xs">מושכרים ({rented.length})</TabsTrigger>
+          <TabsTrigger value="expired" className="text-xs">פגי תוקף ({expired.length})</TabsTrigger>
+          <TabsTrigger value="activate" className="text-xs">הפעלה</TabsTrigger>
+        </TabsList>
 
-      {isLoading ? (
-        <div className="space-y-2">
-          {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
-        </div>
-      ) : (
-        <Card>
-          <CardContent className="p-0">
-            <Tabs defaultValue="all" dir="rtl">
-              <div className="border-b px-4 pt-4 overflow-x-auto">
-                <TabsList>
-                  <TabsTrigger value="all">כל הסימים ({filtered.length})</TabsTrigger>
-                  <TabsTrigger value="available">זמינים ({available.length})</TabsTrigger>
-                  <TabsTrigger value="expired">פגי תוקף ({expired.length})</TabsTrigger>
-                  <TabsTrigger value="rented">מושכרים ({rented.length})</TabsTrigger>
-                  <TabsTrigger value="activate">הפעלה</TabsTrigger>
-                </TabsList>
-              </div>
-              <TabsContent value="all" className="m-0">
-                {viewMode === 'cards' ? (
-                  <SimCardGrid
-                    sims={filtered}
-                    showSystemStatus
-                    inventoryMap={inventoryMap}
-                    needsSwapIccids={needsSwapIccids}
-                    onActivateAndSwapClick={sim => setActivateSwapSim(sim)}
-                  />
-                ) : (
-                  <SimTable
-                    sims={filtered}
-                    showSystemStatus
-                    inventoryMap={inventoryMap}
-                    needsSwapIccids={needsSwapIccids}
-                    onActivateAndSwapClick={sim => setActivateSwapSim(sim)}
-                  />
-                )}
-              </TabsContent>
-              <TabsContent value="available" className="m-0">
-                {viewMode === 'cards' ? (
-                  <SimCardGrid sims={available} />
-                ) : (
-                  <SimTable sims={available} />
-                )}
-              </TabsContent>
-              <TabsContent value="expired" className="m-0">
-                {viewMode === 'cards' ? (
-                  <SimCardGrid sims={expired} />
-                ) : (
-                  <SimTable sims={expired} />
-                )}
-              </TabsContent>
-              <TabsContent value="rented" className="m-0">
-                {viewMode === 'cards' ? (
-                  <SimCardGrid
-                    sims={rented}
-                    showCustomer
-                    showSwap
-                    onSwapClick={sim => openSwapForSim(sim)}
-                    onRentalClick={sim => openRentalForSim(sim)}
-                    needsSwapIccids={needsSwapIccids}
-                    onActivateAndSwapClick={sim => setActivateSwapSim(sim)}
-                  />
-                ) : (
-                  <SimTable
-                    sims={rented}
-                    showCustomer
-                    showSwap
-                    onSwapClick={sim => openSwapForSim(sim)}
-                    onRentalClick={sim => openRentalForSim(sim)}
-                    needsSwapIccids={needsSwapIccids}
-                    onActivateAndSwapClick={sim => setActivateSwapSim(sim)}
-                  />
-                )}
-              </TabsContent>
-              <TabsContent value="activate" className="m-0">
-                <ActivationTab
-                  availableSims={simCards}
-                  onActivate={activateSim}
-                  onActivateAndSwap={activateAndSwap}
-                  isActivating={isActivating}
-                />
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
-      )}
+        {isLoading ? (
+          <div className="space-y-2 mt-4">
+            {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}
+          </div>
+        ) : (
+          <>
+            <TabsContent value="all" className="mt-3">
+              <SimTable sims={filtered} showSystemStatus inventoryMap={inventoryMap} needsSwapIccids={needsSwapIccids} onActivateAndSwapClick={sim => setActivateSwapSim(sim)} onRentalClick={sim => openRentalForSim(sim)} />
+            </TabsContent>
+            <TabsContent value="available" className="mt-3">
+              <SimTable sims={available} />
+            </TabsContent>
+            <TabsContent value="rented" className="mt-3">
+              <SimTable sims={rented} showCustomer showSwap onSwapClick={sim => openSwapForSim(sim)} onRentalClick={sim => openRentalForSim(sim)} needsSwapIccids={needsSwapIccids} onActivateAndSwapClick={sim => setActivateSwapSim(sim)} />
+            </TabsContent>
+            <TabsContent value="expired" className="mt-3">
+              <SimTable sims={expired} />
+            </TabsContent>
+            <TabsContent value="activate" className="mt-3">
+              <ActivationTab availableSims={simCards} onActivate={activateSim} onActivateAndSwap={activateAndSwap} isActivating={isActivating} />
+            </TabsContent>
+          </>
+        )}
+      </Tabs>
 
-      {/* Swap Dialog */}
+      {/* Dialogs */}
       {swapDialogSim && (
         <SwapSimDialog
-          open={!!swapDialogSim}
-          onOpenChange={open => !open && setSwapDialogSim(null)}
-          currentSim={swapDialogSim}
-          availableSims={simCards}
-          onSwap={handleSwapWithUpdates}
+          sim={swapDialogSim}
+          availableSims={simCards.filter(s => s.status === 'available' && s.iccid)}
+          isOpen={!!swapDialogSim}
+          onClose={() => setSwapDialogSim(null)}
+          onSwap={handleSwap}
           isSwapping={isSwapping}
-          rentalId={swapRentalId}
         />
       )}
-
-      {/* Activate + Swap Dialog */}
       {activateSwapSim && (
         <ActivateAndSwapDialog
-          open={!!activateSwapSim}
-          onOpenChange={open => !open && setActivateSwapSim(null)}
-          oldSim={activateSwapSim}
-          availableSims={simCards}
-          onActivateAndSwap={activateAndSwap}
+          currentSim={activateSwapSim}
+          availableSims={simCards.filter(s => s.status === 'available' && s.iccid)}
+          isOpen={!!activateSwapSim}
+          onClose={() => setActivateSwapSim(null)}
+          onActivateAndSwap={handleActivateAndSwap}
+          isActivating={isActivating}
         />
       )}
     </div>
