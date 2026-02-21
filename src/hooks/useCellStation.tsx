@@ -22,7 +22,6 @@ interface CellStationSim {
   start_date: string | null;
   end_date: string | null;
   customer_name: string | null;
-  note: string | null;
   last_sync: string | null;
 }
 
@@ -135,7 +134,6 @@ export function useCellStation() {
           start_date: parseDate(sim.start_date),
           end_date: parseDate(sim.end_date),
           customer_name: extractCustomerName(sim.note),
-          note: sim.note,
           last_sync: now,
         };
       }).filter((r: any) => r.iccid);
@@ -150,11 +148,9 @@ export function useCellStation() {
         if (deleteAllError) console.error('Failed to clear sims:', deleteAllError);
 
         // Step 2: Insert all fresh records from portal
-        // Remove note field as it doesn't exist in DB schema
-        const cleanRecords = records.map(({ note, ...r }: any) => r);
         const { error: insertError } = await cellstationSupabase
           .from('cellstation_sims')
-          .insert(cleanRecords);
+          .insert(records);
         if (insertError) throw insertError;
       }
 
