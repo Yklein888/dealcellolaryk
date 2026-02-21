@@ -18,7 +18,7 @@ import { RefreshCw, Search, Signal, CheckCircle, XCircle, Clock, ArrowLeftRight,
 import { differenceInDays, formatDistanceToNow } from 'date-fns';
 import { he } from 'date-fns/locale';
 
-const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const SYNC_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 const LAST_SYNC_KEY = 'dealcell_cellstation_last_sync';
 const LAST_SIM_COUNT_KEY = 'dealcell_cellstation_sim_count';
 
@@ -510,6 +510,16 @@ export default function CellStation() {
     }
   }, [simCards]);
 
+  // Navigate to rental for a rented SIM
+  const openRentalForSim = useCallback((sim: SimRow) => {
+    const iccid = sim.iccid;
+    if (!iccid || !inventoryMap[iccid]) return;
+    const rentalId = inventoryMap[iccid].rentalId;
+    if (rentalId) {
+      window.location.href = `/rentals?highlight=${rentalId}`;
+    }
+  }, [inventoryMap]);
+
   // Find rental ID for a rented SIM
   const openSwapForSim = useCallback(async (sim: SimRow) => {
     setSwapDialogSim(sim);
@@ -633,6 +643,11 @@ export default function CellStation() {
   const available = useMemo(() => filtered.filter(s => s.status === 'available' && s.status_detail === 'valid'), [filtered]);
   const expired = useMemo(() => filtered.filter(s => s.status_detail === 'expired'), [filtered]);
   const rented = useMemo(() => filtered.filter(s => s.status === 'rented'), [filtered]);
+  const expiringSoon = useMemo(() => simCards.filter(s => {
+    if (!s.expiry_date) return false;
+    const days = differenceInDays(new Date(s.expiry_date), new Date());
+    return days >= 0 && days <= 7;
+  }), [simCards]);
 
   return (
     <div className="space-y-6">
@@ -739,6 +754,43 @@ export default function CellStation() {
         </Card>
       )}
 
+      {/* Expiring Soon Warning */}
+      {expiringSoon.length > 0 && (
+        <Card className="border-yellow-300 bg-yellow-50 dark:bg-yellow-950/20">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <AlertTriangle className="h-5 w-5 text-yellow-600" />
+              <h3 className="font-bold text-yellow-700 dark:text-yellow-400">
+                ⚡ סימים שפגי תוקפם בעוד 7 ימים ({expiringSoon.length} סימים)
+              </h3>
+            </div>
+            <div className="space-y-2">
+              {expiringSoon.map((sim, i) => {
+                const daysLeft = differenceInDays(new Date(sim.expiry_date!), new Date());
+                return (
+                  <div key={i} className="flex items-center justify-between p-2 rounded-md bg-white/60 dark:bg-black/20">
+                    <div className="text-right text-sm">
+                      <span className="font-mono text-xs">{sim.sim_number}</span>
+                      {sim.customer_name && (
+                        <>
+                          <span className="mx-2 text-muted-foreground">|</span>
+                          <span className="font-medium">{sim.customer_name}</span>
+                        </>
+                      )}
+                      <span className="mx-2 text-muted-foreground">|</span>
+                      <span dir="ltr" className="text-xs text-muted-foreground">{sim.il_number || sim.uk_number}</span>
+                    </div>
+                    <span className={`font-bold text-sm ${daysLeft === 0 ? 'text-red-600' : 'text-yellow-600'}`}>
+                      {daysLeft === 0 ? 'פג היום!' : `${daysLeft} ימים`}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard title="סה״כ" value={stats.total} icon={Signal} />
@@ -837,6 +889,7 @@ export default function CellStation() {
                     showCustomer
                     showSwap
                     onSwapClick={sim => openSwapForSim(sim)}
+                    onRentalClick={sim => openRentalForSim(sim)}
                     needsSwapIccids={needsSwapIccids}
                     onActivateAndSwapClick={sim => setActivateSwapSim(sim)}
                   />
@@ -846,6 +899,7 @@ export default function CellStation() {
                     showCustomer
                     showSwap
                     onSwapClick={sim => openSwapForSim(sim)}
+                    onRentalClick={sim => openRentalForSim(sim)}
                     needsSwapIccids={needsSwapIccids}
                     onActivateAndSwapClick={sim => setActivateSwapSim(sim)}
                   />
