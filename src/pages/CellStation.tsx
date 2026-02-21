@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useCellStation } from '@/hooks/useCellStation';
 import { supabase } from '@/integrations/supabase/client';
-import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -9,12 +8,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { StatCard } from '@/components/StatCard';
 import { ActivationTab } from '@/components/cellstation/ActivationTab';
 import { SwapSimDialog } from '@/components/cellstation/SwapSimDialog';
 import { ActivateAndSwapDialog } from '@/components/cellstation/ActivateAndSwapDialog';
-import { SimCardGrid } from '@/components/cellstation/SimCardGrid';
-import { RefreshCw, Search, Signal, CheckCircle, XCircle, Clock, ArrowLeftRight, Zap, AlertTriangle, Phone, LayoutGrid, List } from 'lucide-react';
+import { RefreshCw, Search, Clock, Zap, AlertTriangle, Phone } from 'lucide-react';
 import { differenceInDays, formatDistanceToNow } from 'date-fns';
 import { he } from 'date-fns/locale';
 
