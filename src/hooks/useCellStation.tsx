@@ -17,7 +17,7 @@ const csHeaders = {
 
 // קריאה לטבלה
 async function csSelect(path: string): Promise<any[]> {
-  const res = await fetch(`${CS_URL}/rest/v1/${path}`, { headers: csHeaders });
+  const res = await fetch(`${CS_URL}/rest/v1/${path}`, { headers: csHeaders, mode: 'cors' });
   if (!res.ok) throw new Error(`csSelect failed: ${res.status} ${await res.text()}`);
   return res.json();
 }
@@ -25,7 +25,7 @@ async function csSelect(path: string): Promise<any[]> {
 // מחיקה
 async function csDelete(path: string): Promise<void> {
   const res = await fetch(`${CS_URL}/rest/v1/${path}`, {
-    method: 'DELETE', headers: csHeaders
+    method: 'DELETE', headers: csHeaders, mode: 'cors'
   });
   if (!res.ok) throw new Error(`csDelete failed: ${res.status} ${await res.text()}`);
 }
@@ -34,7 +34,7 @@ async function csDelete(path: string): Promise<void> {
 async function csInsert(table: string, data: any[]): Promise<void> {
   const res = await fetch(`${CS_URL}/rest/v1/${table}`, {
     method: 'POST',
-    headers: { ...csHeaders, 'Prefer': 'return=minimal' },
+    headers: { ...csHeadersJson, 'Prefer': 'return=minimal' },
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error(`csInsert failed: ${res.status} ${await res.text()}`);
@@ -44,7 +44,7 @@ async function csInsert(table: string, data: any[]): Promise<void> {
 async function csUpdate(table: string, match: string, data: any): Promise<void> {
   const res = await fetch(`${CS_URL}/rest/v1/${table}?${match}`, {
     method: 'PATCH',
-    headers: { ...csHeaders, 'Prefer': 'return=minimal' },
+    headers: { ...csHeadersJson, 'Prefer': 'return=minimal' },
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error(`csUpdate failed: ${res.status} ${await res.text()}`);
@@ -54,7 +54,7 @@ async function csUpdate(table: string, match: string, data: any): Promise<void> 
 async function csEdgeFunction(action: string, params: any = {}): Promise<any> {
   const res = await fetch(`${CS_URL}/functions/v1/cellstation-api`, {
     method: 'POST',
-    headers: csHeaders,
+    headers: csHeadersJson,
     body: JSON.stringify({ action, params }),
   });
   if (!res.ok) throw new Error(`Edge function error: ${res.status} ${await res.text()}`);
