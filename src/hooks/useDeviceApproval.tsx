@@ -6,7 +6,7 @@ export function useDeviceApproval() {
 
   // All devices are automatically approved
   return {
-    isApproved: true,
+    isDeviceApproved: true,
     isLoading: false,
     deviceId: 'auto-approved',
   };
