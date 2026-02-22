@@ -307,6 +307,47 @@ serve(async (req) => {
         result = { success: true, action: "activate_and_swap" };
         break;
       }
+      case "get_sims": {
+        const SB_URL = "https://hlswvjyegirbhoszrqyo.supabase.co";
+        const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhsc3d2anllZ2lyYmhvc3pycXlvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MDc5ODgxMCwiZXhwIjoyMDg2Mzc0ODEwfQ.C_0heApIB-wQvh2QM6-BqDakOyRcqiVhexuKAdwUrKI";
+        const simsRes = await fetch(`${SB_URL}/rest/v1/cellstation_sims?select=*&order=status.asc&order=expiry_date.asc`, {
+          headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` }
+        });
+        const sims = await simsRes.json();
+        result = { success: true, sims: Array.isArray(sims) ? sims : [] };
+        break;
+      }
+      case "update_sim_status": {
+        const SB_URL = "https://hlswvjyegirbhoszrqyo.supabase.co";
+        const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhsc3d2anllZ2lyYmhvc3pycXlvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MDc5ODgxMCwiZXhwIjoyMDg2Mzc0ODEwfQ.C_0heApIB-wQvh2QM6-BqDakOyRcqiVhexuKAdwUrKI";
+        const { iccid, status, status_detail } = params;
+        const updRes = await fetch(`${SB_URL}/rest/v1/cellstation_sims?iccid=eq.${encodeURIComponent(iccid)}`, {
+          method: "PATCH",
+          headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Content-Type": "application/json", "Prefer": "return=minimal" },
+          body: JSON.stringify({ status, status_detail })
+        });
+        result = { success: updRes.ok };
+        break;
+      }
+      case "upsert_sims": {
+        const SB_URL = "https://hlswvjyegirbhoszrqyo.supabase.co";
+        const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhsc3d2anllZ2lyYmhvc3pycXlvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MDc5ODgxMCwiZXhwIjoyMDg2Mzc0ODEwfQ.C_0heApIB-wQvh2QM6-BqDakOyRcqiVhexuKAdwUrKI";
+        const { records } = params;
+        // Delete all then insert
+        await fetch(`${SB_URL}/rest/v1/cellstation_sims?id=not.is.null`, {
+          method: "DELETE",
+          headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` }
+        });
+        if (records && records.length > 0) {
+          await fetch(`${SB_URL}/rest/v1/cellstation_sims`, {
+            method: "POST",
+            headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Content-Type": "application/json", "Prefer": "return=minimal" },
+            body: JSON.stringify(records)
+          });
+        }
+        result = { success: true, count: records?.length || 0 };
+        break;
+      }
       default:
         result = { success: false, error: "Unknown action: " + action, available: ["get_sims", "sync_csv", "activate_sim", "swap_sim", "activate_and_swap", "update_sim_status"] };
     }
@@ -316,3 +357,4 @@ serve(async (req) => {
     return new Response(JSON.stringify({ success: false, error: String(error) }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 });
   }
 });
+
