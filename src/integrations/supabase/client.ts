@@ -1,4 +1,5 @@
 // Supabase client - main project qifcynwnxmtoxzpskmmt
+// Updated: 2026-02-22
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
@@ -12,4 +13,3 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     autoRefreshToken: true,
   }
 });
-
