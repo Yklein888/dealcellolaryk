@@ -3,18 +3,16 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 // ── CellStation helpers ─────────────────────────────────────────────────────
-const CS_URL = 'https://hlswvjyegirbhoszrqyo.supabase.co';
-const CS_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhsc3d2anllZ2lyYmhvc3pycXlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3OTg4MTAsImV4cCI6MjA4NjM3NDgxMH0.KNRl4-S-XxVMcaoPPQXV5gLi6W9yYNWeHqtMok-Mpg8';
-const CS_H_JSON = { 'apikey': CS_KEY, 'Authorization': `Bearer ${CS_KEY}`, 'Content-Type': 'application/json' };
+// Vercel API route - same origin, no CORS issues
+const CS_API = '/api/cellstation';
 
-// כל קריאות DB ו-Edge Function עוברות דרך Edge Function - פתרון CORS
 async function csInvoke(action: string, params: any): Promise<any> {
-  const res = await fetch(`${CS_URL}/functions/v1/cellstation-api`, {
+  const res = await fetch(CS_API, {
     method: 'POST',
-    headers: CS_H_JSON,
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action, params }),
   });
-  if (!res.ok) { const t = await res.text(); throw new Error(`Edge Function error: ${res.status} ${t.slice(0, 200)}`); }
+  if (!res.ok) { const t = await res.text(); throw new Error(`API error: ${res.status} ${t.slice(0, 200)}`); }
   return res.json();
 }
 // ────────────────────────────────────────────────────────────────────────────

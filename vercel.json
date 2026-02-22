@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/cellstation.js": {
+      "maxDuration": 300
+    }
+  }
+}
