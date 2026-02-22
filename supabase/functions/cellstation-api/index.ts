@@ -1,42 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const CELLSTATION_BASE = "https://cellstation.co.il/portal";
 const SUPABASE_URL = "https://hlswvjyegirbhoszrqyo.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhsc3d2anllZ2lyYmhvc3pycXlvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MDc5ODgxMCwiZXhwIjoyMDg2Mzc0ODEwfQ.C_0heApIB-wQvh2QM6-BqDakOyRcqiVhexuKAdwUrKI";
-
-const DB_H = {
-  "apikey": SUPABASE_KEY,
-  "Authorization": `Bearer ${SUPABASE_KEY}`,
-  "Content-Type": "application/json",
-  "Prefer": "return=minimal",
-};
-
-async function dbGet(path: string): Promise<any[]> {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers: DB_H });
-  if (!res.ok) throw new Error(`DB get error: ${res.status} ${await res.text()}`);
-  return res.json();
-}
-
-async function dbDeleteAll(table: string): Promise<void> {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=not.is.null`, {
-    method: "DELETE", headers: DB_H,
-  });
-  if (!res.ok) throw new Error(`DB delete error: ${res.status}`);
-}
-
-async function dbInsert(table: string, rows: any[]): Promise<void> {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
-    method: "POST", headers: DB_H, body: JSON.stringify(rows),
-  });
-  if (!res.ok) throw new Error(`DB insert error: ${res.status} ${await res.text()}`);
-}
-
-async function dbUpdate(table: string, filter: string, data: any): Promise<void> {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${filter}`, {
-    method: "PATCH", headers: DB_H, body: JSON.stringify(data),
-  });
-  if (!res.ok) throw new Error(`DB update error: ${res.status} ${await res.text()}`);
-}
+const SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhsc3d2anllZ2lyYmhvc3pycXlvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MDc5ODgxMCwiZXhwIjoyMDg2Mzc0ODEwfQ.C_0heApIB-wQvh2QM6-BqDakOyRcqiVhexuKAdwUrKI";
 
 async function sha512(message: string): Promise<string> {
   const msgBuffer = new TextEncoder().encode(message);
@@ -63,7 +30,7 @@ class CellStationSession {
           "Content-Type": "application/x-www-form-urlencoded",
           "Cookie": this.cookies,
           "Referer": CELLSTATION_BASE + "/login.php",
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         },
         body: new URLSearchParams({ username, p: hashedPassword, password: "" }).toString(),
         redirect: "manual",
@@ -74,7 +41,7 @@ class CellStationSession {
         if (redirectUrl) {
           const fullUrl = redirectUrl.startsWith("http") ? redirectUrl : CELLSTATION_BASE + "/" + redirectUrl;
           const redirectResponse = await fetch(fullUrl, {
-            headers: { "Cookie": this.cookies, "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
+            headers: { "Cookie": this.cookies, "User-Agent": "Mozilla/5.0" },
             redirect: "manual",
           });
           this.extractCookies(redirectResponse);
@@ -97,7 +64,7 @@ class CellStationSession {
     if (!this.isLoggedIn) await this.login();
     const response = await fetch(url, {
       ...options,
-      headers: { ...options.headers, "Cookie": this.cookies, "Referer": CELLSTATION_BASE + "/index.php", "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
+      headers: { ...options.headers, "Cookie": this.cookies, "Referer": CELLSTATION_BASE + "/index.php", "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
     });
     const cloned = response.clone();
     const text = await cloned.text();
@@ -108,7 +75,7 @@ class CellStationSession {
       if (!loggedIn) return response;
       return fetch(url, {
         ...options,
-        headers: { ...options.headers, "Cookie": this.cookies, "Referer": CELLSTATION_BASE + "/index.php", "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
+        headers: { ...options.headers, "Cookie": this.cookies, "Referer": CELLSTATION_BASE + "/index.php", "User-Agent": "Mozilla/5.0" },
       });
     }
     return new Response(text, { status: response.status, statusText: response.statusText, headers: response.headers });
@@ -143,23 +110,6 @@ function parseCSV(csvText: string): any[] {
   return results;
 }
 
-function parseStatusRaw(statusRaw: string | null): { status: string; status_detail: string } {
-  if (!statusRaw) return { status: 'available', status_detail: 'unknown' };
-  const s = statusRaw.trim();
-  if (s.startsWith('בשכירות')) return { status: 'rented', status_detail: 'active' };
-  if (s.startsWith('זמין - תקין')) return { status: 'available', status_detail: 'valid' };
-  if (s.startsWith('זמין - קרוב לפקיעה')) return { status: 'available', status_detail: 'expiring' };
-  if (s.startsWith('זמין - פג תוקף')) return { status: 'available', status_detail: 'expired' };
-  return { status: 'available', status_detail: 'unknown' };
-}
-
-function parseDate(dateStr: string | null): string | null {
-  if (!dateStr || dateStr === '') return null;
-  const parts = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (parts) return `${parts[3]}-${parts[2].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
-  return dateStr;
-}
-
 serve(async (req) => {
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -170,65 +120,82 @@ serve(async (req) => {
 
   try {
     let body: any;
-    try { body = await req.json(); } catch {
-      return new Response(JSON.stringify({ success: false, error: "Invalid JSON" }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 });
-    }
+    try { body = await req.json(); }
+    catch { return new Response(JSON.stringify({ success: false, error: "Invalid JSON" }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }); }
+
     const { action, params } = body;
+    const db = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+    let result: any;
 
-    // ── get_sims: קריאת סימים מ-DB (ללא login לפורטל) ──
+    // ── פעולות DB (ללא CellStation login) ──
     if (action === "get_sims") {
-      const sims = await dbGet('cellstation_sims?select=*&order=status.asc&order=expiry_date.asc');
-      return new Response(JSON.stringify({ success: true, sims }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const { data, error } = await db.from("cellstation_sims").select("*").order("status").order("expiry_date");
+      if (error) { result = { success: false, error: error.message }; }
+      else { result = { success: true, sims: data || [] }; }
+      return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // ── update_sim_status: עדכון סטטוס סים ב-DB ──
     if (action === "update_sim_status") {
-      await dbUpdate('cellstation_sims', `iccid=eq.${params.iccid}`, params.data);
-      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const { iccid, status, status_detail } = params;
+      const { error } = await db.from("cellstation_sims").update({ status, status_detail }).eq("iccid", iccid);
+      result = error ? { success: false, error: error.message } : { success: true };
+      return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // ── פעולות שדורשות CellStation login ──
     const session = new CellStationSession();
     const loggedIn = await session.login();
-    if (!loggedIn) {
-      return new Response(JSON.stringify({ success: false, error: "Login failed" }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 });
-    }
-
-    let result: any;
+    if (!loggedIn) return new Response(JSON.stringify({ success: false, error: "Login failed" }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 });
 
     switch (action) {
       case "sync_csv": {
         const csvResponse = await session.get("content/bh/bh_export_csv.php");
         const csvText = await csvResponse.text();
-        const rawSims = parseCSV(csvText);
-        console.log(`sync_csv: parsed ${rawSims.length} sims`);
+        const sims = parseCSV(csvText);
+        console.log(`sync_csv: parsed ${sims.length} sims`);
 
-        const now = new Date().toISOString();
-        const records = rawSims.map((sim: any) => {
-          const { status, status_detail } = parseStatusRaw(sim.status_raw);
-          return {
-            iccid: sim.iccid, sim_number: sim.sim_number, uk_number: sim.uk_number,
-            il_number: sim.il_number, status, status_detail,
-            expiry_date: parseDate(sim.expiry_date), plan: sim.plan,
-            start_date: parseDate(sim.start_date), end_date: parseDate(sim.end_date),
-            customer_name: sim.note?.trim() || null, last_sync: now,
-          };
-        }).filter((r: any) => r.iccid);
-
-        if (records.length > 0) {
-          await dbDeleteAll('cellstation_sims');
-          await dbInsert('cellstation_sims', records);
+        // שמור ב-DB
+        if (sims.length > 0) {
+          await db.from("cellstation_sims").delete().not("id", "is", null);
+          const now = new Date().toISOString();
+          const records = sims.filter(s => s.iccid).map(sim => {
+            let status = 'available', status_detail = 'unknown';
+            if (sim.status_raw) {
+              const s = sim.status_raw.trim();
+              if (s.startsWith('בשכירות')) { status = 'rented'; status_detail = 'active'; }
+              else if (s.startsWith('זמין - תקין')) { status = 'available'; status_detail = 'valid'; }
+              else if (s.startsWith('זמין - קרוב לפקיעה')) { status = 'available'; status_detail = 'expiring'; }
+              else if (s.startsWith('זמין - פג תוקף')) { status = 'available'; status_detail = 'expired'; }
+            }
+            const parseDate = (d: string | null) => {
+              if (!d) return null;
+              const p = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+              return p ? `${p[3]}-${p[2].padStart(2,'0')}-${p[1].padStart(2,'0')}` : d;
+            };
+            return {
+              iccid: sim.iccid, sim_number: sim.sim_number, uk_number: sim.uk_number,
+              il_number: sim.il_number, status, status_detail,
+              expiry_date: parseDate(sim.expiry_date), plan: sim.plan,
+              start_date: parseDate(sim.start_date), end_date: parseDate(sim.end_date),
+              customer_name: sim.note?.trim() || null, last_sync: now,
+            };
+          });
+          await db.from("cellstation_sims").insert(records);
         }
 
-        // החזר גם את הסימים המעודכנים
-        const sims = await dbGet('cellstation_sims?select=*&order=status.asc&order=expiry_date.asc');
-        result = { success: true, action: "sync_csv", sims, count: records.length };
+        result = { success: true, action: "sync_csv", sims, count: sims.length };
         break;
       }
-
+      case "check_sim_status": {
+        const response = await session.post("index.php?page=bh/index", { sim_lookup_search: params.sim_number });
+        const html = await response.text();
+        result = { success: true, action: "check_sim_status", html_length: html.length, raw_html: html };
+        break;
+      }
       case "activate_sim": {
-        const iccid = params.iccid || "";
+        const iccid = params.iccid || params.swap_iccid || "";
         if (!iccid || iccid.length < 19 || iccid.length > 20 || !/^\d+$/.test(iccid)) {
-          result = { success: false, error: "Invalid ICCID format", action: "activate_sim" }; break;
+          result = { success: false, error: "Invalid ICCID format. Must be 19-20 digits.", action: "activate_sim" }; break;
         }
         await (await session.get("index.php?page=bh/index")).text();
         const detailsResponse = await session.get("content/dashboard/rentals/fetch_BHsim_details.php?zehut=" + encodeURIComponent(iccid));
@@ -236,31 +203,33 @@ serve(async (req) => {
         const allInputFields = detailsHtml.match(/<input[^>]*name=["'][^"']+["'][^>]*>/gi) || [];
         const discoveredFields: Record<string, string> = {};
         for (const field of allInputFields) {
-          const n = field.match(/name=["']([^"']+)["']/); const v = field.match(/value=["']([^"']*)["']/);
-          if (n) discoveredFields[n[1]] = v ? v[1] : "";
+          const nameMatch = field.match(/name=["']([^"']+)["']/);
+          const valueMatch = field.match(/value=["']([^"']*)["']/);
+          if (nameMatch) discoveredFields[nameMatch[1]] = valueMatch ? valueMatch[1] : "";
         }
-        let startRental = params.start_rental || ""; let endRental = params.end_rental || "";
-        const ddRe = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
-        const sm = startRental.match(ddRe); if (sm) startRental = `${sm[3]}-${sm[2].padStart(2,'0')}-${sm[1].padStart(2,'0')}`;
-        const em = endRental.match(ddRe); if (em) endRental = `${em[3]}-${em[2].padStart(2,'0')}-${em[1].padStart(2,'0')}`;
+        let startRental = params.start_rental || "";
+        let endRental = params.end_rental || "";
+        const ddmmyyyyRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+        const startMatch = startRental.match(ddmmyyyyRegex);
+        if (startMatch) startRental = `${startMatch[3]}-${startMatch[2].padStart(2,'0')}-${startMatch[1].padStart(2,'0')}`;
+        const endMatch = endRental.match(ddmmyyyyRegex);
+        if (endMatch) endRental = `${endMatch[3]}-${endMatch[2].padStart(2,'0')}-${endMatch[1].padStart(2,'0')}`;
         await (await session.post("content/dashboard/rentals/calculate_days.php", {
           start_rental: startRental, end_rental: endRental,
           product: discoveredFields['product'] || params.product || "", exp: discoveredFields['exp'] || "",
         })).text();
-        const submitResponse = await session.post("dynamic/submit.php", {
+        const formData: Record<string, string> = {
           ...discoveredFields, start_rental: startRental, end_rental: endRental,
           deler4cus_price: params.price || "", calculated_days_input: params.days || "", note: params.note || "",
-        });
+        };
+        const submitResponse = await session.post("dynamic/submit.php", formData);
         const submitHtml = await submitResponse.text();
         const hasError = submitHtml.includes('שגיאה') || submitHtml.includes('alert-danger') || submitHtml.includes('error');
         const success = !hasError && submitResponse.status === 200;
-        if (success) {
-          await dbUpdate('cellstation_sims', `iccid=eq.${iccid}`, { status: 'rented', status_detail: 'active' });
-        }
+        if (success) await db.from("cellstation_sims").update({ status: 'rented', status_detail: 'active' }).eq("iccid", iccid);
         result = { success, action: "activate_sim", hasError, error: hasError ? submitHtml.substring(0, 500) : undefined };
         break;
       }
-
       case "swap_sim": {
         if (!params.swap_iccid || params.swap_iccid.length < 19 || params.swap_iccid.length > 20) {
           result = { success: false, error: "ICCID must be 19-20 digits" }; break;
@@ -277,21 +246,20 @@ serve(async (req) => {
         const swapSubmitResp = await session.post("dynamic/submit.php", {
           ...swapHiddenVals, swap_iccid: params.swap_iccid, swap_msisdn: params.swap_msisdn || "", current_sim: params.current_sim || "",
         });
-        const swapHtml = await swapSubmitResp.text();
-        const swapHasError = swapHtml.includes('שגיאה') || swapHtml.includes('alert-danger') || swapHtml.includes('error');
+        const swapSubmitHtml = await swapSubmitResp.text();
+        const swapHasError = swapSubmitHtml.includes('שגיאה') || swapSubmitHtml.includes('alert-danger');
         const swapSuccess = !swapHasError && swapSubmitResp.status === 200;
-        result = { success: swapSuccess, action: "swap_sim", hasError: swapHasError, error: swapHasError ? swapHtml.substring(0, 500) : undefined };
+        result = { success: swapSuccess, action: "swap_sim", hasError: swapHasError, error: swapHasError ? swapSubmitHtml.substring(0, 500) : undefined };
         break;
       }
-
       case "activate_and_swap": {
         const iccidAS = params.swap_iccid || params.iccid || "";
         const oldIccid = params.current_iccid || "";
         if (!iccidAS || iccidAS.length < 19 || iccidAS.length > 20 || !/^\d+$/.test(iccidAS)) {
-          result = { success: false, error: "Invalid new ICCID", action: "activate_and_swap" }; break;
+          result = { success: false, error: "Invalid new ICCID format.", action: "activate_and_swap" }; break;
         }
         if (!oldIccid || oldIccid.length < 19 || oldIccid.length > 20) {
-          result = { success: false, error: "Invalid old ICCID", action: "activate_and_swap" }; break;
+          result = { success: false, error: "Invalid old ICCID format.", action: "activate_and_swap" }; break;
         }
         await (await session.get("index.php?page=bh/index")).text();
         const detailsAS = await session.get("content/dashboard/rentals/fetch_BHsim_details.php?zehut=" + encodeURIComponent(iccidAS));
@@ -302,10 +270,12 @@ serve(async (req) => {
           const n = field.match(/name=["']([^"']+)["']/); const v = field.match(/value=["']([^"']*)["']/);
           if (n) discoveredValsAS[n[1]] = v ? v[1] : "";
         }
-        let startRentalAS = params.start_rental || ""; let endRentalAS = params.end_rental || "";
-        const ddAS = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
-        const smAS = startRentalAS.match(ddAS); if (smAS) startRentalAS = `${smAS[3]}-${smAS[2].padStart(2,'0')}-${smAS[1].padStart(2,'0')}`;
-        const emAS = endRentalAS.match(ddAS); if (emAS) endRentalAS = `${emAS[3]}-${emAS[2].padStart(2,'0')}-${emAS[1].padStart(2,'0')}`;
+        let startRentalAS = params.start_rental || "", endRentalAS = params.end_rental || "";
+        const ddmmAS = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+        const smAS = startRentalAS.match(ddmmAS);
+        if (smAS) startRentalAS = `${smAS[3]}-${smAS[2].padStart(2,'0')}-${smAS[1].padStart(2,'0')}`;
+        const emAS = endRentalAS.match(ddmmAS);
+        if (emAS) endRentalAS = `${emAS[3]}-${emAS[2].padStart(2,'0')}-${emAS[1].padStart(2,'0')}`;
         await (await session.post("content/dashboard/rentals/calculate_days.php", {
           start_rental: startRentalAS, end_rental: endRentalAS,
           product: discoveredValsAS['product'] || "", exp: discoveredValsAS['exp'] || "",
@@ -316,10 +286,8 @@ serve(async (req) => {
         });
         const actResult = await actSubmit.text();
         const actSuccess = !actResult.includes('שגיאה') && !actResult.includes('alert-danger') && actSubmit.status === 200;
-        if (!actSuccess) {
-          result = { success: false, action: "activate_and_swap", error: "Activation failed: " + actResult.substring(0, 500) }; break;
-        }
-        console.log('Waiting 60 seconds...');
+        if (!actSuccess) { result = { success: false, action: "activate_and_swap", error: "Activation failed: " + actResult.substring(0, 500) }; break; }
+        console.log('activate_and_swap: waiting 60s...');
         await new Promise(r => setTimeout(r, 60000));
         await (await session.get("index.php?page=bh/index")).text();
         const swapDetailsAS = await session.get("content/dashboard/rentals/fetch_BHsim_details.php?zehut=" + encodeURIComponent(oldIccid));
@@ -330,23 +298,15 @@ serve(async (req) => {
           const n = field.match(/name=["']([^"']+)["']/); const v = field.match(/value=["']([^"']+)["']/);
           if (n) swapValsAS[n[1]] = v ? v[1] : "";
         }
-        const swapSubmitAS = await session.post("dynamic/submit.php", { ...swapValsAS, swap_iccid: iccidAS, swap_msisdn: "", current_sim: params.current_sim || "" });
+        const swapSubmitAS = await session.post("dynamic/submit.php", {
+          ...swapValsAS, swap_iccid: iccidAS, swap_msisdn: "", current_sim: params.current_sim || "",
+        });
         const swapResultAS = await swapSubmitAS.text();
         const swapSuccessAS = !swapResultAS.includes('שגיאה') && !swapResultAS.includes('alert-danger') && swapSubmitAS.status === 200;
-        if (!swapSuccessAS) {
-          result = { success: false, action: "activate_and_swap", error: "Swap failed: " + swapResultAS.substring(0, 500) }; break;
-        }
+        if (!swapSuccessAS) { result = { success: false, action: "activate_and_swap", error: "Swap failed: " + swapResultAS.substring(0, 500) }; break; }
         result = { success: true, action: "activate_and_swap" };
         break;
       }
-
-      case "check_sim_status": {
-        const response = await session.post("index.php?page=bh/index", { sim_lookup_search: params.sim_number });
-        const html = await response.text();
-        result = { success: true, action: "check_sim_status", html_length: html.length, raw_html: html };
-        break;
-      }
-
       default:
         result = { success: false, error: "Unknown action: " + action, available: ["get_sims", "sync_csv", "activate_sim", "swap_sim", "activate_and_swap", "update_sim_status"] };
     }
