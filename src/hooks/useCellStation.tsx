@@ -133,6 +133,10 @@ export function useCellStation() {
         };
       }).filter((r: any) => r.iccid);
 
+      if (records.length > 0) {
+        await csInvoke('upsert_sims', { records });
+      }
+
       const { data: inventoryItems } = await supabase
         .from('inventory' as any)
         .select('id, sim_number, expiry_date, status')
