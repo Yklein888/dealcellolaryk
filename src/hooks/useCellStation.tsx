@@ -1,13 +1,69 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { createClient } from '@supabase/supabase-js';
-
-// CellStation Supabase - פרויקט נפרד לניהול סימים
-const cellstationSupabase = createClient(
-  'https://hlswvjyegirbhoszrqyo.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhsc3d2anllZ2lyYmhvc3pycXlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3OTg4MTAsImV4cCI6MjA4NjM3NDgxMH0.KNRl4-S-XxVMcaoPPQXV5gLi6W9yYNWeHqtMok-Mpg8'
-);
 import { useToast } from '@/hooks/use-toast';
+
+// ============================================================
+// CellStation DB + Edge Function - גישה ישירה דרך fetch
+// ללא Supabase client שני - יציב לנצח, ללא ERR_FAILED
+// ============================================================
+const CS_URL = 'https://hlswvjyegirbhoszrqyo.supabase.co';
+const CS_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhsc3d2anllZ2lyYmhvc3pycXlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3OTg4MTAsImV4cCI6MjA4NjM3NDgxMH0.KNRl4-S-XxVMcaoPPQXV5gLi6W9yYNWeHqtMok-Mpg8';
+
+const csHeaders = {
+  'apikey': CS_KEY,
+  'Authorization': `Bearer ${CS_KEY}`,
+  'Content-Type': 'application/json',
+};
+
+// קריאה לטבלה
+async function csSelect(path: string): Promise<any[]> {
+  const res = await fetch(`${CS_URL}/rest/v1/${path}`, { headers: csHeaders });
+  if (!res.ok) throw new Error(`csSelect failed: ${res.status} ${await res.text()}`);
+  return res.json();
+}
+
+// מחיקה
+async function csDelete(path: string): Promise<void> {
+  const res = await fetch(`${CS_URL}/rest/v1/${path}`, {
+    method: 'DELETE', headers: csHeaders
+  });
+  if (!res.ok) throw new Error(`csDelete failed: ${res.status} ${await res.text()}`);
+}
+
+// הכנסה
+async function csInsert(table: string, data: any[]): Promise<void> {
+  const res = await fetch(`${CS_URL}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: { ...csHeaders, 'Prefer': 'return=minimal' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`csInsert failed: ${res.status} ${await res.text()}`);
+}
+
+// עדכון
+async function csUpdate(table: string, match: string, data: any): Promise<void> {
+  const res = await fetch(`${CS_URL}/rest/v1/${table}?${match}`, {
+    method: 'PATCH',
+    headers: { ...csHeaders, 'Prefer': 'return=minimal' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`csUpdate failed: ${res.status} ${await res.text()}`);
+}
+
+// קריאה ל-Edge Function
+async function csEdgeFunction(action: string, params: any = {}): Promise<any> {
+  const res = await fetch(`${CS_URL}/functions/v1/cellstation-api`, {
+    method: 'POST',
+    headers: csHeaders,
+    body: JSON.stringify({ action, params }),
+  });
+  if (!res.ok) throw new Error(`Edge function error: ${res.status} ${await res.text()}`);
+  const result = await res.json();
+  if (!result.success) throw new Error(result.error || `${action} failed`);
+  return result;
+}
+
+// ============================================================
 
 interface CellStationSim {
   id: string;
@@ -45,7 +101,7 @@ function parseStatusRaw(statusRaw: string | null): { status: string; status_deta
 
 function extractCustomerName(note: string | null): string | null {
   if (!note) return null;
-  const match = note.match(/^(.+?)(?:\s*[\d\-+()\s]{7,}|$)/);
+  const match = note.match(/^(.+?)(?:\s*[\d\-+()\\s]{7,}|$)/);
   return match?.[1]?.trim() || note.trim() || null;
 }
 
@@ -70,12 +126,7 @@ export function useCellStation() {
   const fetchSims = useCallback(async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await cellstationSupabase
-        .from('cellstation_sims')
-        .select('*')
-        .order('status', { ascending: true })
-        .order('expiry_date', { ascending: true });
-      if (error) throw error;
+      const data = await csSelect('cellstation_sims?select=*&order=status.asc,expiry_date.asc');
       setSimCards((data as CellStationSim[]) || []);
     } catch (e: any) {
       console.error('Failed to fetch sims:', e);
@@ -88,34 +139,18 @@ export function useCellStation() {
     setIsSyncing(true);
     try {
       console.log('🚀 Starting sync with CellStation...');
-      const response = await cellstationSupabase.functions.invoke('cellstation-api', {
-        body: { action: 'sync_csv', params: {} },
-      });
-      const data = response.data;
-      const fnError = response.error;
+      const data = await csEdgeFunction('sync_csv');
       
-      console.log('📦 Edge Function Response:', { data, fnError });
-      
-      if (fnError) {
-        const msg = typeof fnError === 'object' && (fnError as any)?.message ? (fnError as any).message : String(fnError);
-        console.error('❌ Edge Function Error:', msg);
-        throw new Error(msg);
-      }
-      if (!data?.success) {
-        console.error('❌ Sync failed:', data?.error);
-        throw new Error(data?.error || 'Sync failed');
-      }
-
       const sims = data.sims || [];
       console.log(`✅ Received ${sims.length} SIMs from CellStation`);
       
       if (sims.length === 0) {
-        console.warn('⚠️ No SIMs returned from CellStation! Check Edge Function logs.');
         toast({
           title: "אין סימים",
           description: "לא התקבלו סימים מ-CellStation. בדוק את פרטי ההתחברות.",
           variant: "destructive",
         });
+        return;
       }
       
       const now = new Date().toISOString();
@@ -139,19 +174,9 @@ export function useCellStation() {
       }).filter((r: any) => r.iccid);
 
       if (records.length > 0) {
-        // Step 1: Delete ALL existing records and re-insert fresh from portal
-        // This handles ICCID changes when SIMs are physically swapped
-        const { error: deleteAllError } = await cellstationSupabase
-          .from('cellstation_sims')
-          .delete()
-          .not('id', 'is', null);
-        if (deleteAllError) console.error('Failed to clear sims:', deleteAllError);
-
-        // Step 2: Insert all fresh records from portal
-        const { error: insertError } = await cellstationSupabase
-          .from('cellstation_sims')
-          .insert(records);
-        if (insertError) throw insertError;
+        // מחק הכל ו-insert מחדש - מטפל גם בהחלפות ICCID
+        await csDelete('cellstation_sims?id=neq.00000000-0000-0000-0000-000000000000');
+        await csInsert('cellstation_sims', records);
       }
 
       // Cross-reference with inventory
@@ -202,16 +227,7 @@ export function useCellStation() {
   }) => {
     setIsActivating(true);
     try {
-      const response = await cellstationSupabase.functions.invoke('cellstation-api', {
-        body: { action: 'activate_sim', params },
-      });
-      const data = response.data;
-      const error = response.error;
-      if (error) {
-        const msg = typeof error === 'object' && error?.message ? error.message : String(error);
-        throw new Error(msg);
-      }
-      if (!data?.success) throw new Error(data?.error || 'Activation failed');
+      const data = await csEdgeFunction('activate_sim', params);
       toast({ title: 'הסים הופעל בהצלחה' });
       return data;
     } catch (e: any) {
@@ -222,7 +238,6 @@ export function useCellStation() {
     }
   }, [toast]);
 
-  // הפעלת סים + עדכון סטטוס מיידי ב-cellstation_sims
   const activateSimWithStatus = useCallback(async (params: {
     iccid: string;
     start_rental: string;
@@ -233,21 +248,11 @@ export function useCellStation() {
   }) => {
     setIsActivating(true);
     try {
-      // 1. קרא לEdge Function להפעלה
-      const response = await cellstationSupabase.functions.invoke('cellstation-api', {
-        body: { action: 'activate_sim', params: { ...params, product: '' } },
+      await csEdgeFunction('activate_sim', { ...params, product: '' });
+      // עדכן סטטוס ב-DB
+      await csUpdate('cellstation_sims', `iccid=eq.${encodeURIComponent(params.iccid)}`, {
+        status: 'rented', status_detail: 'active'
       });
-      const data = response.data;
-      const error = response.error;
-      if (error) throw new Error(typeof error === 'object' ? error.message : String(error));
-      if (!data?.success) throw new Error(data?.error || 'Activation failed');
-
-      // 2. עדכן cellstation_sims → מושכר
-      await cellstationSupabase
-        .from('cellstation_sims')
-        .update({ status: 'rented', status_detail: 'active' })
-        .eq('iccid', params.iccid);
-
       toast({ title: 'הסים הופעל בהצלחה ועבר למושכרים ✅' });
       await fetchSims();
       return { success: true };
@@ -268,16 +273,7 @@ export function useCellStation() {
   }) => {
     setIsSwapping(true);
     try {
-      const response = await cellstationSupabase.functions.invoke('cellstation-api', {
-        body: { action: 'swap_sim', params },
-      });
-      const data = response.data;
-      const error = response.error;
-      if (error) {
-        const msg = typeof error === 'object' && error?.message ? error.message : String(error);
-        throw new Error(msg);
-      }
-      if (!data?.success) throw new Error(data?.error || 'Swap failed');
+      const data = await csEdgeFunction('swap_sim', params);
       toast({ title: 'הסים הוחלף בהצלחה' });
       return data;
     } catch (e: any) {
@@ -302,15 +298,12 @@ export function useCellStation() {
       onProgress?.('מפעיל סים...', 10);
       setActivateAndSwapProgress('מפעיל סים...');
       
-      // Run the edge function and progress polling in parallel
       const startTime = Date.now();
-      const totalWait = 80000; // ~80 seconds visual estimate
+      const totalWait = 80000;
       
-      // Start progress polling
       const progressInterval = setInterval(() => {
         const elapsed = Date.now() - startTime;
         const percent = Math.min(90, Math.round((elapsed / totalWait) * 90));
-        
         if (elapsed < 10000) {
           onProgress?.('מפעיל סים...', percent);
           setActivateAndSwapProgress('מפעיל סים...');
@@ -323,26 +316,16 @@ export function useCellStation() {
         }
       }, 1000);
 
-      // Call edge function (this blocks for ~70s because it waits internally)
       let data: any;
-      let error: any;
       try {
-        const response = await cellstationSupabase.functions.invoke('cellstation-api', {
-          body: { action: 'activate_and_swap', params },
-        });
-        data = response.data;
-        error = response.error;
+        data = await csEdgeFunction('activate_and_swap', params);
       } finally {
         clearInterval(progressInterval);
       }
 
-      if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || 'Activate and swap failed');
-
       onProgress?.('הושלם!', 100);
       setActivateAndSwapProgress('הושלם!');
       toast({ title: 'הפעלה והחלפה הושלמו בהצלחה!' });
-      
       await fetchSims();
       return data;
     } catch (e: any) {
@@ -380,4 +363,3 @@ export function useCellStation() {
     fetchSims,
   };
 }
-
