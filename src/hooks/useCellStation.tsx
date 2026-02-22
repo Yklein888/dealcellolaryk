@@ -222,6 +222,43 @@ export function useCellStation() {
     }
   }, [toast]);
 
+  // הפעלת סים + עדכון סטטוס מיידי ב-cellstation_sims
+  const activateSimWithStatus = useCallback(async (params: {
+    iccid: string;
+    start_rental: string;
+    end_rental: string;
+    price: string;
+    days: string;
+    note: string;
+  }) => {
+    setIsActivating(true);
+    try {
+      // 1. קרא לEdge Function להפעלה
+      const response = await cellstationSupabase.functions.invoke('cellstation-api', {
+        body: { action: 'activate_sim', params: { ...params, product: '' } },
+      });
+      const data = response.data;
+      const error = response.error;
+      if (error) throw new Error(typeof error === 'object' ? error.message : String(error));
+      if (!data?.success) throw new Error(data?.error || 'Activation failed');
+
+      // 2. עדכן cellstation_sims → מושכר
+      await cellstationSupabase
+        .from('cellstation_sims')
+        .update({ status: 'rented', status_detail: 'active' })
+        .eq('iccid', params.iccid);
+
+      toast({ title: 'הסים הופעל בהצלחה ועבר למושכרים ✅' });
+      await fetchSims();
+      return { success: true };
+    } catch (e: any) {
+      toast({ title: 'שגיאה בהפעלת סים', description: e.message, variant: 'destructive' });
+      return { success: false, error: e.message };
+    } finally {
+      setIsActivating(false);
+    }
+  }, [fetchSims, toast]);
+
   const swapSim = useCallback(async (params: {
     rental_id: string;
     current_sim: string;
@@ -336,6 +373,7 @@ export function useCellStation() {
     activateAndSwapProgress,
     syncSims,
     activateSim,
+    activateSimWithStatus,
     swapSim,
     activateAndSwap,
     stats,
