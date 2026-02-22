@@ -6,7 +6,8 @@ import { useToast } from '@/hooks/use-toast';
 // fetch ישיר - יציב, ללא בעיות auth/createClient
 const CS_URL = 'https://hlswvjyegirbhoszrqyo.supabase.co';
 const CS_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhsc3d2anllZ2lyYmhvc3pycXlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3OTg4MTAsImV4cCI6MjA4NjM3NDgxMH0.KNRl4-S-XxVMcaoPPQXV5gLi6W9yYNWeHqtMok-Mpg8';
-const CS_H = { 'apikey': CS_KEY, 'Authorization': `Bearer ${CS_KEY}`, 'Content-Type': 'application/json' };
+const CS_H = { 'apikey': CS_KEY, 'Authorization': `Bearer ${CS_KEY}` };
+const CS_H_JSON = { ...CS_H, 'Content-Type': 'application/json' };
 
 async function csGet(path: string): Promise<any[]> {
   const res = await fetch(`${CS_URL}/rest/v1/${path}`, { headers: CS_H });
@@ -17,7 +18,7 @@ async function csGet(path: string): Promise<any[]> {
 async function csInsert(table: string, rows: any[]): Promise<void> {
   const res = await fetch(`${CS_URL}/rest/v1/${table}`, {
     method: 'POST',
-    headers: { ...CS_H, 'Prefer': 'return=minimal' },
+    headers: { ...CS_H_JSON, 'Prefer': 'return=minimal' },
     body: JSON.stringify(rows),
   });
   if (!res.ok) { const t = await res.text(); throw new Error(`CS insert error: ${res.status} ${t.slice(0, 200)}`); }
@@ -26,7 +27,7 @@ async function csInsert(table: string, rows: any[]): Promise<void> {
 async function csUpdate(table: string, filter: string, data: any): Promise<void> {
   const res = await fetch(`${CS_URL}/rest/v1/${table}?${filter}`, {
     method: 'PATCH',
-    headers: { ...CS_H, 'Prefer': 'return=minimal' },
+    headers: { ...CS_H_JSON, 'Prefer': 'return=minimal' },
     body: JSON.stringify(data),
   });
   if (!res.ok) { const t = await res.text(); throw new Error(`CS update error: ${res.status} ${t.slice(0, 200)}`); }
@@ -44,7 +45,7 @@ async function csDeleteAll(table: string): Promise<void> {
 async function csInvoke(action: string, params: any): Promise<any> {
   const res = await fetch(`${CS_URL}/functions/v1/cellstation-api`, {
     method: 'POST',
-    headers: { ...CS_H },
+    headers: { ...CS_H_JSON },
     body: JSON.stringify({ action, params }),
   });
   if (!res.ok) { const t = await res.text(); throw new Error(`Edge Function error: ${res.status} ${t.slice(0, 200)}`); }
