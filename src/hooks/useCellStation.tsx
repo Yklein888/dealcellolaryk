@@ -1,5 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { createClient } from '@supabase/supabase-js';
+
+// CellStation Supabase - פרויקט נפרד לניהול סימים
+const cellstationSupabase = createClient(
+  'https://hlswvjyegirbhoszrqyo.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhsc3d2anllZ2lyYmhvc3pycXlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3OTg4MTAsImV4cCI6MjA4NjM3NDgxMH0.KNRl4-S-XxVMcaoPPQXV5gLi6W9yYNWeHqtMok-Mpg8'
+);
 import { useToast } from '@/hooks/use-toast';
 
 interface CellStationSim {
@@ -63,7 +70,7 @@ export function useCellStation() {
   const fetchSims = useCallback(async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await cellstationSupabase
         .from('cellstation_sims')
         .select('*')
         .order('status', { ascending: true })
@@ -81,7 +88,7 @@ export function useCellStation() {
     setIsSyncing(true);
     try {
       console.log('🚀 Starting sync with CellStation...');
-      const response = await supabase.functions.invoke('cellstation-api', {
+      const response = await cellstationSupabase.functions.invoke('cellstation-api', {
         body: { action: 'sync_csv', params: {} },
       });
       const data = response.data;
@@ -134,14 +141,14 @@ export function useCellStation() {
       if (records.length > 0) {
         // Step 1: Delete ALL existing records and re-insert fresh from portal
         // This handles ICCID changes when SIMs are physically swapped
-        const { error: deleteAllError } = await supabase
+        const { error: deleteAllError } = await cellstationSupabase
           .from('cellstation_sims')
           .delete()
           .not('id', 'is', null);
         if (deleteAllError) console.error('Failed to clear sims:', deleteAllError);
 
         // Step 2: Insert all fresh records from portal
-        const { error: insertError } = await supabase
+        const { error: insertError } = await cellstationSupabase
           .from('cellstation_sims')
           .insert(records);
         if (insertError) throw insertError;
@@ -195,7 +202,7 @@ export function useCellStation() {
   }) => {
     setIsActivating(true);
     try {
-      const response = await supabase.functions.invoke('cellstation-api', {
+      const response = await cellstationSupabase.functions.invoke('cellstation-api', {
         body: { action: 'activate_sim', params },
       });
       const data = response.data;
@@ -227,7 +234,7 @@ export function useCellStation() {
     setIsActivating(true);
     try {
       // 1. קרא לEdge Function להפעלה
-      const response = await supabase.functions.invoke('cellstation-api', {
+      const response = await cellstationSupabase.functions.invoke('cellstation-api', {
         body: { action: 'activate_sim', params: { ...params, product: '' } },
       });
       const data = response.data;
@@ -236,7 +243,7 @@ export function useCellStation() {
       if (!data?.success) throw new Error(data?.error || 'Activation failed');
 
       // 2. עדכן cellstation_sims → מושכר
-      await supabase
+      await cellstationSupabase
         .from('cellstation_sims')
         .update({ status: 'rented', status_detail: 'active' })
         .eq('iccid', params.iccid);
@@ -261,7 +268,7 @@ export function useCellStation() {
   }) => {
     setIsSwapping(true);
     try {
-      const response = await supabase.functions.invoke('cellstation-api', {
+      const response = await cellstationSupabase.functions.invoke('cellstation-api', {
         body: { action: 'swap_sim', params },
       });
       const data = response.data;
@@ -320,7 +327,7 @@ export function useCellStation() {
       let data: any;
       let error: any;
       try {
-        const response = await supabase.functions.invoke('cellstation-api', {
+        const response = await cellstationSupabase.functions.invoke('cellstation-api', {
           body: { action: 'activate_and_swap', params },
         });
         data = response.data;
