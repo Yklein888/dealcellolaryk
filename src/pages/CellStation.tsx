@@ -115,8 +115,10 @@ interface SimTableProps {
   inventoryMap?: InventoryMap;
   onSwapClick?: (sim: SimRow) => void;
   onActivateAndSwapClick?: (sim: SimRow) => void;
+  onActivateClick?: (sim: SimRow) => void;
   onRentalClick?: (sim: SimRow) => void;
   needsSwapIccids?: Set<string>;
+  showActionButton?: boolean;
 }
 
 function getSystemStatus(sim: SimRow, inventoryMap: InventoryMap): SystemStatus {
@@ -140,7 +142,7 @@ function SystemStatusBadge({ status }: { status: SystemStatus }) {
   }
 }
 
-function SimTable({ sims, showCustomer, showSwap, showSystemStatus, inventoryMap, onSwapClick, onActivateAndSwapClick, onRentalClick, needsSwapIccids }: SimTableProps) {
+function SimTable({ sims, showCustomer, showSwap, showSystemStatus, inventoryMap, onSwapClick, onActivateAndSwapClick, onActivateClick, onRentalClick, needsSwapIccids, showActionButton }: SimTableProps) {
   if (sims.length === 0) {
     return <p className="text-center text-muted-foreground py-8">אין סימים להצגה</p>;
   }
@@ -159,7 +161,7 @@ function SimTable({ sims, showCustomer, showSwap, showSystemStatus, inventoryMap
             <TableHead>חבילה</TableHead>
             {showCustomer && <TableHead>לקוח</TableHead>}
             {showCustomer && <TableHead>תקופה</TableHead>}
-            {(showSwap || needsSwapIccids) && <TableHead>פעולות</TableHead>}
+            {(showSwap || needsSwapIccids || showActionButton) && <TableHead>פעולה</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -167,7 +169,11 @@ function SimTable({ sims, showCustomer, showSwap, showSystemStatus, inventoryMap
             const needsSwap = needsSwapIccids?.has(sim.iccid || '');
             const sysStatus = showSystemStatus && inventoryMap ? getSystemStatus(sim, inventoryMap) : null;
             return (
-              <TableRow key={sim.id} className={needsSwap ? 'bg-yellow-50 dark:bg-yellow-950/10' : ''}>
+              <TableRow
+                key={sim.id}
+                className={`${needsSwap ? 'bg-yellow-50 dark:bg-yellow-950/10' : ''} ${(sim.status === 'rented' && onRentalClick) ? 'cursor-pointer hover:bg-blue-50/50 dark:hover:bg-blue-950/10' : ''}`}
+                onClick={() => { if (sim.status === 'rented' && onRentalClick) onRentalClick(sim); }}
+              >
                 <TableCell className="font-mono text-xs">{sim.sim_number || '-'}</TableCell>
                 <TableCell dir="ltr">{sim.uk_number || '-'}</TableCell>
                 <TableCell dir="ltr">{sim.il_number || '-'}</TableCell>
@@ -191,17 +197,25 @@ function SimTable({ sims, showCustomer, showSwap, showSystemStatus, inventoryMap
                     {sim.start_date ? `${formatDate(sim.start_date)} - ${formatDate(sim.end_date)}` : '-'}
                   </TableCell>
                 )}
-                {(showSwap || needsSwapIccids) && (
-                  <TableCell>
-                    <div className="flex gap-1">
-                      {showSwap && onSwapClick && (
-                        <Button size="sm" variant="outline" onClick={() => onSwapClick(sim)} className="gap-1 text-xs">
-                          <ArrowLeftRight className="h-3 w-3" /> החלף
+                {(showSwap || needsSwapIccids || showActionButton) && (
+                  <TableCell onClick={e => e.stopPropagation()}>
+                    <div className="flex gap-1 flex-wrap">
+                      {/* סים זמין - כפתור הפעלה */}
+                      {showActionButton && sim.status === 'available' && onActivateClick && !needsSwap && (
+                        <Button size="sm" variant="default" onClick={() => onActivateClick(sim)} className="gap-1 text-xs bg-green-600 hover:bg-green-700">
+                          <Zap className="h-3 w-3" /> הפעל
                         </Button>
                       )}
+                      {/* סים שצריך החלפה - הפעל+החלף */}
                       {needsSwap && onActivateAndSwapClick && (
                         <Button size="sm" variant="default" onClick={() => onActivateAndSwapClick(sim)} className="gap-1 text-xs">
                           <Zap className="h-3 w-3" /> הפעל+החלף
+                        </Button>
+                      )}
+                      {/* סים מושכר - כפתור החלפה */}
+                      {showSwap && onSwapClick && (
+                        <Button size="sm" variant="outline" onClick={() => onSwapClick(sim)} className="gap-1 text-xs">
+                          <ArrowLeftRight className="h-3 w-3" /> החלף
                         </Button>
                       )}
                     </div>
@@ -240,7 +254,7 @@ export default function CellStation() {
   } = useCellStation();
 
   const [search, setSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<string>('all');
+  const [activeTab, setActiveTab] = useState<string>('available');
   const [swapDialogSim, setSwapDialogSim] = useState<SimRow | null>(null);
   const [activateSwapSim, setActivateSwapSim] = useState<SimRow | null>(null);
   const [swapRentalId, setSwapRentalId] = useState<string>('');
@@ -697,33 +711,7 @@ export default function CellStation() {
       </div>
 
       {/* התראות */}
-      {overdueSwapItems.length > 0 && (
-        <Card className="border-red-300 bg-red-50 dark:bg-red-950/20">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle className="h-4 w-4 text-red-600" />
-              <span className="font-bold text-red-700 text-sm">⚠️ סימים שדורשים החלפה ({overdueSwapItems.length})</span>
-            </div>
-            <div className="space-y-1">
-              {overdueSwapItems.map((item, i) => (
-                <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-white/70 dark:bg-black/20">
-                  <Button size="sm" variant="destructive" className="gap-1 h-7 text-xs"
-                    onClick={() => { const sim = simCards.find(s => s.iccid === item.iccid); if (sim) setActivateSwapSim(sim); }}>
-                    <Zap className="h-3 w-3" /> החלף עכשיו
-                  </Button>
-                  <div className="text-right text-sm">
-                    <span className="font-semibold">{item.customerName}</span>
-                    <span className="mx-2 text-muted-foreground">·</span>
-                    <span className="font-mono text-xs">{item.simNumber}</span>
-                    <span className="mx-2 text-muted-foreground">·</span>
-                    <span className="text-red-600 font-bold">{item.daysOverdue} ימים</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+
 
       {overdueNotReturned.length > 0 && (
         <Card className="border-orange-300 bg-orange-50 dark:bg-orange-950/20">
@@ -809,10 +797,10 @@ export default function CellStation() {
         ) : (
           <>
             <TabsContent value="all" className="mt-3">
-              <SimTable sims={filtered} showSystemStatus inventoryMap={inventoryMap} needsSwapIccids={needsSwapIccids} onActivateAndSwapClick={sim => setActivateSwapSim(sim)} onRentalClick={sim => openRentalForSim(sim)} />
+              <SimTable sims={filtered} showSystemStatus showActionButton inventoryMap={inventoryMap} needsSwapIccids={needsSwapIccids} onActivateAndSwapClick={sim => setActivateSwapSim(sim)} onActivateClick={sim => { window.location.href = `/cellstation?activate=${sim.iccid}`; }} onRentalClick={sim => openRentalForSim(sim)} />
             </TabsContent>
             <TabsContent value="available" className="mt-3">
-              <SimTable sims={available} />
+              <SimTable sims={available} showActionButton onActivateClick={sim => { setActivateSwapSim(null); window.location.href = `/cellstation?activate=${sim.iccid}`; }} onActivateAndSwapClick={sim => setActivateSwapSim(sim)} needsSwapIccids={needsSwapIccids} />
             </TabsContent>
             <TabsContent value="rented" className="mt-3">
               <SimTable sims={rented} showCustomer showSwap onSwapClick={sim => openSwapForSim(sim)} onRentalClick={sim => openRentalForSim(sim)} needsSwapIccids={needsSwapIccids} onActivateAndSwapClick={sim => setActivateSwapSim(sim)} />
