@@ -242,7 +242,7 @@ interface OverdueNotReturnedItem {
 export default function CellStation() {
   const {
     simCards, isLoading, isSyncing,
-    syncSims, activateSim, swapSim, activateAndSwap,
+    syncSims, activateSim, activateSimWithStatus, swapSim, activateAndSwap,
     stats, fetchSims, isActivating,
   } = useCellStation();
 
@@ -525,48 +525,9 @@ export default function CellStation() {
     note: string;
   }) => {
     if (!sim.iccid) return { success: false, error: 'אין ICCID' };
-    
-    // 1. Call CellStation API to activate
-    const result = await activateSim({
-      iccid: sim.iccid,
-      ...params,
-    });
-    
-    if (!result?.success) return result;
-    
-    // 2. Update cellstation_sims to rented
-    await supabase.from('cellstation_sims')
-      .update({ status: 'rented', status_detail: 'active' })
-      .eq('iccid', sim.iccid);
-    
-    // 3. Update or create inventory item
-    const { data: existingInv } = await supabase
-      .from('inventory')
-      .select('id')
-      .eq('sim_number', sim.iccid)
-      .maybeSingle();
-    
-    if (existingInv) {
-      await supabase.from('inventory')
-        .update({ status: 'rented' })
-        .eq('id', existingInv.id);
-    } else {
-      await supabase.from('inventory').insert({
-        name: sim.plan || 'סים גלישה',
-        category: 'sim_european',
-        sim_number: sim.iccid,
-        local_number: sim.uk_number || null,
-        israeli_number: sim.il_number || null,
-        expiry_date: sim.expiry_date || null,
-        status: 'rented',
-      });
-    }
-    
-    // 4. Refresh
-    await fetchSims();
-    setQuickActivateSim(null);
-    return result;
-  }, [activateSim, fetchSims]);
+    // activateSimWithStatus מפעיל + מעדכן cellstation_sims (דרך Supabase הנכון)
+    return await activateSimWithStatus({ iccid: sim.iccid, ...params });
+  }, [activateSimWithStatus]);
 
   // Navigate to rental for a rented SIM
   const openRentalForSim = useCallback((sim: SimRow) => {
@@ -621,21 +582,7 @@ export default function CellStation() {
     const oldIccid = swapDialogSim?.iccid;
     const newIccid = params.swap_iccid;
 
-    // 1. Update old SIM to available in cellstation_sims
-    if (oldIccid) {
-      await supabase.from('cellstation_sims')
-        .update({ status: 'available', status_detail: 'valid', customer_name: null })
-        .eq('iccid', oldIccid);
-    }
-
-    // 2. Update new SIM to rented in cellstation_sims
-    if (newIccid) {
-      await supabase.from('cellstation_sims')
-        .update({ status: 'rented', status_detail: 'active', customer_name: swapDialogSim?.customer_name })
-        .eq('iccid', newIccid);
-    }
-
-    // 3. Update old inventory item to available
+    // 1. Update old inventory item to available
     if (oldIccid) {
       await supabase.from('inventory')
         .update({ status: 'available', needs_swap: false })
