@@ -135,27 +135,6 @@ export function useCellStation() {
         await csInvoke('upsert_sims', { records });
       }
 
-      const { data: inventoryItems } = await supabase
-        .from('inventory' as any)
-        .select('id, sim_number, expiry_date, status')
-        .not('sim_number', 'is', null);
-
-      if (inventoryItems && inventoryItems.length > 0) {
-        for (const inv of inventoryItems as any[]) {
-          const matched = records.find((r: any) => r.iccid === inv.sim_number);
-          if (matched) {
-            const updates: any = {};
-            if (matched.expiry_date && matched.expiry_date !== inv.expiry_date) updates.expiry_date = matched.expiry_date;
-            if (matched.status === 'available' && inv.status === 'rented') updates.needs_swap = true;
-            if (matched.status_detail) updates.cellstation_status = matched.status_detail;
-            if (Object.keys(updates).length > 0) {
-              updates.last_sync = now;
-              await supabase.from('inventory' as any).update(updates).eq('id', inv.id);
-            }
-          }
-        }
-      }
-
       toast({ title: 'סנכרון הושלם', description: `${records.length} סימים עודכנו` });
       await fetchSims();
     } catch (e: any) {
