@@ -113,7 +113,7 @@ export function useCellStation() {
   const fetchSims = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await csGet('cellstation_sims?select=*&order=status.asc,expiry_date.asc');
+      const data = await csGet('cellstation_sims?select=*&order=status.asc&order=expiry_date.asc');
       setSimCards((data as CellStationSim[]) || []);
     } catch (e: any) {
       console.error('Failed to fetch sims:', e);
