@@ -12,7 +12,7 @@ import { ActivationTab } from '@/components/cellstation/ActivationTab';
 import { SwapSimDialog } from '@/components/cellstation/SwapSimDialog';
 import { ActivateAndSwapDialog } from '@/components/cellstation/ActivateAndSwapDialog';
 import { QuickActivateDialog } from '@/components/cellstation/QuickActivateDialog';
-import { RefreshCw, Search, Clock, Zap, AlertTriangle, Phone } from 'lucide-react';
+import { RefreshCw, Search, Clock, Zap, AlertTriangle, Phone, ArrowLeftRight } from 'lucide-react';
 import { differenceInDays, formatDistanceToNow } from 'date-fns';
 import { he } from 'date-fns/locale';
 
@@ -104,7 +104,7 @@ interface SimRow {
 type SystemStatus = 'match' | 'needs_swap' | 'not_in_inventory' | 'both_rented';
 
 interface InventoryMap {
-  [iccid: string]: { status: string; id: string };
+  [iccid: string]: { status: string; id: string; rentalId?: string };
 }
 
 interface SimTableProps {
