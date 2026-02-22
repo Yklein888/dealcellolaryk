@@ -4,7 +4,7 @@ import { useToast } from '@/hooks/use-toast';
 
 // ── CellStation helpers ─────────────────────────────────────────────────────
 // Vercel API route - same origin, no CORS issues
-const CS_API = 'https://hlswvjyegirbhoszrqyo.supabase.co/functions/v1/cellstation-api';
+const CS_API = '/api/cellstation';
 
 async function csInvoke(action: string, params: any): Promise<any> {
   const res = await fetch(CS_API, {
