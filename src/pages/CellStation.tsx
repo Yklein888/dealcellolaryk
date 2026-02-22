@@ -12,7 +12,7 @@ import { ActivationTab } from '@/components/cellstation/ActivationTab';
 import { SwapSimDialog } from '@/components/cellstation/SwapSimDialog';
 import { ActivateAndSwapDialog } from '@/components/cellstation/ActivateAndSwapDialog';
 import { QuickActivateDialog } from '@/components/cellstation/QuickActivateDialog';
-import { RefreshCw, Search, Clock, Zap, AlertTriangle, Phone, ArrowLeftRight } from 'lucide-react';
+import { RefreshCw, Search, Clock, Zap, AlertTriangle, Phone } from 'lucide-react';
 import { differenceInDays, formatDistanceToNow } from 'date-fns';
 import { he } from 'date-fns/locale';
 
@@ -100,6 +100,9 @@ interface SimRow {
   customer_name: string | null;
 }
 
+// Cross-reference status type
+type SystemStatus = 'match' | 'needs_swap' | 'not_in_inventory' | 'both_rented';
+
 interface InventoryMap {
   [iccid: string]: { status: string; id: string };
 }
@@ -116,6 +119,27 @@ interface SimTableProps {
   needsSwapIccids?: Set<string>;
   overdueIccids?: Set<string>;
   showActionButton?: boolean;
+}
+
+function getSystemStatus(sim: SimRow, inventoryMap: InventoryMap): SystemStatus {
+  if (!sim.iccid || !inventoryMap[sim.iccid]) return 'not_in_inventory';
+  const inv = inventoryMap[sim.iccid];
+  if (sim.status === 'available' && inv.status === 'rented') return 'needs_swap';
+  if (sim.status === 'rented' && inv.status === 'rented') return 'both_rented';
+  return 'match';
+}
+
+function SystemStatusBadge({ status }: { status: SystemStatus }) {
+  switch (status) {
+    case 'match':
+      return <span className="text-xs whitespace-nowrap">✅ תואם</span>;
+    case 'needs_swap':
+      return <span className="text-xs text-orange-600 font-medium whitespace-nowrap">⚠️ צריך החלפה</span>;
+    case 'not_in_inventory':
+      return <span className="text-xs text-muted-foreground whitespace-nowrap">❌ לא במלאי</span>;
+    case 'both_rented':
+      return <span className="text-xs whitespace-nowrap">🔄 מושכר</span>;
+  }
 }
 
 function SimTable({ sims, showCustomer, showSwap, inventoryMap, onSwapClick, onActivateAndSwapClick, onActivateClick, onRentalClick, needsSwapIccids, overdueIccids, showActionButton }: SimTableProps) {
@@ -201,6 +225,14 @@ function SimTable({ sims, showCustomer, showSwap, inventoryMap, onSwapClick, onA
 }
 
 // Overdue warning types
+interface OverdueSwapItem {
+  customerName: string;
+  simNumber: string;
+  iccid: string;
+  daysOverdue: number;
+  rentalId: string;
+}
+
 interface OverdueNotReturnedItem {
   customerName: string;
   simNumber: string;
@@ -272,33 +304,7 @@ export default function CellStation() {
     };
   }, [runAutoSync]);
 
-  // ⚡ REAL-TIME SYNC - Updates appear instantly across all devices!
-  useEffect(() => {
-    console.log('🚀 Real-Time Sync activated - changes sync in real-time!');
-    
-    // Subscribe to cellstation_sims changes
-    const subscription = supabase
-      .channel('cellstation_sims_realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // Listen to INSERT, UPDATE, DELETE
-          schema: 'public',
-          table: 'cellstation_sims'
-        },
-        (payload) => {
-          console.log('⚡ Real-time update received:', payload);
-          // Refresh SIMs data immediately
-          fetchSims();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      console.log('👋 Real-Time Sync disconnected');
-      subscription.unsubscribe();
-    };
-  }, [fetchSims]);
+  // Real-time for cellstation_sims handled via fetchSims() polling
 
   // Refresh "time ago" every 30s
   useEffect(() => {
@@ -366,6 +372,7 @@ export default function CellStation() {
   const [inventoryMap, setInventoryMap] = useState<InventoryMap>({});
   const [needsSwapIccids, setNeedsSwapIccids] = useState<Set<string>>(new Set());
   const [overdueIccids, setOverdueIccids] = useState<Set<string>>(new Set());
+  const [overdueSwapItems, setOverdueSwapItems] = useState<OverdueSwapItem[]>([]);
   const [overdueNotReturned, setOverdueNotReturned] = useState<OverdueNotReturnedItem[]>([]);
 
   useEffect(() => {
@@ -437,6 +444,8 @@ export default function CellStation() {
 
         const invSimMap: Record<string, string> = {};
         ((invItems as any[]) || []).forEach(i => { invSimMap[i.id] = i.sim_number; });
+
+        const swapItems: OverdueSwapItem[] = [];
         const notReturnedItems: OverdueNotReturnedItem[] = [];
 
         for (const rental of overdueRentals) {
@@ -454,6 +463,13 @@ export default function CellStation() {
 
             if (csSim.status === 'available') {
               // CellStation released it but still rented in our system
+              swapItems.push({
+                customerName: rental.customer_name,
+                simNumber: csSim.uk_number || csSim.il_number || simNumber,
+                iccid: simNumber,
+                daysOverdue,
+                rentalId: rental.id,
+              });
             } else if (csSim.status === 'rented') {
               // Customer still has it
               notReturnedItems.push({
@@ -465,6 +481,8 @@ export default function CellStation() {
             }
           }
         }
+
+        setOverdueSwapItems(swapItems);
         setOverdueNotReturned(notReturnedItems);
         // overdueIccids = סימים שהלקוח לא החזיר (מושכר בCS + אצלנו + באיחור)
         const overdueSet = new Set<string>(notReturnedItems.map(i => {
@@ -473,6 +491,7 @@ export default function CellStation() {
         }).filter(Boolean));
         setOverdueIccids(overdueSet);
       } else {
+        setOverdueSwapItems([]);
         setOverdueNotReturned([]);
         setOverdueIccids(new Set());
       }
