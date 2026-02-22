@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ActivationTab } from '@/components/cellstation/ActivationTab';
 import { SwapSimDialog } from '@/components/cellstation/SwapSimDialog';
 import { ActivateAndSwapDialog } from '@/components/cellstation/ActivateAndSwapDialog';
+import { QuickActivateDialog } from '@/components/cellstation/QuickActivateDialog';
 import { RefreshCw, Search, Clock, Zap, AlertTriangle, Phone } from 'lucide-react';
 import { differenceInDays, formatDistanceToNow } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -111,7 +112,6 @@ interface SimTableProps {
   sims: SimRow[];
   showCustomer?: boolean;
   showSwap?: boolean;
-  showSystemStatus?: boolean;
   inventoryMap?: InventoryMap;
   onSwapClick?: (sim: SimRow) => void;
   onActivateAndSwapClick?: (sim: SimRow) => void;
@@ -142,7 +142,7 @@ function SystemStatusBadge({ status }: { status: SystemStatus }) {
   }
 }
 
-function SimTable({ sims, showCustomer, showSwap, showSystemStatus, inventoryMap, onSwapClick, onActivateAndSwapClick, onActivateClick, onRentalClick, needsSwapIccids, showActionButton }: SimTableProps) {
+function SimTable({ sims, showCustomer, showSwap, inventoryMap, onSwapClick, onActivateAndSwapClick, onActivateClick, onRentalClick, needsSwapIccids, showActionButton }: SimTableProps) {
   if (sims.length === 0) {
     return <p className="text-center text-muted-foreground py-8">אין סימים להצגה</p>;
   }
@@ -156,7 +156,6 @@ function SimTable({ sims, showCustomer, showSwap, showSystemStatus, inventoryMap
             <TableHead>IL Number</TableHead>
             <TableHead>ICCID</TableHead>
             <TableHead>סטטוס</TableHead>
-            {showSystemStatus && <TableHead>מצב במערכת</TableHead>}
             <TableHead>תוקף</TableHead>
             <TableHead>חבילה</TableHead>
             {showCustomer && <TableHead>לקוח</TableHead>}
@@ -167,7 +166,6 @@ function SimTable({ sims, showCustomer, showSwap, showSystemStatus, inventoryMap
         <TableBody>
           {sims.map((sim) => {
             const needsSwap = needsSwapIccids?.has(sim.iccid || '');
-            const sysStatus = showSystemStatus && inventoryMap ? getSystemStatus(sim, inventoryMap) : null;
             return (
               <TableRow
                 key={sim.id}
@@ -184,11 +182,6 @@ function SimTable({ sims, showCustomer, showSwap, showSystemStatus, inventoryMap
                     {needsSwap && <AlertTriangle className="h-4 w-4 text-yellow-500" />}
                   </div>
                 </TableCell>
-                {showSystemStatus && (
-                  <TableCell>
-                    {sysStatus && <SystemStatusBadge status={sysStatus} />}
-                  </TableCell>
-                )}
                 <TableCell>{formatDate(sim.expiry_date)}</TableCell>
                 <TableCell>{sim.plan || '-'}</TableCell>
                 {showCustomer && <TableCell>{sim.customer_name || '-'}</TableCell>}
@@ -200,20 +193,20 @@ function SimTable({ sims, showCustomer, showSwap, showSystemStatus, inventoryMap
                 {(showSwap || needsSwapIccids || showActionButton) && (
                   <TableCell onClick={e => e.stopPropagation()}>
                     <div className="flex gap-1 flex-wrap">
-                      {/* סים זמין - כפתור הפעלה */}
+                      {/* זמין בCellStation + לא מושכר במערכת = הפעל */}
                       {showActionButton && sim.status === 'available' && onActivateClick && !needsSwap && (
                         <Button size="sm" variant="default" onClick={() => onActivateClick(sim)} className="gap-1 text-xs bg-green-600 hover:bg-green-700">
                           <Zap className="h-3 w-3" /> הפעל
                         </Button>
                       )}
-                      {/* סים שצריך החלפה - הפעל+החלף */}
+                      {/* זמין בCellStation + מושכר במערכת = לקוח לא החזיר → החלף */}
                       {needsSwap && onActivateAndSwapClick && (
-                        <Button size="sm" variant="default" onClick={() => onActivateAndSwapClick(sim)} className="gap-1 text-xs">
-                          <Zap className="h-3 w-3" /> הפעל+החלף
+                        <Button size="sm" variant="destructive" onClick={() => onActivateAndSwapClick(sim)} className="gap-1 text-xs">
+                          <ArrowLeftRight className="h-3 w-3" /> החלף
                         </Button>
                       )}
-                      {/* סים מושכר - כפתור החלפה */}
-                      {showSwap && onSwapClick && (
+                      {/* מושכר בCellStation = מושכר → כפתור החלפה */}
+                      {showSwap && !needsSwap && onSwapClick && (
                         <Button size="sm" variant="outline" onClick={() => onSwapClick(sim)} className="gap-1 text-xs">
                           <ArrowLeftRight className="h-3 w-3" /> החלף
                         </Button>
@@ -248,7 +241,7 @@ interface OverdueNotReturnedItem {
 
 export default function CellStation() {
   const {
-    simCards, isLoading, isSyncing, isSwapping,
+    simCards, isLoading, isSyncing,
     syncSims, activateSim, swapSim, activateAndSwap,
     stats, fetchSims, isActivating,
   } = useCellStation();
@@ -256,6 +249,7 @@ export default function CellStation() {
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<string>('available');
   const [swapDialogSim, setSwapDialogSim] = useState<SimRow | null>(null);
+  const [quickActivateSim, setQuickActivateSim] = useState<SimRow | null>(null);
   const [activateSwapSim, setActivateSwapSim] = useState<SimRow | null>(null);
   const [swapRentalId, setSwapRentalId] = useState<string>('');
 
@@ -521,6 +515,58 @@ export default function CellStation() {
       loadCrossReference();
     }
   }, [simCards]);
+
+  // Quick activate a SIM directly from the table row
+  const handleQuickActivate = useCallback(async (sim: SimRow, params: {
+    start_rental: string;
+    end_rental: string;
+    price: string;
+    days: string;
+    note: string;
+  }) => {
+    if (!sim.iccid) return { success: false, error: 'אין ICCID' };
+    
+    // 1. Call CellStation API to activate
+    const result = await activateSim({
+      iccid: sim.iccid,
+      ...params,
+    });
+    
+    if (!result?.success) return result;
+    
+    // 2. Update cellstation_sims to rented
+    await supabase.from('cellstation_sims')
+      .update({ status: 'rented', status_detail: 'active' })
+      .eq('iccid', sim.iccid);
+    
+    // 3. Update or create inventory item
+    const { data: existingInv } = await supabase
+      .from('inventory')
+      .select('id')
+      .eq('sim_number', sim.iccid)
+      .maybeSingle();
+    
+    if (existingInv) {
+      await supabase.from('inventory')
+        .update({ status: 'rented' })
+        .eq('id', existingInv.id);
+    } else {
+      await supabase.from('inventory').insert({
+        name: sim.plan || 'סים גלישה',
+        category: 'sim_european',
+        sim_number: sim.iccid,
+        local_number: sim.uk_number || null,
+        israeli_number: sim.il_number || null,
+        expiry_date: sim.expiry_date || null,
+        status: 'rented',
+      });
+    }
+    
+    // 4. Refresh
+    await fetchSims();
+    setQuickActivateSim(null);
+    return result;
+  }, [activateSim, fetchSims]);
 
   // Navigate to rental for a rented SIM
   const openRentalForSim = useCallback((sim: SimRow) => {
@@ -797,10 +843,10 @@ export default function CellStation() {
         ) : (
           <>
             <TabsContent value="all" className="mt-3">
-              <SimTable sims={filtered} showSystemStatus showActionButton inventoryMap={inventoryMap} needsSwapIccids={needsSwapIccids} onActivateAndSwapClick={sim => setActivateSwapSim(sim)} onActivateClick={sim => { window.location.href = `/cellstation?activate=${sim.iccid}`; }} onRentalClick={sim => openRentalForSim(sim)} />
+              <SimTable sims={filtered} showActionButton inventoryMap={inventoryMap} needsSwapIccids={needsSwapIccids} onActivateAndSwapClick={sim => setActivateSwapSim(sim)} onActivateClick={sim => setQuickActivateSim(sim)} onRentalClick={sim => openRentalForSim(sim)} />
             </TabsContent>
             <TabsContent value="available" className="mt-3">
-              <SimTable sims={available} showActionButton onActivateClick={sim => { setActivateSwapSim(null); window.location.href = `/cellstation?activate=${sim.iccid}`; }} onActivateAndSwapClick={sim => setActivateSwapSim(sim)} needsSwapIccids={needsSwapIccids} />
+              <SimTable sims={available} showActionButton onActivateClick={sim => setQuickActivateSim(sim)} onActivateAndSwapClick={sim => setActivateSwapSim(sim)} needsSwapIccids={needsSwapIccids} />
             </TabsContent>
             <TabsContent value="rented" className="mt-3">
               <SimTable sims={rented} showCustomer showSwap onSwapClick={sim => openSwapForSim(sim)} onRentalClick={sim => openRentalForSim(sim)} needsSwapIccids={needsSwapIccids} onActivateAndSwapClick={sim => setActivateSwapSim(sim)} />
@@ -815,25 +861,34 @@ export default function CellStation() {
         )}
       </Tabs>
 
+      {/* Quick Activate Dialog */}
+      {quickActivateSim && (
+        <QuickActivateDialog
+          sim={quickActivateSim}
+          isOpen={!!quickActivateSim}
+          onClose={() => setQuickActivateSim(null)}
+          onActivate={handleQuickActivate}
+          isActivating={isActivating}
+        />
+      )}
+
       {/* Dialogs */}
       {swapDialogSim && (
         <SwapSimDialog
-          sim={swapDialogSim}
+          open={!!swapDialogSim}
+          onOpenChange={(open) => { if (!open) setSwapDialogSim(null); }}
+          currentSim={swapDialogSim}
           availableSims={simCards.filter(s => s.status === 'available' && s.iccid)}
-          isOpen={!!swapDialogSim}
-          onClose={() => setSwapDialogSim(null)}
-          onSwap={handleSwap}
-          isSwapping={isSwapping}
+          onSwap={handleSwapWithUpdates}
         />
       )}
       {activateSwapSim && (
         <ActivateAndSwapDialog
-          currentSim={activateSwapSim}
+          open={!!activateSwapSim}
+          onOpenChange={(open) => { if (!open) setActivateSwapSim(null); }}
+          oldSim={activateSwapSim}
           availableSims={simCards.filter(s => s.status === 'available' && s.iccid)}
-          isOpen={!!activateSwapSim}
-          onClose={() => setActivateSwapSim(null)}
-          onActivateAndSwap={handleActivateAndSwap}
-          isActivating={isActivating}
+          onActivateAndSwap={activateAndSwap}
         />
       )}
     </div>
