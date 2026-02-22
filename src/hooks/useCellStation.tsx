@@ -2,68 +2,55 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
-// ============================================================
-// CellStation DB + Edge Function - גישה ישירה דרך fetch
-// ללא Supabase client שני - יציב לנצח, ללא ERR_FAILED
-// ============================================================
+// ── CellStation DB helpers ─────────────────────────────────────────────────
+// fetch ישיר - יציב, ללא בעיות auth/createClient
 const CS_URL = 'https://hlswvjyegirbhoszrqyo.supabase.co';
 const CS_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhsc3d2anllZ2lyYmhvc3pycXlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3OTg4MTAsImV4cCI6MjA4NjM3NDgxMH0.KNRl4-S-XxVMcaoPPQXV5gLi6W9yYNWeHqtMok-Mpg8';
+const CS_H = { 'apikey': CS_KEY, 'Authorization': `Bearer ${CS_KEY}`, 'Content-Type': 'application/json' };
 
-const csHeaders = {
-  'apikey': CS_KEY,
-  'Authorization': `Bearer ${CS_KEY}`,
-  'Content-Type': 'application/json',
-};
-
-// קריאה לטבלה
-async function csSelect(path: string): Promise<any[]> {
-  const res = await fetch(`${CS_URL}/rest/v1/${path}`, { headers: csHeaders, mode: 'cors' });
-  if (!res.ok) throw new Error(`csSelect failed: ${res.status} ${await res.text()}`);
+async function csGet(path: string): Promise<any[]> {
+  const res = await fetch(`${CS_URL}/rest/v1/${path}`, { headers: CS_H });
+  if (!res.ok) throw new Error(`CS fetch error: ${res.status}`);
   return res.json();
 }
 
-// מחיקה
-async function csDelete(path: string): Promise<void> {
-  const res = await fetch(`${CS_URL}/rest/v1/${path}`, {
-    method: 'DELETE', headers: csHeaders, mode: 'cors'
-  });
-  if (!res.ok) throw new Error(`csDelete failed: ${res.status} ${await res.text()}`);
-}
-
-// הכנסה
-async function csInsert(table: string, data: any[]): Promise<void> {
+async function csInsert(table: string, rows: any[]): Promise<void> {
   const res = await fetch(`${CS_URL}/rest/v1/${table}`, {
     method: 'POST',
-    headers: { ...csHeadersJson, 'Prefer': 'return=minimal' },
-    body: JSON.stringify(data),
+    headers: { ...CS_H, 'Prefer': 'return=minimal' },
+    body: JSON.stringify(rows),
   });
-  if (!res.ok) throw new Error(`csInsert failed: ${res.status} ${await res.text()}`);
+  if (!res.ok) { const t = await res.text(); throw new Error(`CS insert error: ${res.status} ${t.slice(0, 200)}`); }
 }
 
-// עדכון
-async function csUpdate(table: string, match: string, data: any): Promise<void> {
-  const res = await fetch(`${CS_URL}/rest/v1/${table}?${match}`, {
+async function csUpdate(table: string, filter: string, data: any): Promise<void> {
+  const res = await fetch(`${CS_URL}/rest/v1/${table}?${filter}`, {
     method: 'PATCH',
-    headers: { ...csHeadersJson, 'Prefer': 'return=minimal' },
+    headers: { ...CS_H, 'Prefer': 'return=minimal' },
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error(`csUpdate failed: ${res.status} ${await res.text()}`);
+  if (!res.ok) { const t = await res.text(); throw new Error(`CS update error: ${res.status} ${t.slice(0, 200)}`); }
 }
 
-// קריאה ל-Edge Function
-async function csEdgeFunction(action: string, params: any = {}): Promise<any> {
+async function csDeleteAll(table: string): Promise<void> {
+  // מחק לפי id שאינו null
+  const res = await fetch(`${CS_URL}/rest/v1/${table}?id=not.is.null`, {
+    method: 'DELETE',
+    headers: CS_H,
+  });
+  if (!res.ok) throw new Error(`CS delete error: ${res.status}`);
+}
+
+async function csInvoke(action: string, params: any): Promise<any> {
   const res = await fetch(`${CS_URL}/functions/v1/cellstation-api`, {
     method: 'POST',
-    headers: csHeadersJson,
+    headers: { ...CS_H },
     body: JSON.stringify({ action, params }),
   });
-  if (!res.ok) throw new Error(`Edge function error: ${res.status} ${await res.text()}`);
-  const result = await res.json();
-  if (!result.success) throw new Error(result.error || `${action} failed`);
-  return result;
+  if (!res.ok) { const t = await res.text(); throw new Error(`Edge Function error: ${res.status} ${t.slice(0, 200)}`); }
+  return res.json();
 }
-
-// ============================================================
+// ──────────────────────────────────────────────────────────────────────────
 
 interface CellStationSim {
   id: string;
@@ -126,7 +113,7 @@ export function useCellStation() {
   const fetchSims = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await csSelect('cellstation_sims?select=*&order=status.asc,expiry_date.asc');
+      const data = await csGet('cellstation_sims?select=*&order=status.asc,expiry_date.asc');
       setSimCards((data as CellStationSim[]) || []);
     } catch (e: any) {
       console.error('Failed to fetch sims:', e);
@@ -139,20 +126,26 @@ export function useCellStation() {
     setIsSyncing(true);
     try {
       console.log('🚀 Starting sync with CellStation...');
-      const data = await csEdgeFunction('sync_csv');
-      
+      const data = await csInvoke('sync_csv', {});
+
+      console.log('📦 Edge Function Response:', data);
+
+      if (!data?.success) {
+        console.error('❌ Sync failed:', data?.error);
+        throw new Error(data?.error || 'Sync failed');
+      }
+
       const sims = data.sims || [];
       console.log(`✅ Received ${sims.length} SIMs from CellStation`);
-      
+
       if (sims.length === 0) {
         toast({
           title: "אין סימים",
           description: "לא התקבלו סימים מ-CellStation. בדוק את פרטי ההתחברות.",
           variant: "destructive",
         });
-        return;
       }
-      
+
       const now = new Date().toISOString();
 
       const records = sims.map((sim: any) => {
@@ -174,8 +167,7 @@ export function useCellStation() {
       }).filter((r: any) => r.iccid);
 
       if (records.length > 0) {
-        // מחק הכל ו-insert מחדש - מטפל גם בהחלפות ICCID
-        await csDelete('cellstation_sims?id=neq.00000000-0000-0000-0000-000000000000');
+        await csDeleteAll('cellstation_sims');
         await csInsert('cellstation_sims', records);
       }
 
@@ -227,7 +219,8 @@ export function useCellStation() {
   }) => {
     setIsActivating(true);
     try {
-      const data = await csEdgeFunction('activate_sim', params);
+      const data = await csInvoke('activate_sim', params);
+      if (!data?.success) throw new Error(data?.error || 'Activation failed');
       toast({ title: 'הסים הופעל בהצלחה' });
       return data;
     } catch (e: any) {
@@ -248,11 +241,12 @@ export function useCellStation() {
   }) => {
     setIsActivating(true);
     try {
-      await csEdgeFunction('activate_sim', { ...params, product: '' });
+      const data = await csInvoke('activate_sim', { ...params, product: '' });
+      if (!data?.success) throw new Error(data?.error || 'Activation failed');
+
       // עדכן סטטוס ב-DB
-      await csUpdate('cellstation_sims', `iccid=eq.${encodeURIComponent(params.iccid)}`, {
-        status: 'rented', status_detail: 'active'
-      });
+      await csUpdate('cellstation_sims', `iccid=eq.${params.iccid}`, { status: 'rented', status_detail: 'active' });
+
       toast({ title: 'הסים הופעל בהצלחה ועבר למושכרים ✅' });
       await fetchSims();
       return { success: true };
@@ -273,7 +267,8 @@ export function useCellStation() {
   }) => {
     setIsSwapping(true);
     try {
-      const data = await csEdgeFunction('swap_sim', params);
+      const data = await csInvoke('swap_sim', params);
+      if (!data?.success) throw new Error(data?.error || 'Swap failed');
       toast({ title: 'הסים הוחלף בהצלחה' });
       return data;
     } catch (e: any) {
@@ -297,10 +292,10 @@ export function useCellStation() {
     try {
       onProgress?.('מפעיל סים...', 10);
       setActivateAndSwapProgress('מפעיל סים...');
-      
+
       const startTime = Date.now();
       const totalWait = 80000;
-      
+
       const progressInterval = setInterval(() => {
         const elapsed = Date.now() - startTime;
         const percent = Math.min(90, Math.round((elapsed / totalWait) * 90));
@@ -318,14 +313,17 @@ export function useCellStation() {
 
       let data: any;
       try {
-        data = await csEdgeFunction('activate_and_swap', params);
+        data = await csInvoke('activate_and_swap', params);
       } finally {
         clearInterval(progressInterval);
       }
 
+      if (!data?.success) throw new Error(data?.error || 'Activate and swap failed');
+
       onProgress?.('הושלם!', 100);
       setActivateAndSwapProgress('הושלם!');
       toast({ title: 'הפעלה והחלפה הושלמו בהצלחה!' });
+
       await fetchSims();
       return data;
     } catch (e: any) {
