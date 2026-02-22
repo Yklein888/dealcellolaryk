@@ -12,7 +12,7 @@ export function useApproval() {
       setIsLoading(false);
       return;
     }
-    // All authenticated users are approved
+    // All authenticated users are automatically approved
     setIsApproved(true);
     setIsLoading(false);
   }, [user]);
