@@ -631,8 +631,8 @@ export default function CellStation() {
     );
   }, [simCards, search]);
 
-  const available = useMemo(() => filtered.filter(s => s.status === 'available' && s.status_detail === 'valid' && !needsSwapIccids.has(s.iccid || '')), [filtered, needsSwapIccids]);
-  const expired = useMemo(() => filtered.filter(s => s.status_detail === 'expired'), [filtered]);
+  const available = useMemo(() => filtered.filter(s => s.status === 'available' && !needsSwapIccids.has(s.iccid || '')), [filtered, needsSwapIccids]);
+  const expired = useMemo(() => filtered.filter(s => s.status === 'available' && s.status_detail === 'expired'), [filtered]);
   const rented = useMemo(() => filtered.filter(s => s.status === 'rented'), [filtered]);
   const expiringSoon = useMemo(() => simCards.filter(s => {
     if (!s.expiry_date) return false;
