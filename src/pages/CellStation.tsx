@@ -57,20 +57,19 @@ function SyncStatusIndicator({ status, lastSyncTime, simCountDelta }: {
   );
 }
 
-function StatusBadge({ status, detail }: { status: string | null; detail: string | null }) {
+function StatusBadge({ status, detail, isOverdue }: { status: string | null; detail: string | null; isOverdue?: boolean }) {
+  if (detail === 'expired') {
+    return <Badge className="bg-red-500/20 text-red-700 border-red-300">פג תוקף</Badge>;
+  }
   if (status === 'rented') {
+    if (isOverdue) return <Badge className="bg-orange-500/20 text-orange-700 border-orange-300">⏰ באיחור</Badge>;
     return <Badge className="bg-blue-500/20 text-blue-700 border-blue-300">מושכר</Badge>;
   }
-  switch (detail) {
-    case 'valid':
-      return <Badge className="bg-green-500/20 text-green-700 border-green-300">תקין</Badge>;
-    case 'expiring':
-      return <Badge className="bg-yellow-500/20 text-yellow-700 border-yellow-300">קרוב לפקיעה</Badge>;
-    case 'expired':
-      return <Badge className="bg-red-500/20 text-red-700 border-red-300">פג תוקף</Badge>;
-    default:
-      return <Badge variant="outline">{detail || 'לא ידוע'}</Badge>;
+  if (status === 'available') {
+    if (detail === 'expiring') return <Badge className="bg-yellow-500/20 text-yellow-700 border-yellow-300">קרוב לפקיעה</Badge>;
+    return <Badge className="bg-green-500/20 text-green-700 border-green-300">זמין</Badge>;
   }
+  return <Badge variant="outline">{detail || status || 'לא ידוע'}</Badge>;
 }
 
 function formatDate(d: string | null) {
@@ -118,6 +117,7 @@ interface SimTableProps {
   onActivateClick?: (sim: SimRow) => void;
   onRentalClick?: (sim: SimRow) => void;
   needsSwapIccids?: Set<string>;
+  overdueIccids?: Set<string>;
   showActionButton?: boolean;
 }
 
@@ -142,7 +142,7 @@ function SystemStatusBadge({ status }: { status: SystemStatus }) {
   }
 }
 
-function SimTable({ sims, showCustomer, showSwap, inventoryMap, onSwapClick, onActivateAndSwapClick, onActivateClick, onRentalClick, needsSwapIccids, showActionButton }: SimTableProps) {
+function SimTable({ sims, showCustomer, showSwap, inventoryMap, onSwapClick, onActivateAndSwapClick, onActivateClick, onRentalClick, needsSwapIccids, overdueIccids, showActionButton }: SimTableProps) {
   if (sims.length === 0) {
     return <p className="text-center text-muted-foreground py-8">אין סימים להצגה</p>;
   }
@@ -166,6 +166,7 @@ function SimTable({ sims, showCustomer, showSwap, inventoryMap, onSwapClick, onA
         <TableBody>
           {sims.map((sim) => {
             const needsSwap = needsSwapIccids?.has(sim.iccid || '');
+            const isOverdue = overdueIccids?.has(sim.iccid || '');
             return (
               <TableRow
                 key={sim.id}
@@ -178,7 +179,7 @@ function SimTable({ sims, showCustomer, showSwap, inventoryMap, onSwapClick, onA
                 <TableCell className="font-mono text-xs">{shortIccid(sim.iccid)}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">
-                    <StatusBadge status={sim.status} detail={sim.status_detail} />
+                    <StatusBadge status={sim.status} detail={sim.status_detail} isOverdue={isOverdue} />
                     {needsSwap && <AlertTriangle className="h-4 w-4 text-yellow-500" />}
                   </div>
                 </TableCell>
@@ -396,6 +397,7 @@ export default function CellStation() {
   // Inventory map for cross-referencing
   const [inventoryMap, setInventoryMap] = useState<InventoryMap>({});
   const [needsSwapIccids, setNeedsSwapIccids] = useState<Set<string>>(new Set());
+  const [overdueIccids, setOverdueIccids] = useState<Set<string>>(new Set());
   const [overdueSwapItems, setOverdueSwapItems] = useState<OverdueSwapItem[]>([]);
   const [overdueNotReturned, setOverdueNotReturned] = useState<OverdueNotReturnedItem[]>([]);
 
@@ -429,6 +431,9 @@ export default function CellStation() {
         }
       }
       setNeedsSwapIccids(swapNeeded);
+
+      // 2b. overdueIccids = מושכר בCS + מושכר אצלנו + עבר תאריך סיום
+      // נחשב אחרי שנטען overdue rentals למטה
 
       // 3. Load overdue rentals and cross-reference
       const today = new Date().toISOString().split('T')[0];
@@ -505,9 +510,16 @@ export default function CellStation() {
 
         setOverdueSwapItems(swapItems);
         setOverdueNotReturned(notReturnedItems);
+        // overdueIccids = סימים שהלקוח לא החזיר (מושכר בCS + אצלנו + באיחור)
+        const overdueSet = new Set<string>(notReturnedItems.map(i => {
+          const sim = simCards.find(s => (s.uk_number || s.il_number || s.sim_number) === i.simNumber);
+          return sim?.iccid || '';
+        }).filter(Boolean));
+        setOverdueIccids(overdueSet);
       } else {
         setOverdueSwapItems([]);
         setOverdueNotReturned([]);
+        setOverdueIccids(new Set());
       }
     }
 
@@ -645,7 +657,7 @@ export default function CellStation() {
     );
   }, [simCards, search]);
 
-  const available = useMemo(() => filtered.filter(s => s.status === 'available' && s.status_detail === 'valid'), [filtered]);
+  const available = useMemo(() => filtered.filter(s => s.status === 'available' && s.status_detail === 'valid' && !needsSwapIccids.has(s.iccid || '')), [filtered, needsSwapIccids]);
   const expired = useMemo(() => filtered.filter(s => s.status_detail === 'expired'), [filtered]);
   const rented = useMemo(() => filtered.filter(s => s.status === 'rented'), [filtered]);
   const expiringSoon = useMemo(() => simCards.filter(s => {
@@ -790,13 +802,13 @@ export default function CellStation() {
         ) : (
           <>
             <TabsContent value="all" className="mt-3">
-              <SimTable sims={filtered} showActionButton inventoryMap={inventoryMap} needsSwapIccids={needsSwapIccids} onActivateAndSwapClick={sim => setActivateSwapSim(sim)} onActivateClick={sim => setQuickActivateSim(sim)} onRentalClick={sim => openRentalForSim(sim)} />
+              <SimTable sims={filtered} showActionButton inventoryMap={inventoryMap} needsSwapIccids={needsSwapIccids} onActivateAndSwapClick={sim => setActivateSwapSim(sim)} onActivateClick={sim => setQuickActivateSim(sim)} onRentalClick={sim => openRentalForSim(sim)} overdueIccids={overdueIccids} />
             </TabsContent>
             <TabsContent value="available" className="mt-3">
               <SimTable sims={available} showActionButton onActivateClick={sim => setQuickActivateSim(sim)} onActivateAndSwapClick={sim => setActivateSwapSim(sim)} needsSwapIccids={needsSwapIccids} />
             </TabsContent>
             <TabsContent value="rented" className="mt-3">
-              <SimTable sims={rented} showCustomer showSwap onSwapClick={sim => openSwapForSim(sim)} onRentalClick={sim => openRentalForSim(sim)} needsSwapIccids={needsSwapIccids} onActivateAndSwapClick={sim => setActivateSwapSim(sim)} />
+              <SimTable sims={rented} showCustomer showSwap onSwapClick={sim => openSwapForSim(sim)} onRentalClick={sim => openRentalForSim(sim)} needsSwapIccids={needsSwapIccids} overdueIccids={overdueIccids} onActivateAndSwapClick={sim => setActivateSwapSim(sim)} />
             </TabsContent>
             <TabsContent value="expired" className="mt-3">
               <SimTable sims={expired} />
