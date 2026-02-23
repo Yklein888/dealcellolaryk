@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useRental } from '@/hooks/useRental';
+import { PageLoadingSkeleton } from '@/components/PageLoadingSkeleton';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
 import { CallHistoryBadge } from '@/components/CallHistoryBadge';
@@ -43,7 +44,7 @@ import { he } from 'date-fns/locale';
 // deviceTypes removed - using deviceModel input only
 
 export default function Repairs() {
-  const { repairs, addRepair, updateRepair, deleteRepair } = useRental();
+  const { repairs, addRepair, updateRepair, deleteRepair, loading } = useRental();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
@@ -439,6 +440,8 @@ export default function Repairs() {
     }
   };
 
+  if (loading) return <PageLoadingSkeleton columns={1} rows={4} showFilterBar={true} />;
+
   return (
     <div>
       <PageHeader 
@@ -669,11 +672,25 @@ export default function Repairs() {
 
       {/* Repairs List */}
       {filteredRepairs.length === 0 ? (
-        <div className="stat-card text-center py-12">
-          <Wrench className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <p className="text-lg font-medium text-foreground">אין תיקונים</p>
-          <p className="text-muted-foreground">הוסף תיקונים חדשים כדי להתחיל</p>
-        </div>
+        repairs.length === 0 ? (
+          <div className="rounded-2xl border border-border/50 bg-card text-center py-16 px-6 shadow-sm">
+            <div className="flex h-20 w-20 mx-auto mb-5 items-center justify-center rounded-3xl bg-gradient-to-br from-primary/20 to-accent/10">
+              <Wrench className="h-10 w-10 text-primary" />
+            </div>
+            <h3 className="text-xl font-bold text-foreground mb-2">אין תיקונים עדיין</h3>
+            <p className="text-muted-foreground mb-6 max-w-xs mx-auto">קבל מכשיר לתיקון ועקוב אחרי הסטטוס שלו בקלות</p>
+            <Button variant="glow" onClick={() => setIsAddDialogOpen(true)}>
+              <Plus className="h-4 w-4" />
+              הוסף תיקון ראשון
+            </Button>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-border/50 bg-card text-center py-12 px-6 shadow-sm">
+            <Wrench className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
+            <p className="text-lg font-medium text-foreground">לא נמצאו תיקונים</p>
+            <p className="text-sm text-muted-foreground">נסה לשנות את מילות החיפוש</p>
+          </div>
+        )
       ) : (
         <div className="space-y-4">
           {filteredRepairs.map((repair, index) => (
