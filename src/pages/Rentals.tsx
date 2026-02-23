@@ -562,11 +562,11 @@ export default function Rentals() {
       <div className="grid grid-cols-3 gap-3 mb-6">
         <button
           onClick={() => setFilterStatus(filterStatus === 'active' ? 'all' : 'active')}
-          className={`stat-card p-4 text-center transition-all hover:border-primary/50 cursor-pointer ${filterStatus === 'active' ? 'border-primary bg-primary/10' : ''}`}
+          className={`rounded-2xl border border-border/50 bg-card p-4 text-center transition-all duration-200 hover:shadow-md hover:border-primary/40 cursor-pointer shadow-sm ${filterStatus === 'active' ? 'border-primary bg-gradient-to-br from-primary/15 to-accent/5 shadow-md' : ''}`}
         >
           <div className="flex items-center justify-center gap-2 mb-1">
             <ShoppingCart className="h-5 w-5 text-primary" />
-            <span className="text-2xl font-bold text-primary">
+            <span className="text-2xl font-extrabold bg-gradient-to-l from-primary to-accent bg-clip-text text-transparent">
               {rentals.filter(r => r.status === 'active').length}
             </span>
           </div>
@@ -575,11 +575,11 @@ export default function Rentals() {
         
         <button
           onClick={() => setFilterStatus(filterStatus === 'overdue' ? 'all' : 'overdue')}
-          className={`stat-card p-4 text-center transition-all hover:border-destructive/50 cursor-pointer ${filterStatus === 'overdue' ? 'border-destructive bg-destructive/10' : ''}`}
+          className={`rounded-2xl border border-border/50 bg-card p-4 text-center transition-all duration-200 hover:shadow-md hover:border-destructive/40 cursor-pointer shadow-sm ${filterStatus === 'overdue' ? 'border-destructive bg-gradient-to-br from-destructive/15 to-red-500/5 shadow-md' : ''}`}
         >
           <div className="flex items-center justify-center gap-2 mb-1">
             <AlertTriangle className="h-5 w-5 text-destructive" />
-            <span className="text-2xl font-bold text-destructive">
+            <span className="text-2xl font-extrabold text-destructive">
               {rentals.filter(r => {
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
@@ -593,11 +593,11 @@ export default function Rentals() {
         
         <button
           onClick={() => setFilterStatus(filterStatus === 'returned' ? 'all' : 'returned')}
-          className={`stat-card p-4 text-center transition-all hover:border-success/50 cursor-pointer ${filterStatus === 'returned' ? 'border-success bg-success/10' : ''}`}
+          className={`rounded-2xl border border-border/50 bg-card p-4 text-center transition-all duration-200 hover:shadow-md hover:border-green-400/40 cursor-pointer shadow-sm ${filterStatus === 'returned' ? 'border-green-500 bg-gradient-to-br from-green-500/15 to-emerald-500/5 shadow-md' : ''}`}
         >
           <div className="flex items-center justify-center gap-2 mb-1">
             <CheckCircle className="h-5 w-5 text-success" />
-            <span className="text-2xl font-bold text-success">
+            <span className="text-2xl font-extrabold text-green-600 dark:text-green-400">
               {rentals.filter(r => r.status === 'returned').length}
             </span>
           </div>
@@ -692,8 +692,8 @@ export default function Rentals() {
 
               {/* Customer + Item Count */}
               <div className="flex items-center gap-3 mb-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20 shrink-0">
-                  <User className="h-5 w-5 text-primary" />
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-white shadow-md shrink-0">
+                  <User className="h-5 w-5" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-base text-foreground truncate">{rental.customerName}</p>
