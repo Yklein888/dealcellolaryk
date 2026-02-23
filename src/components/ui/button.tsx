@@ -17,7 +17,7 @@ const buttonVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
         success: "bg-gradient-to-r from-success to-success/90 text-success-foreground hover:from-success/90 hover:to-success shadow-lg",
         warning: "bg-gradient-to-r from-warning to-warning/90 text-warning-foreground hover:from-warning/90 hover:to-warning shadow-lg",
-        glow: "bg-gradient-to-r from-primary to-accent text-primary-foreground shadow-[0_4px_20px_-2px_hsl(var(--primary)/0.4)] hover:shadow-[0_8px_30px_-2px_hsl(var(--primary)/0.5)] hover:-translate-y-0.5",
+        glow: "relative overflow-hidden bg-gradient-to-r from-primary to-accent text-primary-foreground shadow-[0_4px_24px_-2px_hsl(var(--primary)/0.45),0_2px_8px_-2px_hsl(var(--accent)/0.3)] hover:shadow-[0_8px_36px_-2px_hsl(var(--primary)/0.55),0_4px_12px_-2px_hsl(var(--accent)/0.4)] hover:-translate-y-0.5 hover:brightness-110 before:absolute before:inset-0 before:bg-[linear-gradient(105deg,transparent_40%,hsl(0_0%_100%/0.18)_50%,transparent_60%)] before:translate-x-[110%] before:skew-x-[-15deg] hover:before:animate-[shimmerSweep_0.6s_ease-out_forwards]",
         glass: "bg-white/60 backdrop-blur-lg border border-white/30 text-foreground hover:bg-white/80 shadow-lg",
       },
       size: {

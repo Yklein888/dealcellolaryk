@@ -16,19 +16,28 @@ interface StatCardProps {
 }
 
 const variantStyles = {
-  default: 'border-white/30',
-  primary: 'border-primary/30',
-  warning: 'border-warning/30',
-  success: 'border-success/30',
+  default:     'border-white/30',
+  primary:     'border-primary/30',
+  warning:     'border-warning/30',
+  success:     'border-success/30',
   destructive: 'border-destructive/30',
 };
 
 const iconVariantStyles = {
-  default: 'bg-muted/50 text-muted-foreground',
-  primary: 'bg-gradient-to-br from-primary/30 to-accent/20 text-primary',
-  warning: 'bg-gradient-to-br from-warning/30 to-orange-400/20 text-warning',
-  success: 'bg-gradient-to-br from-success/30 to-green-400/20 text-success',
+  default:     'bg-muted/50 text-muted-foreground',
+  primary:     'bg-gradient-to-br from-primary/30 to-accent/20 text-primary',
+  warning:     'bg-gradient-to-br from-warning/30 to-orange-400/20 text-warning',
+  success:     'bg-gradient-to-br from-success/30 to-green-400/20 text-success',
   destructive: 'bg-gradient-to-br from-destructive/30 to-red-400/20 text-destructive',
+};
+
+// Value number glow + colour per variant
+const valueVariantStyles = {
+  default:     'text-foreground',
+  primary:     'gradient-text value-glow-primary',
+  warning:     'text-warning value-glow-warning',
+  success:     'text-success value-glow-success',
+  destructive: 'text-destructive value-glow-destructive',
 };
 
 export function StatCard({ title, value, icon: Icon, trend, variant = 'default', href, onClick }: StatCardProps) {
@@ -44,21 +53,32 @@ export function StatCard({ title, value, icon: Icon, trend, variant = 'default',
   };
 
   return (
-    <div 
+    <div
       className={cn(
         'stat-card animate-fade-in card-glow group',
         variantStyles[variant],
-        isClickable && 'cursor-pointer hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] transition-all duration-200'
+        isClickable && 'cursor-pointer active:scale-[0.98]'
       )}
       onClick={isClickable ? handleClick : undefined}
       role={isClickable ? 'button' : undefined}
       tabIndex={isClickable ? 0 : undefined}
       onKeyDown={isClickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') handleClick(); } : undefined}
     >
-      <div className="flex items-start justify-between gap-2">
+      {/* Shimmer sweep — animated by CSS on :hover */}
+      <div className="stat-shimmer" aria-hidden="true" />
+
+      {/* Bottom accent bar — scales in on hover */}
+      <div className="stat-bar" aria-hidden="true" />
+
+      <div className="flex items-start justify-between gap-2 relative z-10">
         <div className="flex-1 min-w-0">
           <p className="text-xs sm:text-sm font-medium text-muted-foreground truncate">{title}</p>
-          <p className="mt-1 sm:mt-2 text-2xl sm:text-3xl font-bold text-foreground">{value}</p>
+          <p className={cn(
+            'mt-1 sm:mt-2 text-2xl sm:text-3xl font-bold transition-all duration-300',
+            valueVariantStyles[variant]
+          )}>
+            {value}
+          </p>
           {trend && (
             <p className={cn(
               'mt-1 text-xs sm:text-sm font-medium',
