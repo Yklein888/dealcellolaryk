@@ -14,6 +14,8 @@ import { ActivationTab } from '@/components/cellstation/ActivationTab';
 import { SwapSimDialog } from '@/components/cellstation/SwapSimDialog';
 import { ActivateAndSwapDialog } from '@/components/cellstation/ActivateAndSwapDialog';
 import { QuickActivateDialog } from '@/components/cellstation/QuickActivateDialog';
+import { SimActionDialog, SimActionType } from '@/components/cellstation/SimActionDialog';
+import { QuickRentalDialog } from '@/components/cellstation/QuickRentalDialog';
 import { RefreshCw, Search, Clock, Zap, AlertTriangle, Phone, ArrowLeftRight, CheckCircle2, Activity, TrendingDown, BarChart3 } from 'lucide-react';
 import { differenceInDays, formatDistanceToNow } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -198,9 +200,9 @@ function SimCard({ sim, showCustomer, showSwap, showActionButton, needsSwapIccid
               <ArrowLeftRight className="h-3 w-3" /> החלף
             </Button>
           )}
-          {showSwap && !needsSwap && onSwapClick && (
-            <Button size="sm" variant="outline" onClick={() => onSwapClick(sim)} className="gap-1 text-xs h-7">
-              <ArrowLeftRight className="h-3 w-3" /> החלף
+          {!needsSwap && isOverdue && onActivateAndSwapClick && (
+            <Button size="sm" variant="outline" onClick={() => onActivateAndSwapClick(sim)} className="gap-1 text-xs h-7 border-orange-400 text-orange-700 hover:bg-orange-50">
+              <ArrowLeftRight className="h-3 w-3" /> החלפה והפעלה
             </Button>
           )}
         </div>
@@ -285,9 +287,9 @@ function SimTable({ sims, showCustomer, showSwap, inventoryMap, onSwapClick, onA
                             <ArrowLeftRight className="h-3 w-3" /> החלף
                           </Button>
                         )}
-                        {showSwap && !needsSwap && onSwapClick && (
-                          <Button size="sm" variant="outline" onClick={() => onSwapClick(sim)} className="gap-1 text-xs">
-                            <ArrowLeftRight className="h-3 w-3" /> החלף
+                        {!needsSwap && isOverdue && onActivateAndSwapClick && (
+                          <Button size="sm" variant="outline" onClick={() => onActivateAndSwapClick(sim)} className="gap-1 text-xs border-orange-400 text-orange-700 hover:bg-orange-50">
+                            <ArrowLeftRight className="h-3 w-3" /> החלפה והפעלה
                           </Button>
                         )}
                       </div>
@@ -334,6 +336,8 @@ export default function CellStation() {
   const [quickActivateSim, setQuickActivateSim] = useState<SimRow | null>(null);
   const [activateSwapSim, setActivateSwapSim] = useState<SimRow | null>(null);
   const [swapRentalId, setSwapRentalId] = useState<string>('');
+  const [simActionDialogSim, setSimActionDialogSim] = useState<SimRow | null>(null);
+  const [quickRentalDialogSim, setQuickRentalDialogSim] = useState<SimRow | null>(null);
 
   // Auto-sync state
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
@@ -629,6 +633,15 @@ export default function CellStation() {
   }, [activateSimWithStatus]);
 
   // Navigate to rental for a rented SIM
+  const handleSimAction = useCallback((action: SimActionType) => {
+    const sim = simActionDialogSim;
+    setSimActionDialogSim(null);
+    if (!sim) return;
+    if (action === 'quick_activate') setQuickActivateSim(sim);
+    if (action === 'quick_rental') setQuickRentalDialogSim(sim);
+    if (action === 'activate_and_swap') setActivateSwapSim(sim);
+  }, [simActionDialogSim]);
+
   const openRentalForSim = useCallback((sim: SimRow) => {
     const iccid = sim.iccid;
     if (!iccid || !inventoryMap[iccid]) return;
@@ -911,10 +924,10 @@ export default function CellStation() {
         ) : (
           <>
             <TabsContent value="all" className="mt-3">
-              <SimTable sims={filtered} showActionButton inventoryMap={inventoryMap} needsSwapIccids={needsSwapIccids} onActivateAndSwapClick={sim => setActivateSwapSim(sim)} onActivateClick={sim => setQuickActivateSim(sim)} onRentalClick={sim => openRentalForSim(sim)} overdueIccids={overdueIccids} />
+              <SimTable sims={filtered} showActionButton inventoryMap={inventoryMap} needsSwapIccids={needsSwapIccids} onActivateAndSwapClick={sim => setActivateSwapSim(sim)} onActivateClick={sim => setSimActionDialogSim(sim)} onRentalClick={sim => openRentalForSim(sim)} overdueIccids={overdueIccids} />
             </TabsContent>
             <TabsContent value="available" className="mt-3">
-              <SimTable sims={available} showActionButton onActivateClick={sim => setQuickActivateSim(sim)} onActivateAndSwapClick={sim => setActivateSwapSim(sim)} needsSwapIccids={needsSwapIccids} />
+              <SimTable sims={available} showActionButton onActivateClick={sim => setSimActionDialogSim(sim)} onActivateAndSwapClick={sim => setActivateSwapSim(sim)} needsSwapIccids={needsSwapIccids} />
             </TabsContent>
             <TabsContent value="rented" className="mt-3">
               <SimTable sims={rented} showCustomer showSwap onSwapClick={sim => openSwapForSim(sim)} onRentalClick={sim => openRentalForSim(sim)} needsSwapIccids={needsSwapIccids} overdueIccids={overdueIccids} onActivateAndSwapClick={sim => setActivateSwapSim(sim)} />
