@@ -24,7 +24,6 @@ import { he } from 'date-fns/locale';
 
 // Dashboard components
 import { DashboardStatsGrid } from '@/components/dashboard/DashboardStatsGrid';
-import { WelcomeBanner } from '@/components/dashboard/WelcomeBanner';
 import { QuickStatsRow } from '@/components/dashboard/QuickStatsRow';
 import { InventoryChart } from '@/components/dashboard/InventoryChart';
 import { RentalsActivityChart } from '@/components/dashboard/RentalsActivityChart';
@@ -187,7 +186,6 @@ export default function Dashboard() {
         </div>
       </PageHeader>
 
-      <WelcomeBanner />
       <DashboardStatsGrid stats={stats} inventory={inventory} />
       <QuickStatsRow 
         rentals={rentals}
