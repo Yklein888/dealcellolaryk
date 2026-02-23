@@ -14,7 +14,7 @@ import { ActivationTab } from '@/components/cellstation/ActivationTab';
 import { SwapSimDialog } from '@/components/cellstation/SwapSimDialog';
 import { ActivateAndSwapDialog } from '@/components/cellstation/ActivateAndSwapDialog';
 import { QuickActivateDialog } from '@/components/cellstation/QuickActivateDialog';
-import { RefreshCw, Search, Clock, Zap, AlertTriangle, Phone, ArrowLeftRight } from 'lucide-react';
+import { RefreshCw, Search, Clock, Zap, AlertTriangle, Phone, ArrowLeftRight, CheckCircle2, Activity, TrendingDown, BarChart3 } from 'lucide-react';
 import { differenceInDays, formatDistanceToNow } from 'date-fns';
 import { he } from 'date-fns/locale';
 
@@ -46,13 +46,17 @@ function SyncStatusIndicator({ status, lastSyncTime, simCountDelta }: {
   const { emoji, text, className } = getDisplay();
 
   return (
-    <div className="flex items-center gap-2">
-      <span className={`text-sm font-medium ${className}`}>
-        {emoji} {text}
-      </span>
+    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+      status === 'syncing' ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-950/30 dark:border-blue-800' :
+      status === 'error'   ? 'bg-red-50 border-red-200 text-red-700 dark:bg-red-950/30 dark:border-red-800' :
+      status === 'success' ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-950/30 dark:border-green-800' :
+      'bg-muted border-border text-muted-foreground'
+    }`}>
+      <span>{emoji}</span>
+      <span>{text}</span>
       {simCountDelta !== null && simCountDelta !== 0 && status === 'success' && (
-        <span className={`text-xs font-medium ${simCountDelta > 0 ? 'text-green-600' : 'text-orange-600'}`}>
-          ({simCountDelta > 0 ? '+' : ''}{simCountDelta} סימים)
+        <span className={`font-bold ${simCountDelta > 0 ? 'text-green-600' : 'text-orange-600'}`}>
+          ({simCountDelta > 0 ? '+' : ''}{simCountDelta})
         </span>
       )}
     </div>
@@ -144,85 +148,158 @@ function SystemStatusBadge({ status }: { status: SystemStatus }) {
   }
 }
 
+// Mobile card view for a single SIM
+function SimCard({ sim, showCustomer, showSwap, showActionButton, needsSwapIccids, overdueIccids, onSwapClick, onActivateAndSwapClick, onActivateClick, onRentalClick }: SimTableProps & { sim: SimRow }) {
+  const needsSwap = needsSwapIccids?.has(sim.iccid || '');
+  const isOverdue = overdueIccids?.has(sim.iccid || '');
+  const isRentedClickable = sim.status === 'rented' && !!onRentalClick;
+  return (
+    <div
+      className={`rounded-xl border bg-card p-4 shadow-sm space-y-2 transition-all duration-150
+        ${needsSwap ? 'border-yellow-300 bg-yellow-50/50 dark:bg-yellow-950/10' : ''}
+        ${isRentedClickable ? 'cursor-pointer hover:shadow-md hover:border-blue-300 active:scale-[0.99]' : ''}`}
+      onClick={() => { if (isRentedClickable) onRentalClick!(sim); }}
+    >
+      {/* Row 1: Status + ICCID */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <StatusBadge status={sim.status} detail={sim.status_detail} isOverdue={isOverdue} />
+          {needsSwap && <AlertTriangle className="h-4 w-4 text-yellow-500 shrink-0" />}
+        </div>
+        <span className="font-mono text-xs text-muted-foreground">{shortIccid(sim.iccid)}</span>
+      </div>
+      {/* Row 2: Phone numbers */}
+      <div className="flex gap-3 text-sm">
+        {sim.uk_number && <span dir="ltr" className="font-semibold">{sim.uk_number}</span>}
+        {sim.il_number && <span dir="ltr" className="text-muted-foreground">{sim.il_number}</span>}
+        {!sim.uk_number && !sim.il_number && <span className="text-muted-foreground">—</span>}
+      </div>
+      {/* Row 3: Customer + period (if rented) */}
+      {showCustomer && sim.customer_name && (
+        <div className="text-sm text-muted-foreground">
+          <span className="font-medium text-foreground">{sim.customer_name}</span>
+          {sim.start_date && <span className="mr-2 text-xs">{formatDate(sim.start_date)} – {formatDate(sim.end_date)}</span>}
+        </div>
+      )}
+      {/* Row 4: Expiry + plan + actions */}
+      <div className="flex items-center justify-between pt-1" onClick={e => e.stopPropagation()}>
+        <div className="flex gap-2 text-xs text-muted-foreground">
+          {sim.expiry_date && <span>תוקף: {formatDate(sim.expiry_date)}</span>}
+          {sim.plan && <span>· {sim.plan}</span>}
+        </div>
+        <div className="flex gap-1">
+          {showActionButton && sim.status === 'available' && onActivateClick && !needsSwap && (
+            <Button size="sm" onClick={() => onActivateClick(sim)} className="gap-1 text-xs h-7 bg-green-600 hover:bg-green-700">
+              <Zap className="h-3 w-3" /> הפעל
+            </Button>
+          )}
+          {needsSwap && onActivateAndSwapClick && (
+            <Button size="sm" variant="destructive" onClick={() => onActivateAndSwapClick(sim)} className="gap-1 text-xs h-7">
+              <ArrowLeftRight className="h-3 w-3" /> החלף
+            </Button>
+          )}
+          {showSwap && !needsSwap && onSwapClick && (
+            <Button size="sm" variant="outline" onClick={() => onSwapClick(sim)} className="gap-1 text-xs h-7">
+              <ArrowLeftRight className="h-3 w-3" /> החלף
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SimTable({ sims, showCustomer, showSwap, inventoryMap, onSwapClick, onActivateAndSwapClick, onActivateClick, onRentalClick, needsSwapIccids, overdueIccids, showActionButton }: SimTableProps) {
   if (sims.length === 0) {
     return <p className="text-center text-muted-foreground py-8">אין סימים להצגה</p>;
   }
   return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>SIM</TableHead>
-            <TableHead>UK Number</TableHead>
-            <TableHead>IL Number</TableHead>
-            <TableHead>ICCID</TableHead>
-            <TableHead>סטטוס</TableHead>
-            <TableHead>תוקף</TableHead>
-            <TableHead>חבילה</TableHead>
-            {showCustomer && <TableHead>לקוח</TableHead>}
-            {showCustomer && <TableHead>תקופה</TableHead>}
-            {(showSwap || needsSwapIccids || showActionButton) && <TableHead>פעולה</TableHead>}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {sims.map((sim) => {
-            const needsSwap = needsSwapIccids?.has(sim.iccid || '');
-            const isOverdue = overdueIccids?.has(sim.iccid || '');
-            return (
-              <TableRow
-                key={sim.id}
-                className={`${needsSwap ? 'bg-yellow-50 dark:bg-yellow-950/10' : ''} ${(sim.status === 'rented' && onRentalClick) ? 'cursor-pointer hover:bg-blue-50/50 dark:hover:bg-blue-950/10' : ''}`}
-                onClick={() => { if (sim.status === 'rented' && onRentalClick) onRentalClick(sim); }}
-              >
-                <TableCell className="font-mono text-xs">{sim.sim_number || '-'}</TableCell>
-                <TableCell dir="ltr">{sim.uk_number || '-'}</TableCell>
-                <TableCell dir="ltr">{sim.il_number || '-'}</TableCell>
-                <TableCell className="font-mono text-xs">{shortIccid(sim.iccid)}</TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1">
-                    <StatusBadge status={sim.status} detail={sim.status_detail} isOverdue={isOverdue} />
-                    {needsSwap && <AlertTriangle className="h-4 w-4 text-yellow-500" />}
-                  </div>
-                </TableCell>
-                <TableCell>{formatDate(sim.expiry_date)}</TableCell>
-                <TableCell>{sim.plan || '-'}</TableCell>
-                {showCustomer && <TableCell>{sim.customer_name || '-'}</TableCell>}
-                {showCustomer && (
-                  <TableCell className="text-xs">
-                    {sim.start_date ? `${formatDate(sim.start_date)} - ${formatDate(sim.end_date)}` : '-'}
-                  </TableCell>
-                )}
-                {(showSwap || needsSwapIccids || showActionButton) && (
-                  <TableCell onClick={e => e.stopPropagation()}>
-                    <div className="flex gap-1 flex-wrap">
-                      {/* זמין בCellStation + לא מושכר במערכת = הפעל */}
-                      {showActionButton && sim.status === 'available' && onActivateClick && !needsSwap && (
-                        <Button size="sm" variant="default" onClick={() => onActivateClick(sim)} className="gap-1 text-xs bg-green-600 hover:bg-green-700">
-                          <Zap className="h-3 w-3" /> הפעל
-                        </Button>
-                      )}
-                      {/* זמין בCellStation + מושכר במערכת = לקוח לא החזיר → החלף */}
-                      {needsSwap && onActivateAndSwapClick && (
-                        <Button size="sm" variant="destructive" onClick={() => onActivateAndSwapClick(sim)} className="gap-1 text-xs">
-                          <ArrowLeftRight className="h-3 w-3" /> החלף
-                        </Button>
-                      )}
-                      {/* מושכר בCellStation = מושכר → כפתור החלפה */}
-                      {showSwap && !needsSwap && onSwapClick && (
-                        <Button size="sm" variant="outline" onClick={() => onSwapClick(sim)} className="gap-1 text-xs">
-                          <ArrowLeftRight className="h-3 w-3" /> החלף
-                        </Button>
-                      )}
+    <>
+      {/* Mobile: Cards */}
+      <div className="lg:hidden space-y-2.5">
+        {sims.map(sim => (
+          <SimCard key={sim.id} sim={sim} sims={sims} showCustomer={showCustomer} showSwap={showSwap} showActionButton={showActionButton}
+            needsSwapIccids={needsSwapIccids} overdueIccids={overdueIccids}
+            onSwapClick={onSwapClick} onActivateAndSwapClick={onActivateAndSwapClick}
+            onActivateClick={onActivateClick} onRentalClick={onRentalClick} />
+        ))}
+      </div>
+      {/* Desktop: Table */}
+      <div className="hidden lg:block overflow-x-auto rounded-xl border border-border/50">
+        <Table>
+          <TableHeader className="bg-muted/40">
+            <TableRow className="border-b border-border/50 hover:bg-transparent">
+              <TableHead className="font-semibold text-foreground">SIM</TableHead>
+              <TableHead className="font-semibold text-foreground">UK Number</TableHead>
+              <TableHead className="font-semibold text-foreground">IL Number</TableHead>
+              <TableHead className="font-semibold text-foreground">ICCID</TableHead>
+              <TableHead className="font-semibold text-foreground">סטטוס</TableHead>
+              <TableHead className="font-semibold text-foreground">תוקף</TableHead>
+              <TableHead className="font-semibold text-foreground">חבילה</TableHead>
+              {showCustomer && <TableHead className="font-semibold text-foreground">לקוח</TableHead>}
+              {showCustomer && <TableHead className="font-semibold text-foreground">תקופה</TableHead>}
+              {(showSwap || needsSwapIccids || showActionButton) && <TableHead className="font-semibold text-foreground">פעולה</TableHead>}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sims.map((sim, idx) => {
+              const needsSwap = needsSwapIccids?.has(sim.iccid || '');
+              const isOverdue = overdueIccids?.has(sim.iccid || '');
+              return (
+                <TableRow
+                  key={sim.id}
+                  className={`transition-colors duration-100
+                    ${idx % 2 === 1 ? 'bg-muted/20' : ''}
+                    ${needsSwap ? 'bg-yellow-50 dark:bg-yellow-950/10' : ''}
+                    ${(sim.status === 'rented' && onRentalClick) ? 'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/20' : 'hover:bg-muted/40'}`}
+                  onClick={() => { if (sim.status === 'rented' && onRentalClick) onRentalClick(sim); }}
+                >
+                  <TableCell className="font-mono text-xs">{sim.sim_number || '-'}</TableCell>
+                  <TableCell dir="ltr" className="font-medium">{sim.uk_number || '-'}</TableCell>
+                  <TableCell dir="ltr">{sim.il_number || '-'}</TableCell>
+                  <TableCell className="font-mono text-xs">{shortIccid(sim.iccid)}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      <StatusBadge status={sim.status} detail={sim.status_detail} isOverdue={isOverdue} />
+                      {needsSwap && <AlertTriangle className="h-4 w-4 text-yellow-500" />}
                     </div>
                   </TableCell>
-                )}
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </div>
+                  <TableCell>{formatDate(sim.expiry_date)}</TableCell>
+                  <TableCell>{sim.plan || '-'}</TableCell>
+                  {showCustomer && <TableCell className="font-medium">{sim.customer_name || '-'}</TableCell>}
+                  {showCustomer && (
+                    <TableCell className="text-xs text-muted-foreground">
+                      {sim.start_date ? `${formatDate(sim.start_date)} - ${formatDate(sim.end_date)}` : '-'}
+                    </TableCell>
+                  )}
+                  {(showSwap || needsSwapIccids || showActionButton) && (
+                    <TableCell onClick={e => e.stopPropagation()}>
+                      <div className="flex gap-1 flex-wrap">
+                        {showActionButton && sim.status === 'available' && onActivateClick && !needsSwap && (
+                          <Button size="sm" variant="default" onClick={() => onActivateClick(sim)} className="gap-1 text-xs bg-green-600 hover:bg-green-700">
+                            <Zap className="h-3 w-3" /> הפעל
+                          </Button>
+                        )}
+                        {needsSwap && onActivateAndSwapClick && (
+                          <Button size="sm" variant="destructive" onClick={() => onActivateAndSwapClick(sim)} className="gap-1 text-xs">
+                            <ArrowLeftRight className="h-3 w-3" /> החלף
+                          </Button>
+                        )}
+                        {showSwap && !needsSwap && onSwapClick && (
+                          <Button size="sm" variant="outline" onClick={() => onSwapClick(sim)} className="gap-1 text-xs">
+                            <ArrowLeftRight className="h-3 w-3" /> החלף
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  )}
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    </>
   );
 }
 
@@ -691,47 +768,59 @@ export default function CellStation() {
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold">📶 ניהול סימים</h1>
-          <p className="text-sm text-muted-foreground">כרטיסי SIM מ-CellStation</p>
+          <h1 className="text-2xl sm:text-3xl font-extrabold bg-gradient-to-l from-primary to-foreground bg-clip-text text-transparent">📶 ניהול סימים</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">כרטיסי SIM מ-CellStation</p>
         </div>
         <div className="flex items-center gap-2">
           <SyncStatusIndicator status={syncStatus} lastSyncTime={lastSyncTime} simCountDelta={simCountDelta} />
-          <Button onClick={runAutoSync} disabled={isSyncing} variant="outline" size="sm" className="gap-2">
+          <Button onClick={runAutoSync} disabled={isSyncing} size="sm" className="gap-2 bg-gradient-to-r from-primary to-accent text-white hover:opacity-90 shadow-sm">
             <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
             רענן
           </Button>
         </div>
       </div>
 
-      {/* Stats - כרטיסים גדולים וקליקביליים */}
+      {/* Stats - כרטיסי gradient עם אייקונים */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <button
           onClick={() => setActiveTab('available')}
-          className={`rounded-xl p-4 text-right border-2 transition-all ${activeTab === 'available' ? 'border-green-500 bg-green-50 dark:bg-green-950/30' : 'border-transparent bg-green-100/60 dark:bg-green-950/20 hover:border-green-300'}`}
+          className={`rounded-2xl p-4 text-right shadow-md hover:shadow-xl hover:scale-[1.03] transition-all duration-200 bg-gradient-to-br from-emerald-400 to-green-600 text-white ring-2 ${activeTab === 'available' ? 'ring-emerald-300 ring-offset-2' : 'ring-transparent'}`}
         >
-          <div className="text-3xl font-bold text-green-700 dark:text-green-400">{stats.available}</div>
-          <div className="text-sm font-medium text-green-800 dark:text-green-300">✅ זמינים</div>
+          <div className="flex items-start justify-between mb-1">
+            <CheckCircle2 className="h-7 w-7 opacity-75" />
+            <div className="text-4xl font-extrabold">{stats.available}</div>
+          </div>
+          <div className="text-sm font-semibold opacity-90">זמינים</div>
         </button>
         <button
           onClick={() => setActiveTab('rented')}
-          className={`rounded-xl p-4 text-right border-2 transition-all ${activeTab === 'rented' ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30' : 'border-transparent bg-blue-100/60 dark:bg-blue-950/20 hover:border-blue-300'}`}
+          className={`rounded-2xl p-4 text-right shadow-md hover:shadow-xl hover:scale-[1.03] transition-all duration-200 bg-gradient-to-br from-blue-400 to-blue-600 text-white ring-2 ${activeTab === 'rented' ? 'ring-blue-300 ring-offset-2' : 'ring-transparent'}`}
         >
-          <div className="text-3xl font-bold text-blue-700 dark:text-blue-400">{stats.rented}</div>
-          <div className="text-sm font-medium text-blue-800 dark:text-blue-300">📤 מושכרים</div>
+          <div className="flex items-start justify-between mb-1">
+            <Activity className="h-7 w-7 opacity-75" />
+            <div className="text-4xl font-extrabold">{stats.rented}</div>
+          </div>
+          <div className="text-sm font-semibold opacity-90">מושכרים</div>
         </button>
         <button
           onClick={() => setActiveTab('expired')}
-          className={`rounded-xl p-4 text-right border-2 transition-all ${activeTab === 'expired' ? 'border-red-500 bg-red-50 dark:bg-red-950/30' : 'border-transparent bg-red-100/60 dark:bg-red-950/20 hover:border-red-300'}`}
+          className={`rounded-2xl p-4 text-right shadow-md hover:shadow-xl hover:scale-[1.03] transition-all duration-200 bg-gradient-to-br from-rose-400 to-red-600 text-white ring-2 ${activeTab === 'expired' ? 'ring-rose-300 ring-offset-2' : 'ring-transparent'}`}
         >
-          <div className="text-3xl font-bold text-red-700 dark:text-red-400">{stats.expired}</div>
-          <div className="text-sm font-medium text-red-800 dark:text-red-300">❌ פגי תוקף</div>
+          <div className="flex items-start justify-between mb-1">
+            <TrendingDown className="h-7 w-7 opacity-75" />
+            <div className="text-4xl font-extrabold">{stats.expired}</div>
+          </div>
+          <div className="text-sm font-semibold opacity-90">פגי תוקף</div>
         </button>
         <button
           onClick={() => setActiveTab('all')}
-          className={`rounded-xl p-4 text-right border-2 transition-all ${activeTab === 'all' ? 'border-gray-500 bg-gray-100 dark:bg-gray-800' : 'border-transparent bg-gray-100/60 dark:bg-gray-800/40 hover:border-gray-300'}`}
+          className={`rounded-2xl p-4 text-right shadow-md hover:shadow-xl hover:scale-[1.03] transition-all duration-200 bg-gradient-to-br from-slate-500 to-slate-700 text-white ring-2 ${activeTab === 'all' ? 'ring-slate-400 ring-offset-2' : 'ring-transparent'}`}
         >
-          <div className="text-3xl font-bold text-gray-700 dark:text-gray-300">{stats.total}</div>
-          <div className="text-sm font-medium text-gray-600 dark:text-gray-400">📊 סה״כ</div>
+          <div className="flex items-start justify-between mb-1">
+            <BarChart3 className="h-7 w-7 opacity-75" />
+            <div className="text-4xl font-extrabold">{stats.total}</div>
+          </div>
+          <div className="text-sm font-semibold opacity-90">סה״כ</div>
         </button>
       </div>
 
@@ -796,23 +885,23 @@ export default function CellStation() {
 
       {/* חיפוש */}
       <div className="relative">
-        <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
         <Input
           placeholder="חיפוש לפי מספר, לקוח, ICCID..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="pr-10 h-11 text-base"
+          className="pr-10 h-12 text-base border-border/70 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary rounded-xl shadow-sm"
         />
       </div>
 
       {/* לשוניות */}
       <Tabs value={activeTab} onValueChange={setActiveTab} dir="rtl">
-        <TabsList className="w-full grid grid-cols-5 h-11">
-          <TabsTrigger value="all" className="text-xs">כל ({filtered.length})</TabsTrigger>
-          <TabsTrigger value="available" className="text-xs">זמינים ({available.length})</TabsTrigger>
-          <TabsTrigger value="rented" className="text-xs">מושכרים ({rented.length})</TabsTrigger>
-          <TabsTrigger value="expired" className="text-xs">פגי תוקף ({expired.length})</TabsTrigger>
-          <TabsTrigger value="activate" className="text-xs">הפעלה</TabsTrigger>
+        <TabsList className="w-full grid grid-cols-5 h-12 rounded-xl bg-muted/60 p-1 gap-0.5">
+          <TabsTrigger value="all" className="text-xs rounded-lg font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-background">כל ({filtered.length})</TabsTrigger>
+          <TabsTrigger value="available" className="text-xs rounded-lg font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-green-700 dark:data-[state=active]:bg-background">זמינים ({available.length})</TabsTrigger>
+          <TabsTrigger value="rented" className="text-xs rounded-lg font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-blue-700 dark:data-[state=active]:bg-background">מושכרים ({rented.length})</TabsTrigger>
+          <TabsTrigger value="expired" className="text-xs rounded-lg font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-red-700 dark:data-[state=active]:bg-background">פגי תוקף ({expired.length})</TabsTrigger>
+          <TabsTrigger value="activate" className="text-xs rounded-lg font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-background">הפעלה</TabsTrigger>
         </TabsList>
 
         {isLoading ? (
