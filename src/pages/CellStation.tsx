@@ -61,6 +61,8 @@ function SyncStatusIndicator({ status, lastSyncTime, simCountDelta }: {
           ({simCountDelta > 0 ? '+' : ''}{simCountDelta})
         </span>
       )}
+      {simActionDialogSim && (<SimActionDialog sim={simActionDialogSim} isOpen={!!simActionDialogSim} onClose={() => setSimActionDialogSim(null)} onAction={handleSimAction} />)}
+      {quickRentalDialogSim && (<QuickRentalDialog sim={quickRentalDialogSim} isOpen={!!quickRentalDialogSim} onClose={() => setQuickRentalDialogSim(null)} onActivate={handleQuickActivate} onSuccess={() => { setQuickRentalDialogSim(null); fetchSims(); }} />)}
     </div>
   );
 }
@@ -930,7 +932,7 @@ export default function CellStation() {
               <SimTable sims={available} showActionButton onActivateClick={sim => setSimActionDialogSim(sim)} onActivateAndSwapClick={sim => setActivateSwapSim(sim)} needsSwapIccids={needsSwapIccids} />
             </TabsContent>
             <TabsContent value="rented" className="mt-3">
-              <SimTable sims={rented} showCustomer showSwap onSwapClick={sim => openSwapForSim(sim)} onRentalClick={sim => openRentalForSim(sim)} needsSwapIccids={needsSwapIccids} overdueIccids={overdueIccids} onActivateAndSwapClick={sim => setActivateSwapSim(sim)} />
+              <SimTable sims={rented} showCustomer onRentalClick={sim => openRentalForSim(sim)} needsSwapIccids={needsSwapIccids} overdueIccids={overdueIccids} onActivateAndSwapClick={sim => setActivateSwapSim(sim)} />
             </TabsContent>
             <TabsContent value="expired" className="mt-3">
               <SimTable sims={expired} />
