@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { useRental } from '@/hooks/useRental';
+import { PageLoadingSkeleton } from '@/components/PageLoadingSkeleton';
 import { InventoryItem } from '@/types/rental';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -71,7 +72,8 @@ export default function Rentals() {
     returnRental,
     deleteRental,
     addInventoryItem,
-    getAvailableItems 
+    getAvailableItems,
+    loading 
   } = useRental();
   const { toast } = useToast();
   
@@ -531,6 +533,8 @@ export default function Rentals() {
     }
   };
 
+  if (loading) return <PageLoadingSkeleton columns={3} rows={6} showStats={true} />;
+
   return (
     <div>
       <PageHeader 
@@ -645,11 +649,25 @@ export default function Rentals() {
 
       {/* Rentals List */}
       {filteredRentals.length === 0 ? (
-        <div className="stat-card text-center py-12">
-          <ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <p className="text-lg font-medium text-foreground">אין השכרות</p>
-          <p className="text-muted-foreground">צור השכרה חדשה כדי להתחיל</p>
-        </div>
+        rentals.length === 0 ? (
+          <div className="rounded-2xl border border-border/50 bg-card text-center py-16 px-6 shadow-sm">
+            <div className="flex h-20 w-20 mx-auto mb-5 items-center justify-center rounded-3xl bg-gradient-to-br from-primary/20 to-accent/10">
+              <ShoppingCart className="h-10 w-10 text-primary" />
+            </div>
+            <h3 className="text-xl font-bold text-foreground mb-2">אין השכרות עדיין</h3>
+            <p className="text-muted-foreground mb-6 max-w-xs mx-auto">צור השכרה ראשונה ועקוב אחרי כל הציוד המושכר</p>
+            <Button variant="glow" onClick={() => setIsAddDialogOpen(true)}>
+              <Plus className="h-4 w-4" />
+              צור השכרה ראשונה
+            </Button>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-border/50 bg-card text-center py-12 px-6 shadow-sm">
+            <ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
+            <p className="text-lg font-medium text-foreground">לא נמצאו השכרות</p>
+            <p className="text-sm text-muted-foreground">נסה לשנות את מסנני החיפוש</p>
+          </div>
+        )
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredRentals.map((rental, index) => (
