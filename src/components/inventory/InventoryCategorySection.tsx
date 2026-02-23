@@ -131,7 +131,7 @@ export function InventoryCategorySection({
                   <Button 
                     variant="ghost" 
                     size="icon"
-                    className="h-8 w-8"
+                    className="h-9 w-9 hover:bg-primary/10 hover:text-primary"
                     onClick={() => onEdit(item)}
                   >
                     <Edit2 className="h-4 w-4" />
@@ -139,7 +139,7 @@ export function InventoryCategorySection({
                   <Button 
                     variant="ghost" 
                     size="icon"
-                    className="h-8 w-8 text-destructive hover:text-destructive"
+                    className="h-9 w-9 text-destructive hover:bg-destructive/10 hover:text-destructive"
                     onClick={() => onDelete(item.id)}
                   >
                     <Trash2 className="h-4 w-4" />
