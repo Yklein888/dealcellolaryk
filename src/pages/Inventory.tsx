@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { useRental } from '@/hooks/useRental';
+import { PageLoadingSkeleton } from '@/components/PageLoadingSkeleton';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,7 +43,7 @@ import { BarcodePrintDialog } from '@/components/inventory/BarcodePrintDialog';
 import { supabase } from '@/integrations/supabase/client';
 
 export default function Inventory() {
-  const { inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem, refreshData } = useRental();
+  const { inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem, refreshData, loading } = useRental();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
@@ -193,6 +194,8 @@ export default function Inventory() {
   const isSim = (category: ItemCategory) => 
     category === 'sim_american' || category === 'sim_european';
 
+
+  if (loading) return <PageLoadingSkeleton columns={1} rows={4} showStats={false} />;
 
   return (
     <div>
@@ -470,11 +473,25 @@ export default function Inventory() {
 
       {/* Inventory by Category */}
       {filteredInventory.length === 0 ? (
-        <div className="stat-card text-center py-6 sm:py-8">
-          <Package className="h-8 w-8 sm:h-10 sm:w-10 mx-auto text-muted-foreground mb-2 sm:mb-3" />
-          <p className="text-sm sm:text-base font-medium text-foreground">אין פריטים במלאי</p>
-          <p className="text-xs sm:text-sm text-muted-foreground">הוסף פריטים חדשים כדי להתחיל</p>
-        </div>
+        inventory.length === 0 ? (
+          <div className="rounded-2xl border border-border/50 bg-card text-center py-16 px-6 shadow-sm">
+            <div className="flex h-20 w-20 mx-auto mb-5 items-center justify-center rounded-3xl bg-gradient-to-br from-primary/20 to-accent/10">
+              <Package className="h-10 w-10 text-primary" />
+            </div>
+            <h3 className="text-xl font-bold text-foreground mb-2">המלאי ריק</h3>
+            <p className="text-muted-foreground mb-6 max-w-xs mx-auto">הוסף פריטים למלאי כדי להתחיל להשכיר ולנהל את הציוד שלך</p>
+            <Button variant="glow" onClick={() => setIsAddDialogOpen(true)}>
+              <Plus className="h-4 w-4" />
+              הוסף פריט ראשון
+            </Button>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-border/50 bg-card text-center py-12 px-6 shadow-sm">
+            <Package className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
+            <p className="text-lg font-medium text-foreground">לא נמצאו פריטים</p>
+            <p className="text-sm text-muted-foreground">נסה לשנות את מילות החיפוש</p>
+          </div>
+        )
       ) : (
         <div className="space-y-3 sm:space-y-4">
           {categoryOrder
