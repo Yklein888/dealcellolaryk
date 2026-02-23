@@ -58,27 +58,27 @@ export function MobileBottomNav() {
 
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 glass-strong border-t border-white/20 safe-area-bottom">
-      <div className="flex items-center justify-around h-16 px-2">
+      <div className="flex items-center justify-around h-16 px-1">
         {visibleMainItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.path);
-          
+
           return (
             <Link
               key={item.path}
               to={item.path}
               className={cn(
-                'flex flex-col items-center justify-center flex-1 h-full py-2 transition-all duration-200 rounded-xl mx-0.5',
-                active 
-                  ? 'text-primary bg-primary/10' 
+                'flex flex-col items-center justify-center flex-1 py-2 mx-0.5 rounded-xl transition-all duration-200',
+                active
+                  ? 'text-white bg-gradient-to-b from-primary to-accent shadow-md scale-[1.04]'
                   : 'text-muted-foreground hover:text-foreground active:bg-muted/50'
               )}
             >
               <Icon className={cn(
-                'h-5 w-5 mb-1 transition-transform duration-200',
-                active && 'scale-110'
+                'h-5 w-5 mb-1 transition-all duration-200',
+                active ? 'scale-110' : ''
               )} />
-              <span className="text-[10px] font-medium leading-tight">{item.label}</span>
+              <span className={cn('text-[10px] font-semibold leading-tight', active && 'text-white')}>{item.label}</span>
             </Link>
           );
         })}
@@ -88,17 +88,17 @@ export function MobileBottomNav() {
           <SheetTrigger asChild>
             <button
               className={cn(
-                'flex flex-col items-center justify-center flex-1 h-full py-2 transition-all duration-200 rounded-xl mx-0.5',
-                isMoreActive 
-                  ? 'text-primary bg-primary/10' 
+                'flex flex-col items-center justify-center flex-1 py-2 mx-0.5 rounded-xl transition-all duration-200',
+                isMoreActive
+                  ? 'text-white bg-gradient-to-b from-primary to-accent shadow-md scale-[1.04]'
                   : 'text-muted-foreground hover:text-foreground active:bg-muted/50'
               )}
             >
               <MoreHorizontal className={cn(
-                'h-5 w-5 mb-1 transition-transform duration-200',
-                isMoreActive && 'scale-110'
+                'h-5 w-5 mb-1 transition-all duration-200',
+                isMoreActive ? 'scale-110' : ''
               )} />
-              <span className="text-[10px] font-medium leading-tight">עוד</span>
+              <span className={cn('text-[10px] font-semibold leading-tight', isMoreActive && 'text-white')}>עוד</span>
             </button>
           </SheetTrigger>
           <SheetContent side="bottom" className="h-auto max-h-[70vh] rounded-t-3xl">
