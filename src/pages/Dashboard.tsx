@@ -31,6 +31,7 @@ import { RentalsActivityChart } from '@/components/dashboard/RentalsActivityChar
 import { UpcomingReturnsCard } from '@/components/dashboard/UpcomingReturnsCard';
 import { RecentRepairsCard } from '@/components/dashboard/RecentRepairsCard';
 import { OverdueAlert } from '@/components/dashboard/OverdueAlert';
+import { RevenueChart } from '@/components/dashboard/RevenueChart';
 
 export default function Dashboard() {
   const { stats, rentals, repairs, inventory, getUpcomingReturns, loading } = useRental();
@@ -199,6 +200,10 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <InventoryChart inventory={inventory} />
         <RentalsActivityChart rentals={rentals} />
+      </div>
+
+      <div className="mb-8">
+        <RevenueChart rentals={rentals} />
       </div>
 
       <div className="mb-8">
