@@ -87,22 +87,24 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
               onClick={onNavigate}
               className={cn(
                 'flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300',
-                'hover:bg-white/40 hover:shadow-sm group',
-                isActive && 'bg-gradient-to-l from-primary/20 to-primary/5 text-primary shadow-sm border border-primary/20'
+                'hover:bg-primary/10 hover:shadow-sm group',
+                isActive
+                  ? 'bg-gradient-to-l from-primary to-accent text-white shadow-md scale-[1.01]'
+                  : ''
               )}
             >
               <Icon className={cn(
                 'h-5 w-5 transition-all duration-300',
-                isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground group-hover:scale-110'
+                isActive ? 'text-white' : 'text-muted-foreground group-hover:text-primary group-hover:scale-110'
               )} />
               <span className={cn(
-                'font-medium transition-colors duration-300',
-                isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
+                'font-semibold transition-colors duration-300',
+                isActive ? 'text-white' : 'text-muted-foreground group-hover:text-foreground'
               )}>
                 {item.label}
               </span>
               {isActive && (
-                <ChevronRight className="h-4 w-4 mr-auto text-primary animate-pulse" />
+                <ChevronRight className="h-4 w-4 mr-auto text-white/80" />
               )}
             </Link>
           );
@@ -118,7 +120,7 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
             {adminNavItems.map((item) => {
               const isActive = location.pathname === item.path;
               const Icon = item.icon;
-              
+
               return (
                 <Link
                   key={item.path}
@@ -126,22 +128,24 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
                   onClick={onNavigate}
                   className={cn(
                     'flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300',
-                    'hover:bg-white/40 hover:shadow-sm group',
-                    isActive && 'bg-gradient-to-l from-primary/20 to-primary/5 text-primary shadow-sm border border-primary/20'
+                    'hover:bg-primary/10 hover:shadow-sm group',
+                    isActive
+                      ? 'bg-gradient-to-l from-primary to-accent text-white shadow-md scale-[1.01]'
+                      : ''
                   )}
                 >
                   <Icon className={cn(
                     'h-5 w-5 transition-all duration-300',
-                    isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground group-hover:scale-110'
+                    isActive ? 'text-white' : 'text-muted-foreground group-hover:text-primary group-hover:scale-110'
                   )} />
                   <span className={cn(
-                    'font-medium transition-colors duration-300',
-                    isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
+                    'font-semibold transition-colors duration-300',
+                    isActive ? 'text-white' : 'text-muted-foreground group-hover:text-foreground'
                   )}>
                     {item.label}
                   </span>
                   {isActive && (
-                    <ChevronRight className="h-4 w-4 mr-auto text-primary animate-pulse" />
+                    <ChevronRight className="h-4 w-4 mr-auto text-white/80" />
                   )}
                 </Link>
               );
