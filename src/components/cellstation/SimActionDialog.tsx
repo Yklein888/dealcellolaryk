@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Zap, Package, ArrowLeftRight } from 'lucide-react';
+import { Package, ArrowLeftRight } from 'lucide-react';
 
-export type SimActionType = 'quick_activate' | 'quick_rental' | 'activate_and_swap';
+export type SimActionType = 'quick_rental' | 'activate_and_swap';
 
 interface SimRow {
   id: string;
@@ -36,14 +36,6 @@ interface ActionItem {
 
 const ACTION_LIST: ActionItem[] = [
   {
-    key: 'quick_activate',
-    title: 'הפעלה מהירה',
-    description: 'הפעל את הסים ב-CellStation בלבד',
-    border: 'border-green-200 hover:border-green-400 hover:bg-green-50/60',
-    iconBg: 'bg-green-100',
-    iconColor: 'text-green-600',
-  },
-  {
     key: 'quick_rental',
     title: 'השכרה מהירה',
     description: 'הפעל + צור השכרה בסיסטם ללקוח',
@@ -62,7 +54,6 @@ const ACTION_LIST: ActionItem[] = [
 ];
 
 function ActionIcon({ actionKey, className }: { actionKey: SimActionType; className?: string }) {
-  if (actionKey === 'quick_activate') return <Zap className={className} />;
   if (actionKey === 'quick_rental') return <Package className={className} />;
   return <ArrowLeftRight className={className} />;
 }
