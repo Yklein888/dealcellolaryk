@@ -1,6 +1,8 @@
 import { Link, useLocation } from 'react-router-dom';
+import { isBefore, parseISO } from 'date-fns';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { useRental } from '@/hooks/useRental';
 import { useAuth } from '@/hooks/useAuth';
 import { useRole } from '@/hooks/useRole';
 import { usePermissions, PermissionKey } from '@/hooks/usePermissions';
@@ -58,6 +60,18 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
   const { hasPermission } = usePermissions();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
+  // Live badge counts for desktop nav
+  const { rentals, repairs } = useRental();
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const overdueCount = rentals.filter(
+    (r) => r.status === 'active' && isBefore(parseISO(r.endDate), today)
+  ).length;
+  const readyRepairsCount = repairs.filter((r) => r.status === 'ready').length;
+  const navBadges: Record<string, { count: number; activeColor: string; inactiveColor: string }> = {
+    '/rentals': { count: overdueCount, activeColor: 'bg-white/30 text-white', inactiveColor: 'bg-destructive text-white' },
+    '/repairs': { count: readyRepairsCount, activeColor: 'bg-white/30 text-white', inactiveColor: 'bg-green-500 text-white' },
+  };
+
   // Filter nav items by permission (admins see all)
   const visibleNavItems = navItems.filter(item => isAdmin || hasPermission(item.permission));
 
@@ -103,7 +117,14 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
               )}>
                 {item.label}
               </span>
-              {isActive && (
+              {navBadges[item.path]?.count > 0 && (
+                <span className={`mr-auto text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center ${
+                  isActive ? navBadges[item.path].activeColor : navBadges[item.path].inactiveColor
+                }`}>
+                  {navBadges[item.path].count}
+                </span>
+              )}
+              {isActive && !navBadges[item.path]?.count && (
                 <ChevronRight className="h-4 w-4 mr-auto text-white/80" />
               )}
             </Link>
