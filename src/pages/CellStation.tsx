@@ -813,6 +813,7 @@ export default function CellStation() {
           currentSim={swapDialogSim}
           availableSims={simCards.filter(s => s.status === 'available' && s.iccid)}
           onSwap={handleSwapWithUpdates}
+          isSwapping={false}
         />
       )}
       {activateSwapSim && (
