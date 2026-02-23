@@ -59,14 +59,14 @@ export function InventoryCategorySection({
   }).length;
 
   return (
-    <div className="stat-card overflow-hidden">
+    <div className="rounded-2xl border border-border/50 bg-card shadow-sm overflow-hidden">
       {/* Category Header */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
+        className={`w-full flex items-center justify-between px-4 py-4 hover:bg-muted/50 transition-colors ${isExpanded ? 'bg-gradient-to-l from-primary/5 to-accent/5' : ''}`}
       >
         <div className="flex items-center gap-3">
-          <span className="text-2xl">{categoryIcons[category]}</span>
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-accent/10 text-xl shrink-0">{categoryIcons[category]}</span>
           <div className="text-right">
             <h3 className="text-lg font-semibold text-foreground">
               {categoryLabels[category]}
@@ -77,7 +77,7 @@ export function InventoryCategorySection({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-2xl font-bold text-primary">{items.length}</span>
+          <span className="text-2xl font-extrabold bg-gradient-to-l from-primary to-accent bg-clip-text text-transparent">{items.length}</span>
           {isExpanded ? (
             <ChevronUp className="h-5 w-5 text-muted-foreground" />
           ) : (
@@ -94,7 +94,7 @@ export function InventoryCategorySection({
             return (
               <div 
                 key={item.id}
-                className={`flex items-center justify-between p-3 border-b border-border last:border-b-0 hover:bg-muted/30 transition-colors ${expired ? 'bg-destructive/5' : ''}`}
+                className={`flex items-center gap-3 px-4 py-3 border-b border-border/60 last:border-b-0 hover:bg-primary/5 transition-colors ${expired ? 'bg-destructive/5' : ''}`}
               >
                 <div className="flex items-center gap-3 flex-1">
                   <div className="flex-1 min-w-0">
