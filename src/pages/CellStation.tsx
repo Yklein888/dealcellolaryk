@@ -933,7 +933,7 @@ export default function CellStation() {
               <SimTable sims={rented} showCustomer onRentalClick={sim => openRentalForSim(sim)} needsSwapIccids={needsSwapIccids} overdueIccids={overdueIccids} onActivateAndSwapClick={sim => setActivateSwapSim(sim)} />
             </TabsContent>
             <TabsContent value="expired" className="mt-3">
-              <SimTable sims={expired} />
+              <SimTable sims={expired} showActionButton onActivateClick={sim => setSimActionDialogSim(sim)} onActivateAndSwapClick={sim => setActivateSwapSim(sim)} needsSwapIccids={needsSwapIccids} />
             </TabsContent>
             <TabsContent value="activate" className="mt-3">
               <ActivationTab availableSims={simCards} onActivate={activateSim} onActivateAndSwap={activateAndSwap} isActivating={isActivating} />
