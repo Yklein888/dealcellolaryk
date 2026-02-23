@@ -4,6 +4,7 @@ import { MobileBottomNav } from './MobileBottomNav';
 import { ConnectionStatusIndicator } from './ConnectionStatusIndicator';
 import { ConnectionStatusProvider } from '@/hooks/useConnectionStatus';
 import { Smartphone } from 'lucide-react';
+import { PWAInstallPrompt } from './PWAInstallPrompt';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -39,6 +40,9 @@ export function AppLayout({ children }: AppLayoutProps) {
 
         {/* Mobile Bottom Navigation */}
         <MobileBottomNav />
+
+        {/* PWA Install Prompt */}
+        <PWAInstallPrompt />
       </div>
     </ConnectionStatusProvider>
   );
