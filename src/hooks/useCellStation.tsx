@@ -17,6 +17,10 @@ async function csInvoke(action: string, params: any): Promise<any> {
 }
 // ────────────────────────────────────────────────────────────────────────────
 
+// Module-level SIM cache - persists across navigations (avoids full reload on tab switch)
+let simsCache: { data: CellStationSim[]; ts: number } | null = null;
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
 interface CellStationSim {
   id: string;
   sim_number: string | null;
@@ -76,11 +80,17 @@ export function useCellStation() {
   const { toast } = useToast();
 
   // fetchSims - דרך Edge Function כדי למנוע CORS
-  const fetchSims = useCallback(async () => {
+  const fetchSims = useCallback(async (force = false) => {
+    if (!force && simsCache && (Date.now() - simsCache.ts) < CACHE_TTL_MS) {
+      setSimCards(simsCache.data);
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
       const data = await csInvoke('get_sims', {});
       if (data?.success && Array.isArray(data.sims)) {
+        simsCache = { data: data.sims as CellStationSim[], ts: Date.now() };
         setSimCards(data.sims as CellStationSim[]);
       } else {
         console.error('get_sims failed:', data);
@@ -136,6 +146,7 @@ export function useCellStation() {
       }
 
       toast({ title: 'סנכרון הושלם', description: `${records.length} סימים עודכנו` });
+      simsCache = null; // Invalidate cache after sync
       await fetchSims();
     } catch (e: any) {
       toast({ title: 'שגיאת סנכרון', description: e.message, variant: 'destructive' });
@@ -173,6 +184,7 @@ export function useCellStation() {
       // עדכן סטטוס דרך Edge Function
       await csInvoke('update_sim_status', { iccid: params.iccid, status: 'rented', status_detail: 'active' });
       toast({ title: 'הסים הופעל בהצלחה ועבר למושכרים ✅' });
+      simsCache = null; // Invalidate cache after activation
       await fetchSims();
       return { success: true };
     } catch (e: any) {
@@ -227,6 +239,7 @@ export function useCellStation() {
       onProgress?.('הושלם!', 100);
       setActivateAndSwapProgress('הושלם!');
       toast({ title: 'הפעלה והחלפה הושלמו בהצלחה!' });
+      simsCache = null; // Invalidate cache after activate+swap
       await fetchSims();
       return data;
     } catch (e: any) {
