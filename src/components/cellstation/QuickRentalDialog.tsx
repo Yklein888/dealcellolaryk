@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { calculateRentalPrice } from '@/lib/pricing';
 import { printCallingInstructions } from '@/lib/callingInstructions';
-import { Loader2, CheckCircle, AlertTriangle, Search, X, User, Printer } from 'lucide-react';
+import { Loader2, CheckCircle, AlertTriangle, Search, X, User, Printer, UserPlus } from 'lucide-react';
 
 interface SimRow {
   id: string;
@@ -59,6 +59,10 @@ export function QuickRentalDialog({ sim, isOpen, onClose, onActivate, onSuccess 
   const [manualName, setManualName] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  // Quick-add customer
+  const [showAddCustomer, setShowAddCustomer] = useState(false);
+  const [newCustomerPhone, setNewCustomerPhone] = useState('');
+  const [isAddingCustomer, setIsAddingCustomer] = useState(false);
 
   // Rental details
   const [startDate, setStartDate] = useState(today);
@@ -72,6 +76,10 @@ export function QuickRentalDialog({ sim, isOpen, onClose, onActivate, onSuccess 
   const [createdRentalId, setCreatedRentalId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
 
+  const days = Math.max(1, Math.ceil(
+    (new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)
+  ));
+
   // Auto price calculation using main system pricing library
   const priceResult = useMemo(() => {
     if (!startDate || !endDate || startDate >= endDate) return null;
@@ -84,24 +92,14 @@ export function QuickRentalDialog({ sim, isOpen, onClose, onActivate, onSuccess 
         startDate,
         endDate
       );
-    } catch {
-      return null;
-    }
+    } catch { return null; }
   }, [startDate, endDate, includeDevice]);
 
   const totalPrice = priceResult?.total || 0;
 
-  const days = Math.max(1, Math.ceil(
-    (new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)
-  ));
-
   // Debounced customer search
   useEffect(() => {
-    if (searchTerm.trim().length < 2) {
-      setSearchResults([]);
-      setDropdownOpen(false);
-      return;
-    }
+    if (searchTerm.trim().length < 2) { setSearchResults([]); setDropdownOpen(false); return; }
     setIsSearching(true);
     const timer = setTimeout(async () => {
       try {
@@ -112,16 +110,37 @@ export function QuickRentalDialog({ sim, isOpen, onClose, onActivate, onSuccess 
           .limit(8);
         setSearchResults((data as Customer[]) || []);
         setDropdownOpen(true);
-      } catch (e) {
-        console.error('Customer search error:', e);
-      } finally {
-        setIsSearching(false);
-      }
+      } catch { } finally { setIsSearching(false); }
     }, 300);
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Real PDF print calling instructions
+  // Quick-add new customer
+  const handleAddNewCustomer = async () => {
+    const name = manualName.trim() || searchTerm.trim();
+    if (!name) return;
+    setIsAddingCustomer(true);
+    try {
+      const { data, error } = await supabase
+        .from('customers' as any)
+        .insert({ name, phone: newCustomerPhone.trim() || null })
+        .select('id, name, phone')
+        .single();
+      if (error) throw new Error(error.message);
+      const newC = data as Customer;
+      setSelectedCustomer(newC);
+      setSearchTerm(newC.name);
+      setManualName(newC.name);
+      setShowAddCustomer(false);
+      setNewCustomerPhone('');
+      setDropdownOpen(false);
+      toast({ title: '✅ לקוח נוסף', description: `${newC.name} נוסף בהצלחה` });
+    } catch (e: any) {
+      toast({ title: '❌ שגיאה', description: e.message, variant: 'destructive' });
+    } finally { setIsAddingCustomer(false); }
+  };
+
+  // Real PDF print
   const handlePrint = async () => {
     if (!sim) return;
     setIsPrinting(true);
@@ -136,10 +155,8 @@ export function QuickRentalDialog({ sim, isOpen, onClose, onActivate, onSuccess 
         sim.sim_number || undefined
       );
     } catch {
-      toast({ title: '❌ שגיאת הדפסה', description: 'לא ניתן להדפיס כעת', variant: 'destructive' });
-    } finally {
-      setIsPrinting(false);
-    }
+      toast({ title: '❌ שגיאת הדפסה', description: 'לא ניתן להדפיס', variant: 'destructive' });
+    } finally { setIsPrinting(false); }
   };
 
   const handleSubmit = async () => {
@@ -150,74 +167,47 @@ export function QuickRentalDialog({ sim, isOpen, onClose, onActivate, onSuccess 
     setErrorMsg('');
     setIsSubmitting(true);
     try {
-      // Step 1: Activate on CellStation
       const activateResult = await onActivate(sim, {
-        start_rental: startDate,
-        end_rental: endDate,
-        price: String(totalPrice),
-        days: String(days),
-        note: customerName,
+        start_rental: startDate, end_rental: endDate,
+        price: String(totalPrice), days: String(days), note: customerName,
       });
       if (activateResult?.success === false) throw new Error(activateResult.error || 'שגיאה בהפעלת הסים');
 
-      // Step 2: Create rental record
       const { data: newRental, error: rentalError } = await supabase
         .from('rentals' as any)
         .insert({
           customer_id: selectedCustomer?.id || null,
           customer_name: customerName,
-          start_date: startDate,
-          end_date: endDate,
-          status: 'active',
-          total_price: totalPrice,
-          currency: 'ILS',
+          start_date: startDate, end_date: endDate,
+          status: 'active', total_price: totalPrice, currency: 'ILS',
           notes: includeDevice ? 'כולל מכשיר פשוט' : undefined,
         })
-        .select('id')
-        .single();
+        .select('id').single();
       if (rentalError) throw new Error(rentalError.message);
 
       const rentalId = (newRental as any).id;
-
-      // Step 3: Get or create SIM inventory item
       const { data: invItem } = await supabase
-        .from('inventory' as any)
-        .select('id')
-        .eq('sim_number', sim.iccid || '')
-        .maybeSingle();
+        .from('inventory' as any).select('id').eq('sim_number', sim.iccid || '').maybeSingle();
 
       let simInventoryId: string;
       if (invItem) {
         simInventoryId = (invItem as any).id;
+        await supabase.from('inventory' as any).update({ status: 'rented' }).eq('id', simInventoryId);
       } else {
         const { data: newInv, error: invErr } = await supabase
           .from('inventory' as any)
-          .insert({
-            name: 'סים גלישה',
-            category: 'sim_european',
-            sim_number: sim.iccid || '',
-            local_number: sim.uk_number || null,
-            israeli_number: sim.il_number || null,
-            expiry_date: sim.expiry_date || null,
-            status: 'rented',
-          })
-          .select('id')
-          .single();
+          .insert({ name: 'סים גלישה', category: 'sim_european', sim_number: sim.iccid || '',
+            local_number: sim.uk_number || null, israeli_number: sim.il_number || null,
+            expiry_date: sim.expiry_date || null, status: 'rented' })
+          .select('id').single();
         if (invErr) throw new Error(invErr.message);
         simInventoryId = (newInv as any).id;
       }
-
-      // Step 4: Create rental_item for SIM
       await supabase.from('rental_items' as any).insert({
-        rental_id: rentalId,
-        inventory_item_id: simInventoryId,
+        rental_id: rentalId, inventory_item_id: simInventoryId,
         item_name: sim.uk_number || sim.il_number || sim.iccid || 'SIM',
         item_category: 'sim_european',
       });
-
-      if (invItem) {
-        await supabase.from('inventory' as any).update({ status: 'rented' }).eq('id', simInventoryId);
-      }
 
       setCreatedRentalId(rentalId);
       setStep('success');
@@ -226,14 +216,13 @@ export function QuickRentalDialog({ sim, isOpen, onClose, onActivate, onSuccess 
       const msg = e.message || 'שגיאה ביצירת ההשכרה';
       setErrorMsg(msg);
       toast({ title: '❌ שגיאה', description: msg, variant: 'destructive' });
-    } finally {
-      setIsSubmitting(false);
-    }
+    } finally { setIsSubmitting(false); }
   };
 
   const handleClose = useCallback(() => {
     setSearchTerm(''); setSearchResults([]); setSelectedCustomer(null); setManualName('');
     setStartDate(today); setEndDate(defaultEnd); setIncludeDevice(false);
+    setShowAddCustomer(false); setNewCustomerPhone(''); setIsAddingCustomer(false);
     setIsSubmitting(false); setIsPrinting(false);
     setStep('form'); setCreatedRentalId(null); setErrorMsg(''); setDropdownOpen(false);
     onClose();
@@ -247,97 +236,164 @@ export function QuickRentalDialog({ sim, isOpen, onClose, onActivate, onSuccess 
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent
-        className="flex flex-col max-w-md p-0 gap-0 h-[100dvh] sm:h-auto sm:max-h-[90vh] rounded-none sm:rounded-2xl overflow-hidden"
-        dir="rtl"
-      >
-        {/* Fixed Header */}
-        <div className="flex-shrink-0 px-5 pt-5 pb-4 border-b bg-background">
+      {/* size="full" hides drag handle; p-0 gap-0 removes default padding; sm:max-w-md limits desktop width */}
+      <DialogContent size="full" className="p-0 gap-0 sm:max-w-md" dir="rtl">
+
+        {/* ── STICKY HEADER ── */}
+        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm px-5 pt-4 pb-3 border-b">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold">📋 השכרה מהירה</DialogTitle>
+            <DialogTitle className="text-lg font-bold text-right">📋 השכרה מהירה</DialogTitle>
           </DialogHeader>
-          <div className="rounded-lg bg-muted/60 border border-border/50 px-3 py-2 text-sm mt-3">
-            <span className="font-mono font-semibold">{simLabel}</span>
-            {sim.plan && <span className="text-muted-foreground mr-2">· {sim.plan}</span>}
+          <div className="rounded-lg bg-muted/60 border border-border/50 px-3 py-2 text-sm mt-3 flex items-center gap-2">
+            <span className="font-mono font-semibold flex-1">{simLabel}</span>
+            {sim.plan && <span className="text-muted-foreground text-xs">· {sim.plan}</span>}
           </div>
         </div>
 
-        {/* Success Screen */}
+        {/* ── SUCCESS SCREEN ── */}
         {step === 'success' ? (
-          <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6 text-center">
-            <div className="rounded-full bg-green-100 p-4">
-              <CheckCircle className="h-10 w-10 text-green-600" />
+          <div className="flex flex-col items-center justify-center gap-5 px-5 py-10 text-center min-h-[50vh]">
+            <div className="rounded-full bg-green-100 p-5">
+              <CheckCircle className="h-12 w-12 text-green-600" />
             </div>
             <div>
-              <p className="font-bold text-lg text-green-700">ההשכרה נוצרה בהצלחה!</p>
+              <p className="font-bold text-xl text-green-700">ההשכרה נוצרה בהצלחה!</p>
               <p className="text-sm text-muted-foreground mt-1">הסים הופעל ונרשם בסיסטם</p>
             </div>
-            <div className="flex flex-col sm:flex-row gap-2 w-full max-w-xs mt-2">
+            <div className="flex flex-col gap-3 w-full max-w-xs mt-2">
               <Button
                 onClick={handlePrint}
                 disabled={isPrinting}
-                className="flex-1 gap-2 bg-green-600 hover:bg-green-700"
+                className="h-14 gap-2 bg-green-600 hover:bg-green-700 text-base font-semibold"
               >
-                {isPrinting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+                {isPrinting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Printer className="h-5 w-5" />}
                 הדפס הוראות חיוג
               </Button>
               {createdRentalId && (
                 <Button
                   variant="outline"
+                  className="h-12"
                   onClick={() => { navigate(`/rentals?highlight=${createdRentalId}`); handleClose(); }}
-                  className="flex-1"
                 >
                   עבור להשכרה
                 </Button>
               )}
-              <Button variant="ghost" onClick={handleClose} className="flex-1">סגור</Button>
+              <Button variant="ghost" onClick={handleClose} className="h-10 text-muted-foreground">
+                סגור
+              </Button>
             </div>
           </div>
         ) : (
           <>
-            {/* Scrollable Form */}
-            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+            {/* ── SCROLLABLE FORM CONTENT ── */}
+            <div className="px-5 py-4 space-y-5 pb-28">
+
               {/* Customer search */}
               <div className="space-y-2">
-                <Label>לקוח</Label>
+                <Label className="text-sm font-semibold">לקוח</Label>
                 {selectedCustomer ? (
-                  <div className="flex items-center gap-2 p-2.5 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+                  <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-xl text-sm">
                     <User className="h-4 w-4 text-blue-600 shrink-0" />
                     <span className="font-medium flex-1">{selectedCustomer.name}</span>
                     {selectedCustomer.phone && <span className="text-muted-foreground text-xs">{selectedCustomer.phone}</span>}
                     <button onClick={() => { setSelectedCustomer(null); setSearchTerm(''); setManualName(''); }}>
-                      <X className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                      <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
                     </button>
+                  </div>
+                ) : showAddCustomer ? (
+                  // ── QUICK ADD CUSTOMER INLINE FORM ──
+                  <div className="rounded-xl border-2 border-green-300 bg-green-50/80 dark:bg-green-950/20 dark:border-green-700 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-bold text-green-700 dark:text-green-300">➕ הוסף לקוח חדש</p>
+                      <button onClick={() => { setShowAddCustomer(false); setNewCustomerPhone(''); }}>
+                        <X className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">שם לקוח *</Label>
+                      <Input
+                        value={manualName}
+                        onChange={e => setManualName(e.target.value)}
+                        placeholder="שם מלא..."
+                        className="h-12 text-base bg-background"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">טלפון (אופציונלי)</Label>
+                      <Input
+                        value={newCustomerPhone}
+                        onChange={e => setNewCustomerPhone(e.target.value)}
+                        placeholder="05X-XXXXXXX"
+                        type="tel"
+                        inputMode="tel"
+                        dir="ltr"
+                        className="h-12 text-base text-left bg-background"
+                      />
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => { setShowAddCustomer(false); setNewCustomerPhone(''); }}
+                        className="flex-none h-10"
+                      >
+                        ביטול
+                      </Button>
+                      <Button
+                        onClick={handleAddNewCustomer}
+                        disabled={isAddingCustomer || !manualName.trim()}
+                        className="flex-1 h-10 gap-2 bg-green-600 hover:bg-green-700"
+                      >
+                        {isAddingCustomer
+                          ? <Loader2 className="h-4 w-4 animate-spin" />
+                          : <UserPlus className="h-4 w-4" />}
+                        הוסף לקוח
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <div className="relative">
                     <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                     <Input
-                      className="pr-9 h-12 text-base"
+                      className="pr-9 h-13 text-base"
+                      style={{ height: '52px' }}
                       placeholder="חפש לפי שם או טלפון..."
                       value={searchTerm}
-                      onChange={e => { setSearchTerm(e.target.value); setManualName(e.target.value); }}
+                      onChange={e => { setSearchTerm(e.target.value); setManualName(e.target.value); setShowAddCustomer(false); }}
                       autoComplete="off"
                     />
                     {isSearching && <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />}
-                    {dropdownOpen && searchResults.length > 0 && (
-                      <div className="absolute z-50 w-full mt-1 bg-background border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    {dropdownOpen && (searchResults.length > 0 || searchTerm.trim().length >= 2) && (
+                      <div className="absolute z-50 w-full mt-1 bg-background border border-border rounded-xl shadow-xl max-h-52 overflow-y-auto">
                         {searchResults.map(c => (
                           <button
                             key={c.id}
-                            className="w-full text-right px-3 py-2.5 hover:bg-muted/60 flex justify-between items-center text-sm border-b border-border/40 last:border-0"
+                            className="w-full text-right px-4 py-3 hover:bg-muted/60 flex justify-between items-center text-sm border-b border-border/40 last:border-0 active:bg-muted"
                             onClick={() => { setSelectedCustomer(c); setSearchTerm(c.name); setManualName(c.name); setDropdownOpen(false); }}
                           >
                             <span className="font-medium">{c.name}</span>
                             <span className="text-muted-foreground text-xs">{c.phone}</span>
                           </button>
                         ))}
-                        <button
-                          className="w-full text-right px-3 py-2 text-xs text-muted-foreground hover:bg-muted/40 border-t border-border/40"
-                          onClick={() => { setSelectedCustomer(null); setManualName(searchTerm); setDropdownOpen(false); }}
-                        >
-                          המשך עם &quot;{searchTerm}&quot; ללא קישור ללקוח
-                        </button>
+                        {/* Quick-add option */}
+                        {searchTerm.trim().length >= 2 && (
+                          <button
+                            className="w-full text-right px-4 py-3 text-sm text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/30 flex items-center gap-2 border-t border-border/40 active:bg-green-100 font-medium"
+                            onClick={() => { setDropdownOpen(false); setShowAddCustomer(true); setManualName(searchTerm); }}
+                          >
+                            <UserPlus className="h-4 w-4 shrink-0" />
+                            הוסף לקוח חדש: &quot;{searchTerm}&quot;
+                          </button>
+                        )}
+                        {searchResults.length > 0 && (
+                          <button
+                            className="w-full text-right px-4 py-2.5 text-xs text-muted-foreground hover:bg-muted/40 border-t border-border/40"
+                            onClick={() => { setSelectedCustomer(null); setManualName(searchTerm); setDropdownOpen(false); }}
+                          >
+                            המשך עם &quot;{searchTerm}&quot; ללא קישור ללקוח
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -347,71 +403,67 @@ export function QuickRentalDialog({ sim, isOpen, onClose, onActivate, onSuccess 
               {/* Dates */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>תאריך התחלה</Label>
-                  <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="h-12 text-base" />
+                  <Label className="text-sm font-semibold">תאריך התחלה</Label>
+                  <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="h-13 text-base" style={{ height: '52px' }} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>תאריך סיום</Label>
-                  <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="h-12 text-base" />
+                  <Label className="text-sm font-semibold">תאריך סיום</Label>
+                  <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="h-13 text-base" style={{ height: '52px' }} />
                 </div>
               </div>
 
               {/* Device toggle */}
-              <label className="flex items-center gap-3 p-3 rounded-xl border-2 border-dashed border-muted-foreground/30 hover:border-primary/40 hover:bg-muted/30 cursor-pointer transition-colors">
-                <Checkbox
-                  checked={includeDevice}
-                  onCheckedChange={v => setIncludeDevice(!!v)}
-                  id="include-device"
-                />
-                <div>
-                  <p className="font-medium text-sm">תוספת מכשיר פשוט</p>
-                  <p className="text-xs text-muted-foreground">מחושב לפי ימי עסקים (ללא שבת וחגים)</p>
+              <label className="flex items-center gap-3 p-4 rounded-2xl border-2 border-dashed border-muted-foreground/25 hover:border-primary/40 hover:bg-muted/20 cursor-pointer transition-colors active:bg-muted/40">
+                <Checkbox checked={includeDevice} onCheckedChange={v => setIncludeDevice(!!v)} className="shrink-0" />
+                <div className="flex-1">
+                  <p className="font-semibold text-sm">תוספת מכשיר פשוט</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">מחושב לפי ימי עסקים (ללא שבת וחגים)</p>
                 </div>
               </label>
 
               {/* Auto-calculated price breakdown */}
               {priceResult && (
-                <div className="rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-200/60 p-4 space-y-2">
-                  <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wide mb-2">פירוט מחיר</p>
+                <div className="rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-200/60 p-4 space-y-2.5">
+                  <p className="text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider">פירוט מחיר אוטומטי</p>
                   {priceResult.breakdown.map((b, i) => (
-                    <div key={i} className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">{b.item}{b.details ? <span className="text-xs opacity-70"> ({b.details})</span> : null}</span>
-                      <span className="font-medium">{b.currency}{b.price.toLocaleString()}</span>
+                    <div key={i} className="flex justify-between text-sm items-start gap-2">
+                      <span className="text-muted-foreground leading-snug">{b.item}{b.details ? <span className="text-xs opacity-60 block">{b.details}</span> : null}</span>
+                      <span className="font-semibold shrink-0">{b.currency}{b.price.toLocaleString()}</span>
                     </div>
                   ))}
-                  {priceResult.breakdown.length > 0 && (
-                    <div className="flex justify-between font-bold text-foreground text-base border-t border-blue-200/60 pt-2 mt-1">
-                      <span>סה&quot;כ לתשלום</span>
-                      <span className="text-blue-700 dark:text-blue-300">₪{totalPrice.toLocaleString()}</span>
-                    </div>
-                  )}
+                  <div className="flex justify-between font-bold text-base border-t border-blue-200/60 pt-2.5 mt-1">
+                    <span>סה&quot;כ לתשלום</span>
+                    <span className="text-blue-700 dark:text-blue-300 text-lg">₪{totalPrice.toLocaleString()}</span>
+                  </div>
                   {priceResult.businessDaysInfo && (
-                    <p className="text-[11px] text-muted-foreground">{days} ימים סה&quot;כ · {priceResult.businessDaysInfo.businessDays} ימי עסקים</p>
+                    <p className="text-[11px] text-muted-foreground">{days} ימים · {priceResult.businessDaysInfo.businessDays} ימי עסקים</p>
                   )}
                 </div>
               )}
 
-              {/* Error message */}
+              {/* Error */}
               {errorMsg && (
-                <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                  <AlertTriangle className="h-4 w-4 shrink-0" />
-                  {errorMsg}
+                <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />{errorMsg}
                 </div>
               )}
             </div>
 
-            {/* Sticky Action Footer */}
-            <div className="flex-shrink-0 flex gap-3 px-5 py-4 border-t bg-background">
-              <Button variant="outline" onClick={handleClose} disabled={isSubmitting} className="h-12">
-                ביטול
-              </Button>
-              <Button
-                onClick={handleSubmit}
-                disabled={isSubmitting || !startDate || !endDate}
-                className="flex-1 h-12 gap-2 bg-blue-600 hover:bg-blue-700 text-base font-semibold"
-              >
-                {isSubmitting ? <><Loader2 className="h-4 w-4 animate-spin" /> יוצר...</> : '✅ צור השכרה'}
-              </Button>
+            {/* ── STICKY FOOTER ── */}
+            <div className="sticky bottom-0 z-10 bg-background/95 backdrop-blur-sm border-t px-5 py-3">
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={handleClose} disabled={isSubmitting} className="h-13" style={{ height: '52px' }}>
+                  ביטול
+                </Button>
+                <Button
+                  onClick={handleSubmit}
+                  disabled={isSubmitting || !startDate || !endDate}
+                  className="flex-1 h-13 gap-2 bg-blue-600 hover:bg-blue-700 text-base font-bold"
+                  style={{ height: '52px' }}
+                >
+                  {isSubmitting ? <><Loader2 className="h-4 w-4 animate-spin" /> יוצר...</> : '✅ צור השכרה'}
+                </Button>
+              </div>
             </div>
           </>
         )}
