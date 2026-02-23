@@ -366,7 +366,7 @@ export default function Customers() {
             >
               <div className="flex items-start justify-between mb-3 sm:mb-4">
                 <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-primary/20 text-primary font-bold text-base sm:text-lg">
+                  <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-white font-bold text-base sm:text-lg shadow-md">
                     {customer.name.charAt(0)}
                   </div>
                   <div className="min-w-0">
@@ -408,10 +408,10 @@ export default function Customers() {
 
               <div className="flex gap-2 pt-2 sm:pt-3 border-t border-border">
                 <Button 
-                  variant="ghost" 
+                  variant="outline"
                   size="sm"
                   onClick={() => handleEdit(customer)}
-                  className="flex-1"
+                  className="flex-1 h-10 gap-1 hover:bg-primary/10 hover:border-primary/30"
                 >
                   <Edit2 className="h-4 w-4" />
                   עריכה
