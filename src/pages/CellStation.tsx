@@ -1,5 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useCellStation } from '@/hooks/useCellStation';
+import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -241,6 +243,8 @@ interface OverdueNotReturnedItem {
 }
 
 export default function CellStation() {
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const {
     simCards, isLoading, isSyncing,
     syncSims, activateSim, activateSimWithStatus, swapSim, activateAndSwap,
@@ -293,16 +297,20 @@ export default function CellStation() {
     }
   }, [simCards.length, syncStatus]);
 
-  // Auto-sync interval
+  // Keep ref in sync with latest runAutoSync (avoids interval reset on state changes)
+  const autoSyncFnRef = useRef(runAutoSync);
+  useEffect(() => { autoSyncFnRef.current = runAutoSync; }, [runAutoSync]);
+
+  // Auto-sync interval - stable, never resets due to isSyncing state flips
   useEffect(() => {
     syncIntervalRef.current = setInterval(() => {
-      runAutoSync();
+      autoSyncFnRef.current();
     }, SYNC_INTERVAL_MS);
 
     return () => {
       if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
     };
-  }, [runAutoSync]);
+  }, []);
 
   // Real-time for cellstation_sims handled via fetchSims() polling
 
@@ -392,6 +400,34 @@ export default function CellStation() {
             if (item.status === 'rented') {
               rentedIccids.add(item.sim_number);
             }
+          }
+        }
+      }
+
+      // Add rentalId to map by joining rented inventory items → rental_items → active rentals
+      const rentedInvIds = Object.values(map).filter(v => v.status === 'rented').map(v => v.id);
+      if (rentedInvIds.length > 0) {
+        const { data: riData } = await supabase
+          .from('rental_items')
+          .select('inventory_item_id, rental_id')
+          .in('inventory_item_id', rentedInvIds);
+        if (riData && riData.length > 0) {
+          const rentalIds = [...new Set((riData as any[]).map((r: any) => r.rental_id).filter(Boolean))];
+          const { data: activeRentals } = await supabase
+            .from('rentals')
+            .select('id')
+            .in('id', rentalIds)
+            .in('status', ['active', 'overdue']);
+          const activeSet = new Set((activeRentals || []).map((r: any) => r.id));
+          const invToRental: Record<string, string> = {};
+          for (const ri of riData as any[]) {
+            if (ri.inventory_item_id && ri.rental_id && activeSet.has(ri.rental_id)) {
+              invToRental[ri.inventory_item_id] = ri.rental_id;
+            }
+          }
+          for (const iccid of Object.keys(map)) {
+            const rId = invToRental[map[iccid].id];
+            if (rId) map[iccid] = { ...map[iccid], rentalId: rId };
           }
         }
       }
@@ -521,9 +557,9 @@ export default function CellStation() {
     if (!iccid || !inventoryMap[iccid]) return;
     const rentalId = inventoryMap[iccid].rentalId;
     if (rentalId) {
-      window.location.href = `/rentals?highlight=${rentalId}`;
+      navigate(`/rentals?highlight=${rentalId}`);
     }
-  }, [inventoryMap]);
+  }, [inventoryMap, navigate]);
 
   // Find rental ID for a rented SIM
   const openSwapForSim = useCallback(async (sim: SimRow) => {
@@ -562,65 +598,75 @@ export default function CellStation() {
     swap_msisdn: string;
     swap_iccid: string;
   }) => {
-    const result = await swapSim(params);
+    try {
+      const result = await swapSim(params);
 
-    // After edge function succeeds, update local DB
-    const oldIccid = swapDialogSim?.iccid;
-    const newIccid = params.swap_iccid;
+      // After edge function succeeds, update local DB
+      const oldIccid = swapDialogSim?.iccid;
+      const newIccid = params.swap_iccid;
 
-    // 1. Update old inventory item to available
-    if (oldIccid) {
-      await supabase.from('inventory')
-        .update({ status: 'available', needs_swap: false })
-        .eq('sim_number', oldIccid);
-    }
+      // 1. Update old inventory item to available
+      if (oldIccid) {
+        await supabase.from('inventory')
+          .update({ status: 'available', needs_swap: false })
+          .eq('sim_number', oldIccid);
+      }
 
-    // 4. Ensure new inventory item exists and mark as rented
-    const { data: newInvItem } = await supabase
-      .from('inventory')
-      .select('id')
-      .eq('sim_number', newIccid)
-      .maybeSingle();
-
-    let newInventoryId: string;
-    if (!newInvItem) {
-      const newSimData = simCards.find(s => s.iccid === newIccid);
-      const { data: created } = await supabase.from('inventory').insert({
-        name: `סים גלישה`,
-        category: 'sim_european',
-        sim_number: newIccid,
-        local_number: newSimData?.uk_number || params.swap_msisdn || null,
-        israeli_number: newSimData?.il_number || null,
-        expiry_date: newSimData?.expiry_date || null,
-        status: 'rented',
-      }).select('id').single();
-      newInventoryId = created!.id;
-    } else {
-      newInventoryId = newInvItem.id;
-      await supabase.from('inventory')
-        .update({ status: 'rented' })
-        .eq('id', newInventoryId);
-    }
-
-    // 5. Update rental_items to point to new inventory item
-    if (params.rental_id && oldIccid) {
-      const { data: oldInv } = await supabase
+      // 4. Ensure new inventory item exists and mark as rented
+      const { data: newInvItem } = await supabase
         .from('inventory')
         .select('id')
-        .eq('sim_number', oldIccid)
+        .eq('sim_number', newIccid)
         .maybeSingle();
-      if (oldInv) {
-        await supabase.from('rental_items')
-          .update({ inventory_item_id: newInventoryId })
-          .eq('rental_id', params.rental_id)
-          .eq('inventory_item_id', oldInv.id);
-      }
-    }
 
-    // Refresh data
-    await fetchSims();
-    return result;
-  }, [swapSim, swapDialogSim, simCards, fetchSims]);
+      let newInventoryId: string;
+      if (!newInvItem) {
+        const newSimData = simCards.find(s => s.iccid === newIccid);
+        const { data: created, error: createError } = await supabase.from('inventory').insert({
+          name: `סים גלישה`,
+          category: 'sim_european',
+          sim_number: newIccid,
+          local_number: newSimData?.uk_number || params.swap_msisdn || null,
+          israeli_number: newSimData?.il_number || null,
+          expiry_date: newSimData?.expiry_date || null,
+          status: 'rented',
+        }).select('id').single();
+        if (!created || createError) {
+          toast({ title: 'שגיאה ביצירת מלאי', description: createError?.message || 'לא ניתן ליצור פריט מלאי חדש', variant: 'destructive' });
+          return result;
+        }
+        newInventoryId = created.id;
+      } else {
+        newInventoryId = newInvItem.id;
+        await supabase.from('inventory')
+          .update({ status: 'rented' })
+          .eq('id', newInventoryId);
+      }
+
+      // 5. Update rental_items to point to new inventory item
+      if (params.rental_id && oldIccid) {
+        const { data: oldInv } = await supabase
+          .from('inventory')
+          .select('id')
+          .eq('sim_number', oldIccid)
+          .maybeSingle();
+        if (oldInv) {
+          await supabase.from('rental_items')
+            .update({ inventory_item_id: newInventoryId })
+            .eq('rental_id', params.rental_id)
+            .eq('inventory_item_id', oldInv.id);
+        }
+      }
+
+      // Refresh data
+      await fetchSims();
+      toast({ title: '✅ החלפה הושלמה!', description: `הסים הוחלף בהצלחה ל-${params.swap_msisdn}` });
+      return result;
+    } catch (e: any) {
+      toast({ title: '❌ החלפה נכשלה', description: e.message, variant: 'destructive' });
+      throw e;
+    }
+  }, [swapSim, swapDialogSim, simCards, fetchSims, toast]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return simCards;
@@ -631,7 +677,7 @@ export default function CellStation() {
     );
   }, [simCards, search]);
 
-  const available = useMemo(() => filtered.filter(s => s.status === 'available' && !needsSwapIccids.has(s.iccid || '')), [filtered, needsSwapIccids]);
+  const available = useMemo(() => filtered.filter(s => s.status === 'available' && s.status_detail !== 'expired' && !needsSwapIccids.has(s.iccid || '')), [filtered, needsSwapIccids]);
   const expired = useMemo(() => filtered.filter(s => s.status === 'available' && s.status_detail === 'expired'), [filtered]);
   const rented = useMemo(() => filtered.filter(s => s.status === 'rented'), [filtered]);
   const expiringSoon = useMemo(() => simCards.filter(s => {
