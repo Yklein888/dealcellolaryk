@@ -61,8 +61,6 @@ function SyncStatusIndicator({ status, lastSyncTime, simCountDelta }: {
           ({simCountDelta > 0 ? '+' : ''}{simCountDelta})
         </span>
       )}
-      {simActionDialogSim && (<SimActionDialog sim={simActionDialogSim} isOpen={!!simActionDialogSim} onClose={() => setSimActionDialogSim(null)} onAction={handleSimAction} />)}
-      {quickRentalDialogSim && (<QuickRentalDialog sim={quickRentalDialogSim} isOpen={!!quickRentalDialogSim} onClose={() => setQuickRentalDialogSim(null)} onActivate={handleQuickActivate} onSuccess={() => { setQuickRentalDialogSim(null); fetchSims(); }} />)}
     </div>
   );
 }
@@ -943,6 +941,27 @@ export default function CellStation() {
           </>
         )}
       </Tabs>
+
+      {/* SimAction Dialog */}
+      {simActionDialogSim && (
+        <SimActionDialog
+          sim={simActionDialogSim}
+          isOpen={!!simActionDialogSim}
+          onClose={() => setSimActionDialogSim(null)}
+          onAction={handleSimAction}
+        />
+      )}
+
+      {/* Quick Rental Dialog */}
+      {quickRentalDialogSim && (
+        <QuickRentalDialog
+          sim={quickRentalDialogSim}
+          isOpen={!!quickRentalDialogSim}
+          onClose={() => setQuickRentalDialogSim(null)}
+          onActivate={handleQuickActivate}
+          onSuccess={() => { setQuickRentalDialogSim(null); fetchSims(); }}
+        />
+      )}
 
       {/* Quick Activate Dialog */}
       {quickActivateSim && (
