@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Sparkles, Zap, AlertCircle, CheckCircle } from 'lucide-react';
+import { Sparkles, Zap, AlertCircle } from 'lucide-react';
 import { Rental, Repair } from '@/types/rental';
 
 interface WelcomeBannerProps {
@@ -40,19 +40,6 @@ export const WelcomeBanner = memo(function WelcomeBanner({ overdueRentals, ready
                 ? `${readyRepairs.length} תיקונים מוכנים ומחכים לאיסוף`
                 : 'הכל תקין! אין פעולות דחופות כרגע'}
             </p>
-          </div>
-
-          <div className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm self-start sm:self-center ${
-            hasUrgent 
-              ? 'bg-destructive/10 text-destructive' 
-              : hasReady 
-              ? 'bg-warning/10 text-warning' 
-              : 'bg-success/10 text-success'
-          }`}>
-            <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
-            <span className="font-medium">
-              {hasUrgent ? 'דורש תשומת לב' : hasReady ? 'יש פעילות' : 'תקין'}
-            </span>
           </div>
         </div>
       </div>
