@@ -346,7 +346,7 @@ export default function Customers() {
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           placeholder="חיפוש לפי שם, טלפון או אימייל..."
-          className="pr-10"
+          className="h-12 rounded-xl border-border/70 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary shadow-sm pr-10"
         />
       </div>
 
@@ -419,7 +419,7 @@ export default function Customers() {
                 <Button 
                   variant="ghost" 
                   size="sm"
-                  className="text-destructive hover:text-destructive flex-1"
+                  className="flex-1 h-10 gap-1 text-destructive hover:bg-destructive/10 hover:border-destructive/30"
                   onClick={() => handleDelete(customer.id)}
                 >
                   <Trash2 className="h-4 w-4" />
