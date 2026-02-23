@@ -685,7 +685,7 @@ export default function Repairs() {
                 <div className="flex items-start gap-4">
                   {/* Prominent Repair Number Badge */}
                   <div className="flex flex-col items-center gap-1">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary text-primary-foreground font-bold text-xl shadow-lg">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-white font-bold text-xl shadow-lg">
                       {repair.repairNumber}
                     </div>
                   </div>
@@ -714,7 +714,7 @@ export default function Repairs() {
                   </div>
                 </div>
 
-                <div className="flex gap-2 md:flex-col">
+                <div className="grid grid-cols-2 sm:flex sm:flex-row sm:flex-wrap gap-2">
                   <Button 
                     variant="outline" 
                     size="sm"
