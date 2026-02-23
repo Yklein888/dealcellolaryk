@@ -31,7 +31,7 @@ import { he } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 
 export default function Customers() {
-  const { customers, addCustomer, updateCustomer, deleteCustomer, refreshData } = useRental();
+  const { customers, addCustomer, updateCustomer, deleteCustomer, refreshData, loading } = useRental();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
