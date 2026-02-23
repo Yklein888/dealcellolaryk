@@ -613,11 +613,11 @@ export default function Rentals() {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="חיפוש לפי שם לקוח או פריט..."
-            className="pr-10"
+            className="pr-10 h-12 rounded-xl border-border/70 focus-visible:ring-2 focus-visible:ring-primary/40 shadow-sm"
           />
         </div>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-full md:w-40">
+          <SelectTrigger className="w-full md:w-40 rounded-xl">
             <SelectValue placeholder="כל הסטטוסים" />
           </SelectTrigger>
           <SelectContent>
@@ -628,7 +628,7 @@ export default function Rentals() {
           </SelectContent>
         </Select>
         <Select value={filterCategory} onValueChange={setFilterCategory}>
-          <SelectTrigger className="w-full md:w-44">
+          <SelectTrigger className="w-full md:w-44 rounded-xl">
             <SelectValue placeholder="כל הקטגוריות" />
           </SelectTrigger>
           <SelectContent>
@@ -655,7 +655,7 @@ export default function Rentals() {
           {filteredRentals.map((rental, index) => (
             <div 
               key={rental.id}
-              className={`stat-card hover:border-primary/30 transition-all duration-200 p-5 flex flex-col min-h-[280px] border-r-4 ${
+              className={`stat-card hover:shadow-lg hover:border-primary/20 transition-all duration-200 p-5 flex flex-col min-h-[280px] border-r-4 ${
                 rental.status === 'active' ? 'border-r-primary' :
                 rental.status === 'overdue' ? 'border-r-destructive' :
                 'border-r-success'
