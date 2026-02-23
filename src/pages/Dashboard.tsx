@@ -187,7 +187,7 @@ export default function Dashboard() {
         </div>
       </PageHeader>
 
-      <WelcomeBanner overdueRentals={overdueRentals} readyRepairs={readyRepairs} />
+      <WelcomeBanner />
       <DashboardStatsGrid stats={stats} inventory={inventory} />
       <QuickStatsRow 
         rentals={rentals}
