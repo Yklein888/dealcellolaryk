@@ -51,9 +51,9 @@ const DialogContent = React.forwardRef<
           "fixed z-50 grid w-full gap-4 p-4 sm:p-6 shadow-2xl duration-300",
           "bg-white/95 backdrop-blur-xl border border-white/40",
           // Mobile: full-width bottom sheet style
-          "inset-x-0 bottom-0 rounded-t-3xl max-h-[90vh] overflow-y-auto",
+          "inset-x-0 bottom-0 rounded-t-3xl max-h-[92dvh] overflow-y-auto overscroll-contain",
           // Desktop: centered dialog
-          "sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-2xl sm:max-h-[85vh]",
+          "sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-2xl sm:max-h-[88vh]",
           sizeClasses[size],
           size === 'full' && 'sm:p-0 sm:max-h-[95vh]',
           "data-[state=open]:animate-in data-[state=closed]:animate-out",
