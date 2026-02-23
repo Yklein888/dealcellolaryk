@@ -14,22 +14,18 @@
 ### Hosting
 - **Platform**: Vercel
 - **Live URL**: https://dealcellolaryk.vercel.app
-- **Project**: dealcellolaryk
-- **Team**: yklein89-3235's projects
+- **Deploy**: אוטומטי עם כל push ל-main
 
-### Database - פרויקט אחד בלבד!
+### Database - Supabase יחיד!
+> ⚠️ יש רק פרויקט Supabase אחד: **hlswvjyegirbhoszrqyo**
 
-#### ⚠️ חשוב: יש פרויקט Supabase אחד בלבד
-- **Project**: Sim-manager
-- **Project ID**: hlswvjyegirbhoszrqyo
+#### Supabase (hlswvjyegirbhoszrqyo)
 - **URL**: https://hlswvjyegirbhoszrqyo.supabase.co
 - **Dashboard**: https://supabase.com/dashboard/project/hlswvjyegirbhoszrqyo
-- **טבלאות**: cellstation_sims (+ כל שאר הטבלאות של האפליקציה)
-- **Edge Function**: cellstation-api
-- **Secrets**: CELLSTATION_USERNAME, CELLSTATION_PASSWORD
-- **RLS על cellstation_sims**: מכובה (DISABLED) - חובה להשאיר כך!
-
-> ❌ הפרויקט qifcynwnxmtoxzpskmmt לא קיים (נמחק). לא לציין אותו בשום מקום.
+- **Anon Key**: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhsc3d2anllZ2lyYmhvc3pycXlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3OTg4MTAsImV4cCI6MjA4NjM3NDgxMH0.KNRl4-S-XxVMcaoPPQXV5gLi6W9yYNWeHqtMok-Mpg8`
+- **Service Role Key**: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhsc3d2anllZ2lyYmhvc3pycXlvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MDc5ODgxMCwiZXhwIjoyMDg2Mzc0ODEwfQ.C_0heApIB-wQvh2QM6-BqDakOyRcqiVhexuKAdwUrKI`
+- **טבלאות**: cellstation_sims (+ כל שאר הטבלאות של המערכת)
+- **Edge Function**: cellstation-api ✅ פעילה
 
 ---
 
@@ -37,84 +33,100 @@
 
 ### GitHub
 ```
-Token: [GITHUB_TOKEN_IN_SETTINGS]
+Token: ghp_xxxx... (שמור בנפרד - לא לשמור ב-GitHub\!)
 Owner: Yklein888
 Expires: March 22, 2026
 ```
 
 ### Vercel Environment Variables
 ```
-VITE_SUPABASE_URL=https://hlswvjyegirbhoszrqyo.supabase.co   ← לא בשימוש! client.ts hardcoded
-VITE_SUPABASE_ANON_KEY=[KEY_IN_VERCEL_ENV]
-```
-
-### Supabase Keys
-```
-Anon Key: [KEY_IN_VERCEL_ENV]
-
-Service Role Key: [KEY_IN_VERCEL_ENV]
+VITE_SUPABASE_URL=https://hlswvjyegirbhoszrqyo.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhsc3d2anllZ2lyYmhvc3pycXlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3OTg4MTAsImV4cCI6MjA4NjM3NDgxMH0.KNRl4-S-XxVMcaoPPQXV5gLi6W9yYNWeHqtMok-Mpg8
 ```
 
 ---
 
-## 🔧 ארכיטקטורת הקוד - קריטי!
+## ⚙️ cellstation-api Edge Function
 
-### src/integrations/supabase/client.ts
-```typescript
-// URL מקושח - לא תלוי ב-env vars
-const SUPABASE_URL = 'https://hlswvjyegirbhoszrqyo.supabase.co';
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-```
+### מה היא עושה
+הפונקציה מתחברת לפורטל CellStation (https://cellstation.co.il/portal) ומנהלת את כל הסימים:
 
-### src/hooks/useCellStation.tsx - fetch ישיר!
-```typescript
-// ⚠️ לא להחליף ב-createClient! יגרום ל-CORS ERR_FAILED
-const CS_URL = 'https://hlswvjyegirbhoszrqyo.supabase.co';
-const CS_KEY = '...anon key...';
-const CS_H = { 'apikey': CS_KEY, 'Authorization': `Bearer ${CS_KEY}` };          // ← ללא Content-Type (GET)
-const CS_H_JSON = { ...CS_H, 'Content-Type': 'application/json' };               // ← עם Content-Type (POST/PATCH)
+| Action | תיאור |
+|--------|-------|
+| `get_sims` | שליפת כל הסימים מה-DB (ללא login לפורטל) |
+| `sync_csv` | סנכרון מהפורטל → שולף CSV → שומר ב-DB |
+| `activate_sim` | הפעלת SIM חדש בפורטל |
+| `swap_sim` | החלפת SIM |
+| `activate_and_swap` | הפעלה + החלפה (עם המתנה 60 שניות ביניהם) |
+| `update_sim_status` | עדכון סטטוס SIM ב-DB |
 
-// GET - ללא Content-Type כדי למנוע CORS preflight
-async function csGet(path: string): Promise<any[]>
+### Secrets שמוגדרים ב-Supabase
+- `CELLSTATION_USERNAME` ✅
+- `CELLSTATION_PASSWORD` ✅
 
-// POST/PATCH/DELETE - עם Content-Type
-async function csInsert(table: string, rows: any[]): Promise<void>
-async function csUpdate(table: string, filter: string, data: any): Promise<void>
-async function csDelete(path: string): Promise<void>
-async function csInvoke(action: string, params: any): Promise<any>  // Edge Function
-```
-
-### ⚠️ כללי CORS קריטיים
-- **Content-Type בלי צורך → preflight OPTIONS → נכשל!**
-- ב-GET requests: **אסור** להוסיף `Content-Type: application/json`
-- ב-POST/PATCH: מותר כי הדפדפן שולח preflight שעובד
-
----
-
-## 🔄 Workflow
-
-### לעשות שינויים בקוד
+### איך לקרוא לפונקציה
 ```bash
-1. ערוך קבצים ב-src/
-2. git add -A
-3. git commit -m "תיאור השינוי"
-4. git push origin main
-5. Vercel יעשה deploy אוטומטי (1-2 דקות)
+curl -X POST https://hlswvjyegirbhoszrqyo.supabase.co/functions/v1/cellstation-api \
+  -H "Content-Type: application/json" \
+  -H "apikey: <ANON_KEY>" \
+  -d '{"action":"get_sims"}'
 ```
 
-### לשנות Database
-```
-1. Supabase Dashboard → Table Editor / SQL Editor
-2. ערוך או הרץ SQL
-3. שינויים מיידיים
+---
+
+## 🚨 כללי ברזל - Edge Functions ב-Supabase
+
+### ❌ אסור - קוד ישן שלא עובד
+```typescript
+// אסור! - import ישן מ-deno.land
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+
+// אסור! - esm.sh לא נתמך ב-runtime החדש
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+// אסור! - שימוש ב-serve() הישן
+serve(async (req) => { ... });
 ```
 
-### לעדכן Edge Functions
+### ✅ חובה - קוד נכון ל-runtime הנוכחי
+```typescript
+// נכון! - npm: specifier
+import { createClient } from "npm:@supabase/supabase-js@2";
+
+// נכון! - Deno.serve ישירות
+Deno.serve(async (req) => { ... });
 ```
-1. Supabase Dashboard → Edge Functions
-2. ערוך קוד
-3. Deploy
-4. פעיל תוך שניות
+
+> 💡 **למה?** Supabase עדכנו את ה-Deno runtime. הפקודה `serve` מ-deno.land/std
+> ו-imports מ-`esm.sh` גורמים ל-`BOOT_ERROR` בגרסאות חדשות.
+> תמיד להשתמש ב-`npm:` ו-`Deno.serve`.
+
+---
+
+## 🔄 איך לעדכן Edge Function
+
+### דרך Management API (מומלץ)
+```bash
+# 1. הכן את הקוד
+# 2. שלח PATCH עם body=קוד ו-verify_jwt=false
+
+curl -X PATCH \
+  "https://api.supabase.com/v1/projects/hlswvjyegirbhoszrqyo/functions/cellstation-api" \
+  -H "Authorization: Bearer <SUPABASE_PAT>" \
+  -H "Content-Type: application/json" \
+  -d '{"verify_jwt": false, "body": "<קוד TypeScript כ-string>"}'
+```
+
+### Supabase Personal Access Token (PAT)
+נשמר בצ'אט - לא לשתף. ניתן לצור ב: https://supabase.com/dashboard/account/tokens
+
+### לבדוק שהפונקציה עובדת אחרי עדכון
+```bash
+curl -X POST https://hlswvjyegirbhoszrqyo.supabase.co/functions/v1/cellstation-api \
+  -H "Content-Type: application/json" \
+  -H "apikey: <ANON_KEY>" \
+  -d '{"action":"get_sims"}'
+# צפוי: {"success":true,"sims":[...]} עם 29 סימים
 ```
 
 ---
@@ -124,42 +136,46 @@ async function csInvoke(action: string, params: any): Promise<any>  // Edge Func
 ```
 src/
 ├── pages/
-│   ├── Dashboard.tsx           # דף ראשי + Real-Time Sync
+│   ├── Dashboard.tsx           # דף ראשי
 │   ├── CellStation.tsx         # ניהול סימים
-│   ├── Rentals.tsx
 │   └── ...
 ├── hooks/
-│   ├── useCellStation.tsx      # ⚠️ fetch ישיר - לא createClient!
-│   ├── useRental.tsx
+│   ├── useCellStation.tsx      # Logic CellStation - קורא ל-Edge Function
 │   └── ...
-├── components/
-│   ├── cellstation/
-│   ├── dashboard/
-│   └── ...
-└── integrations/
-    └── supabase/
-        └── client.ts           # URL מקושח ל-hlswvjyegirbhoszrqyo
+├── integrations/
+│   └── supabase/
+│       └── client.ts           # hardcoded URL ל-hlswvjyegirbhoszrqyo
 
 supabase/functions/
 └── cellstation-api/
-    └── index.ts               # Edge Function - login ל-CellStation portal
+    └── index.ts               # ✅ מעודכן - npm: + Deno.serve
 ```
 
 ---
 
-## ✅ Features מיושמים
+## 🔄 Workflow
 
-- ✅ מערכת השכרות מלאה
-- ✅ ניהול לקוחות ומלאי
-- ✅ תיקונים ותשלומים
-- ✅ Real-Time Sync (Dashboard)
-- ✅ אינטגרציה עם Pelecard
-- ✅ אינטגרציה עם Yemot
-- ✅ יצירת חשבוניות
-- ✅ CellStation Sync - עובד! (fetch ישיר, RLS מכובה)
+### לעשות שינויים בקוד
+```
+1. ערוך קבצים דרך GitHub API
+2. Vercel עושה deploy אוטומטי (1-2 דקות)
+3. בדוק ב: https://dealcellolaryk.vercel.app
+```
+
+### לעדכן Edge Function
+```
+1. ערוך supabase/functions/cellstation-api/index.ts ב-GitHub
+2. שלח PATCH ל-Supabase Management API
+3. בדוק עם curl
+```
 
 ---
 
-## 📞 תמיכה
+## ✅ סטטוס נוכחי (פברואר 2026)
 
-שאלות? פתח צ'אט חדש עם Claude עם הקישור למסמך הזה!
+- ✅ מערכת השכרות מלאה
+- ✅ ניהול לקוחות ומלאי
+- ✅ cellstation-api פעילה ועובדת (גרסה 17)
+- ✅ סנכרון 29 סימים מ-CellStation
+- ✅ Real-Time Sync
+- ✅ אינטגרציה Pelecard, Yemot
