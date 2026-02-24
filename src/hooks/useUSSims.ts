@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { simManagerClient } from '@/integrations/supabase/simManagerClient';
+import { supabase } from '@/integrations/supabase/client';
 import { USSim, USSimStatus } from '@/types/rental';
 
 type SimRow = {
@@ -34,38 +35,88 @@ function mapSim(row: SimRow): USSim {
   };
 }
 
+function buildStatusChangeMessage(
+  sim: USSim,
+  oldStatus: USSimStatus,
+  newStatus: USSimStatus
+): string {
+  if (newStatus === 'activating') {
+    return `🔄 סים ${sim.simCompany} החל בהפעלה\nממתין למספרים...`;
+  }
+  if (newStatus === 'active') {
+    return `✅ סים ${sim.simCompany} הופעל בהצלחה!\n📱 מספר מקומי: ${sim.localNumber || 'לא מוגדר'}\n🇮🇱 מספר ישראלי: ${sim.israeliNumber || 'לא הוגדר'}\nתוקף: ${sim.expiryDate || 'לא מוגדר'}`;
+  }
+  if (newStatus === 'returned') {
+    return `🔙 סים ${sim.simCompany} הוחזר למלאי`;
+  }
+  return `📱 סים ${sim.simCompany}: ${newStatus}`;
+}
+
 export function useUSSims() {
   const [sims, setSims] = useState<USSim[]>([]);
   const [loading, setLoading] = useState(true);
   const [activatorToken, setActivatorToken] = useState<string | null>(null);
+  const [whatsappContact, setWhatsappContact] = useState<string | null>(null);
+  const previousSimsRef = useRef<USSim[]>([]);
 
   const fetchSims = useCallback(async (token?: string) => {
     const t = token ?? activatorToken;
     if (!t) return;
     const { data, error } = await simManagerClient.rpc('get_sims_by_token', { p_token: t });
     if (!error && data) {
-      setSims((data as SimRow[]).map(mapSim));
+      const newSims = (data as SimRow[]).map(mapSim);
+
+      // Detect status changes and send WhatsApp notifications
+      if (whatsappContact && previousSimsRef.current.length > 0) {
+        for (const newSim of newSims) {
+          const oldSim = previousSimsRef.current.find(s => s.id === newSim.id);
+          if (oldSim && oldSim.status !== newSim.status) {
+            // Status changed - send WhatsApp notification
+            try {
+              const message = buildStatusChangeMessage(newSim, oldSim.status, newSim.status);
+              await supabase.functions.invoke('send-whatsapp-notification', {
+                body: {
+                  phone: whatsappContact,
+                  message: message,
+                },
+              });
+            } catch (err) {
+              console.warn('Failed to send WhatsApp notification:', err);
+            }
+          }
+        }
+      }
+
+      previousSimsRef.current = newSims;
+      setSims(newSims);
     }
-  }, [activatorToken]);
+  }, [activatorToken, whatsappContact]);
 
   useEffect(() => {
     let mounted = true;
 
     const init = async () => {
-      // Load token (anon can read app_settings due to anon_read_settings policy)
-      const { data: setting } = await simManagerClient
+      // Load token and WhatsApp contact (anon can read app_settings)
+      const { data: settings } = await simManagerClient
         .from('app_settings')
-        .select('value')
-        .eq('key', 'us_activator_token')
-        .single();
+        .select('key, value');
 
       if (!mounted) return;
 
-      if (setting) {
-        setActivatorToken(setting.value);
-        const { data, error } = await simManagerClient.rpc('get_sims_by_token', { p_token: setting.value });
+      const tokenSetting = settings?.find(s => s.key === 'us_activator_token');
+      const whatsappSetting = settings?.find(s => s.key === 'us_activator_whatsapp');
+
+      if (tokenSetting?.value) {
+        setActivatorToken(tokenSetting.value);
+        if (whatsappSetting?.value) {
+          setWhatsappContact(whatsappSetting.value);
+        }
+
+        const { data, error } = await simManagerClient.rpc('get_sims_by_token', { p_token: tokenSetting.value });
         if (mounted && !error && data) {
-          setSims((data as SimRow[]).map(mapSim));
+          const mappedSims = (data as SimRow[]).map(mapSim);
+          setSims(mappedSims);
+          previousSimsRef.current = mappedSims;
         }
       }
       if (mounted) setLoading(false);
