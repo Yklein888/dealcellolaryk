@@ -186,5 +186,14 @@ export function useUSSims() {
     return { error: error ?? (result?.error ? new Error(result.error) : null), newExpiry: result?.new_expiry };
   }, [activatorToken, fetchSims]);
 
-  return { sims, loading, activatorToken, addSim, deleteSim, markReturned, renewSim };
+  const updateWhatsappContact = useCallback(async (phone: string) => {
+    const { error } = await simManagerClient
+      .from('app_settings')
+      .update({ value: phone })
+      .eq('key', 'us_activator_whatsapp');
+    if (!error) setWhatsappContact(phone);
+    return { error };
+  }, []);
+
+  return { sims, loading, activatorToken, whatsappContact, addSim, deleteSim, markReturned, renewSim, updateWhatsappContact };
 }

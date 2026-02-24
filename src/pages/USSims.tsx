@@ -21,7 +21,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { USSimStatus, USSim, USSimPackage, PACKAGE_LABELS } from '@/types/rental';
-import { Plus, Copy, Link2, Trash2, CheckCircle, Globe, RotateCw } from 'lucide-react';
+import { Plus, Copy, Link2, Trash2, CheckCircle, Globe, RotateCw, Settings, MessageCircle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
 const US_COMPANIES = [
@@ -51,10 +51,12 @@ const statusLabels: Record<USSimStatus, string> = {
 };
 
 export default function USSims() {
-  const { sims, loading, activatorToken, addSim, deleteSim, markReturned, renewSim } = useUSSims();
+  const { sims, loading, activatorToken, whatsappContact, addSim, deleteSim, markReturned, renewSim, updateWhatsappContact } = useUSSims();
   const { toast } = useToast();
 
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsWhatsapp, setSettingsWhatsapp] = useState('');
   const [newCompany, setNewCompany] = useState('T-Mobile');
   const [newSimNumber, setNewSimNumber] = useState('');
   const [newPackage, setNewPackage] = useState<USSimPackage>('calls_only');
@@ -140,6 +142,16 @@ export default function USSims() {
     }
   };
 
+  const handleSaveSettings = async () => {
+    const { error } = await updateWhatsappContact(settingsWhatsapp);
+    if (error) {
+      toast({ title: 'שגיאה', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: '✅ נשמר', description: 'מספר הוואטסאפ עודכן' });
+      setIsSettingsOpen(false);
+    }
+  };
+
   const pendingCount    = sims.filter(s => s.status === 'pending').length;
   const activatingCount = sims.filter(s => s.status === 'activating').length;
   const activeCount     = sims.filter(s => s.status === 'active').length;
@@ -155,6 +167,14 @@ export default function USSims() {
   return (
     <div>
       <PageHeader title='סימים ארה"ב' description="ניהול סימים אמריקאים לשליחה ולהפעלה">
+        <Button
+          variant="outline"
+          onClick={() => { setSettingsWhatsapp(whatsappContact ?? ''); setIsSettingsOpen(true); }}
+          className="gap-2"
+        >
+          <Settings className="h-4 w-4" />
+          הגדרות
+        </Button>
         <Button variant="glow" onClick={() => setIsAddOpen(true)} className="gap-2">
           <Plus className="h-4 w-4" />
           הוסף סים
@@ -344,6 +364,46 @@ export default function USSims() {
             <Button variant="outline" onClick={() => setIsAddOpen(false)}>ביטול</Button>
             <Button variant="glow" onClick={handleAdd} disabled={isSaving || !newCompany}>
               {isSaving ? 'שומר...' : 'הוסף'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Settings Dialog */}
+      <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageCircle className="h-5 w-5 text-green-500" />
+              הגדרות התראות WhatsApp
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              הגדר את מספר הוואטסאפ שאליו יישלחו התראות אוטומטיות כאשר סים משנה סטטוס (הפעלה, החזרה וכו׳).
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="whatsapp-contact">מספר וואטסאפ</Label>
+              <Input
+                id="whatsapp-contact"
+                dir="ltr"
+                placeholder="+1-555-000-0000"
+                value={settingsWhatsapp}
+                onChange={e => setSettingsWhatsapp(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">כולל קידומת מדינה, לדוגמה: +1-555-000-0000</p>
+            </div>
+            {whatsappContact && (
+              <div className="flex items-center gap-2 p-2 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 text-sm">
+                <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
+                <span>מספר נוכחי: <span dir="ltr" className="font-mono">{whatsappContact}</span></span>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsSettingsOpen(false)}>ביטול</Button>
+            <Button variant="glow" onClick={handleSaveSettings} disabled={!settingsWhatsapp}>
+              שמור
             </Button>
           </DialogFooter>
         </DialogContent>
