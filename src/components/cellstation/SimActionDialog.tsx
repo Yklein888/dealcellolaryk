@@ -45,7 +45,7 @@ const ACTION_LIST: ActionItem[] = [
   },
   {
     key: 'activate_and_swap',
-    title: 'החלפה והפעלה',
+    title: 'הפעלה והחלפה',
     description: 'הפעל סים חדש והחלף ישן קיים',
     border: 'border-orange-200 hover:border-orange-400 hover:bg-orange-50/60',
     iconBg: 'bg-orange-100',

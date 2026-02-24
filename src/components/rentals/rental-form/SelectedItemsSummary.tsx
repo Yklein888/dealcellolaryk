@@ -107,7 +107,7 @@ export function SelectedItemsSummary({
                       <Label className="text-xs">+ מכשיר (₪5/יום)</Label>
                     </div>
                   )}
-                  {isEuropeanSimFromInventory && inventoryItem && (
+                  {item.category === 'sim_european' && inventoryItem && (inventoryItem.localNumber || inventoryItem.israeliNumber) && (
                     <Button
                       type="button"
                       variant="ghost"
@@ -120,6 +120,7 @@ export function SelectedItemsSummary({
                         inventoryItem.barcode || undefined
                       )}
                       className="h-7 w-7 p-0"
+                      title="הדפס הוראות חיוג"
                     >
                       {downloadingInstructions === item.inventoryItemId ? (
                         <Loader2 className="h-4 w-4 animate-spin" />

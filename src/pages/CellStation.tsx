@@ -202,7 +202,7 @@ function SimCard({ sim, showCustomer, showSwap, showActionButton, needsSwapIccid
           )}
           {!needsSwap && isOverdue && onActivateAndSwapClick && (
             <Button size="sm" variant="outline" onClick={() => onActivateAndSwapClick(sim)} className="gap-1 text-xs h-7 border-orange-400 text-orange-700 hover:bg-orange-50">
-              <ArrowLeftRight className="h-3 w-3" /> החלפה והפעלה
+              <ArrowLeftRight className="h-3 w-3" /> הפעלה והחלפה
             </Button>
           )}
         </div>
@@ -289,7 +289,7 @@ function SimTable({ sims, showCustomer, showSwap, inventoryMap, onSwapClick, onA
                         )}
                         {!needsSwap && isOverdue && onActivateAndSwapClick && (
                           <Button size="sm" variant="outline" onClick={() => onActivateAndSwapClick(sim)} className="gap-1 text-xs border-orange-400 text-orange-700 hover:bg-orange-50">
-                            <ArrowLeftRight className="h-3 w-3" /> החלפה והפעלה
+                            <ArrowLeftRight className="h-3 w-3" /> הפעלה והחלפה
                           </Button>
                         )}
                       </div>
