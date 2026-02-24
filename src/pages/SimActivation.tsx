@@ -154,49 +154,43 @@ export default function SimActivation() {
               {sims.map(sim => (
                 <div key={sim.id} className="stat-card">
                   <div className="relative z-10">
-                    {/* SIM Info Header - Prominent */}
-                    <div className="bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 rounded-lg p-4 mb-4">
-                      <div className="flex items-start justify-between mb-3">
+                    {/* SIM Info Header - Compact */}
+                    <div className="bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 rounded-lg p-3 mb-3">
+                      <div className="flex items-start justify-between mb-2">
                         <div>
-                          <h3 className="font-bold text-xl text-foreground">{sim.sim_company}</h3>
-                          <p className="text-xs text-muted-foreground mt-1">חברת תקשורת</p>
+                          <h3 className="font-bold text-lg text-foreground">{sim.sim_company}</h3>
                         </div>
-                        <span className={`text-xs font-medium px-3 py-1.5 rounded-full ${statusColors[sim.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${statusColors[sim.status] ?? 'bg-gray-100 text-gray-600'}`}>
                           {statusLabels[sim.status] ?? sim.status}
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                         {sim.sim_number && (
-                          <div className="bg-muted/30 rounded p-2.5">
-                            <p className="text-xs text-muted-foreground mb-1">מספר סים (ICCID)</p>
-                            <p className="font-mono text-sm font-bold text-foreground break-all">{sim.sim_number}</p>
+                          <div>
+                            <p className="text-muted-foreground">ICCID</p>
+                            <p className="font-mono font-bold text-foreground truncate">{sim.sim_number.slice(0, 12)}...</p>
                           </div>
                         )}
                         {sim.package && (
-                          <div className="bg-muted/30 rounded p-2.5">
-                            <p className="text-xs text-muted-foreground mb-1">סוג חבילה</p>
-                            <p className="font-bold text-sm text-foreground">{sim.package}</p>
+                          <div>
+                            <p className="text-muted-foreground">חבילה</p>
+                            <p className="font-bold text-foreground">{sim.package}</p>
                           </div>
                         )}
                         {sim.price_per_day && (
-                          <div className="bg-muted/30 rounded p-2.5">
-                            <p className="text-xs text-muted-foreground mb-1">מחיר ליום</p>
-                            <p className="font-bold text-sm text-foreground">${sim.price_per_day.toFixed(2)}</p>
+                          <div>
+                            <p className="text-muted-foreground">מחיר</p>
+                            <p className="font-bold text-foreground">${sim.price_per_day.toFixed(2)}</p>
                           </div>
                         )}
                         {sim.notes && (
-                          <div className="bg-muted/30 rounded p-2.5">
-                            <p className="text-xs text-muted-foreground mb-1">הערות</p>
-                            <p className="text-sm text-foreground">{sim.notes}</p>
+                          <div>
+                            <p className="text-muted-foreground">הערות</p>
+                            <p className="text-foreground truncate">{sim.notes}</p>
                           </div>
                         )}
                       </div>
-                    </div>
-
-                    {/* Editable fields */}
-                    <div className="mb-4">
-                      <p className="text-sm font-semibold text-foreground mb-3">עדכן את הפרטים:</p>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
                       <div className="space-y-1.5">

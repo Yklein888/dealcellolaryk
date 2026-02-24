@@ -129,34 +129,16 @@ export default function USSims() {
         </Button>
       </PageHeader>
 
-      {/* Activation Link Card */}
-      <div className="stat-card mb-6">
-        <div className="relative z-10">
-          <div className="flex items-center gap-2 mb-2">
-            <Globe className="h-5 w-5 text-primary" />
-            <h3 className="font-semibold text-foreground">קישור הפעלה לשותף בארה"ב</h3>
-          </div>
-          <p className="text-sm text-muted-foreground mb-3">
-            שלח קישור זה לאיש הקשר שלך. הוא יוכל לעדכן מספרים ותאריכי תפוגה ללא התחברות.
-          </p>
-          {activationUrl ? (
-            <div className="flex gap-2">
-              <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border text-sm font-mono text-muted-foreground overflow-hidden">
-                <Link2 className="h-4 w-4 shrink-0 text-primary" />
-                <span className="truncate">{activationUrl}</span>
-              </div>
-              <Button variant="outline" onClick={copyLink} className="gap-2 shrink-0">
-                <Copy className="h-4 w-4" />
-                העתק
-              </Button>
-            </div>
-          ) : (
-            <p className="text-sm text-destructive">לא נמצא טוקן — ודא שהרצת את ה-SQL migration בסופאבייס</p>
-          )}
+      {/* Quick Link Button */}
+      {activationUrl && (
+        <div className="mb-6 flex gap-2">
+          <Button variant="outline" onClick={copyLink} className="gap-2">
+            <Copy className="h-4 w-4" />
+            העתק קישור הפעלה
+          </Button>
+          <p className="text-xs text-muted-foreground self-center">שלח לשותף בארה"ב</p>
         </div>
-        <div className="stat-shimmer" />
-        <div className="stat-bar" />
-      </div>
+      )}
 
       {/* Stats Row */}
       <div className="grid grid-cols-3 gap-4 mb-6">
