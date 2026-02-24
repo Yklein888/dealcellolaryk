@@ -18,9 +18,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { USSimStatus } from '@/types/rental';
-import { Plus, Copy, Link2, Trash2, CheckCircle, Globe } from 'lucide-react';
+import { USSimStatus, USSim } from '@/types/rental';
+import { Plus, Copy, Link2, Trash2, CheckCircle, Globe, RotateCw } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
 const US_COMPANIES = [
@@ -50,7 +51,7 @@ const statusLabels: Record<USSimStatus, string> = {
 };
 
 export default function USSims() {
-  const { sims, loading, activatorToken, addSim, deleteSim, markReturned } = useUSSims();
+  const { sims, loading, activatorToken, addSim, deleteSim, markReturned, renewSim } = useUSSims();
   const { toast } = useToast();
 
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -60,6 +61,14 @@ export default function USSims() {
   const [newPrice, setNewPrice] = useState('');
   const [newNotes, setNewNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+
+  // Renewal dialog state
+  const [isRenewOpen, setIsRenewOpen] = useState(false);
+  const [renewSimId, setRenewSimId] = useState<string | null>(null);
+  const [renewContact, setRenewContact] = useState('');
+  const [renewMethod, setRenewMethod] = useState<'whatsapp' | 'email' | 'none'>('whatsapp');
+  const [renewIncludesIsraeli, setRenewIncludesIsraeli] = useState(false);
+  const [isRenewSaving, setIsRenewSaving] = useState(false);
 
   const activationUrl = activatorToken
     ? `${window.location.origin}/activate/${activatorToken}`
@@ -105,6 +114,40 @@ export default function USSims() {
       toast({ title: 'שגיאה', description: error.message, variant: 'destructive' });
     } else {
       toast({ title: 'עודכן', description: `${company} סומן כהוחזר` });
+    }
+  };
+
+  const openRenewDialog = (simId: string) => {
+    setRenewSimId(simId);
+    setRenewContact('');
+    setRenewMethod('whatsapp');
+    setRenewIncludesIsraeli(false);
+    setIsRenewOpen(true);
+  };
+
+  const handleRenew = async () => {
+    if (!renewSimId) return;
+    if (renewMethod !== 'none' && !renewContact) {
+      toast({ title: 'שגיאה', description: 'יש להזין איש קשר' });
+      return;
+    }
+
+    setIsRenewSaving(true);
+    const { error } = await renewSim(
+      renewSimId,
+      1, // hardcoded to 1 month as per user requirement
+      renewMethod !== 'none' ? renewContact : undefined,
+      renewMethod !== 'none' ? renewMethod : undefined,
+      renewIncludesIsraeli
+    );
+    setIsRenewSaving(false);
+
+    if (error) {
+      toast({ title: 'שגיאה', description: error.message, variant: 'destructive' });
+    } else {
+      const sim = sims.find(s => s.id === renewSimId);
+      toast({ title: 'הורחק', description: `${sim?.simCompany} הורחק לחודש נוסף` });
+      setIsRenewOpen(false);
     }
   };
 
@@ -209,6 +252,17 @@ export default function USSims() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1 justify-end">
+                        {sim.status === 'active' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-primary"
+                            title="הארך לחודש נוסף"
+                            onClick={() => openRenewDialog(sim.id)}
+                          >
+                            <RotateCw className="h-4 w-4" />
+                          </Button>
+                        )}
                         {sim.status !== 'returned' && (
                           <Button
                             variant="ghost"
@@ -301,6 +355,86 @@ export default function USSims() {
             <Button variant="outline" onClick={() => setIsAddOpen(false)}>ביטול</Button>
             <Button variant="glow" onClick={handleAdd} disabled={isSaving || !newCompany}>
               {isSaving ? 'שומר...' : 'הוסף'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Renew SIM Dialog */}
+      <Dialog open={isRenewOpen} onOpenChange={setIsRenewOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>הארך סים לחודש נוסף</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>דרך התנעה</Label>
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2 space-x-reverse">
+                  <input
+                    type="radio"
+                    id="whatsapp"
+                    value="whatsapp"
+                    checked={renewMethod === 'whatsapp'}
+                    onChange={() => setRenewMethod('whatsapp')}
+                    className="w-4 h-4"
+                  />
+                  <Label htmlFor="whatsapp" className="font-normal cursor-pointer">WhatsApp</Label>
+                </div>
+                <div className="flex items-center space-x-2 space-x-reverse">
+                  <input
+                    type="radio"
+                    id="email"
+                    value="email"
+                    checked={renewMethod === 'email'}
+                    onChange={() => setRenewMethod('email')}
+                    className="w-4 h-4"
+                  />
+                  <Label htmlFor="email" className="font-normal cursor-pointer">דוא״ל</Label>
+                </div>
+                <div className="flex items-center space-x-2 space-x-reverse">
+                  <input
+                    type="radio"
+                    id="none"
+                    value="none"
+                    checked={renewMethod === 'none'}
+                    onChange={() => setRenewMethod('none')}
+                    className="w-4 h-4"
+                  />
+                  <Label htmlFor="none" className="font-normal cursor-pointer">ללא הודעה</Label>
+                </div>
+              </div>
+            </div>
+
+            {renewMethod !== 'none' && (
+              <div className="space-y-1.5">
+                <Label>
+                  {renewMethod === 'whatsapp' ? 'מספר WhatsApp' : 'כתובת דוא״ל'}
+                </Label>
+                <Input
+                  placeholder={renewMethod === 'whatsapp' ? '+972501234567' : 'example@example.com'}
+                  value={renewContact}
+                  onChange={e => setRenewContact(e.target.value)}
+                  dir={renewMethod === 'whatsapp' ? 'ltr' : 'auto'}
+                />
+              </div>
+            )}
+
+            <div className="flex items-center space-x-2 space-x-reverse">
+              <Checkbox
+                id="includes-israeli"
+                checked={renewIncludesIsraeli}
+                onCheckedChange={(checked) => setRenewIncludesIsraeli(checked as boolean)}
+              />
+              <Label htmlFor="includes-israeli" className="font-normal cursor-pointer">
+                כולל מספר ישראלי חדש
+              </Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRenewOpen(false)}>ביטול</Button>
+            <Button variant="glow" onClick={handleRenew} disabled={isRenewSaving || (renewMethod !== 'none' && !renewContact)}>
+              {isRenewSaving ? 'מעדכן...' : 'הארך לחודש נוסף'}
             </Button>
           </DialogFooter>
         </DialogContent>
