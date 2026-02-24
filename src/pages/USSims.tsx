@@ -27,6 +27,8 @@ const US_COMPANIES = [
   'T-Mobile',
   'AT&T',
   'Verizon',
+  'Ultra Mobile',
+  'H2O Wireless',
   'Mint Mobile',
   'Cricket',
   'Boost Mobile',
@@ -53,6 +55,7 @@ export default function USSims() {
 
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newCompany, setNewCompany] = useState('T-Mobile');
+  const [newSimNumber, setNewSimNumber] = useState('');
   const [newPackage, setNewPackage] = useState('');
   const [newNotes, setNewNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -70,7 +73,7 @@ export default function USSims() {
   const handleAdd = async () => {
     if (!newCompany) return;
     setIsSaving(true);
-    const { error } = await addSim(newCompany, newPackage || undefined, newNotes || undefined);
+    const { error } = await addSim(newCompany, newSimNumber || undefined, newPackage || undefined, newNotes || undefined);
     setIsSaving(false);
     if (error) {
       toast({ title: 'שגיאה', description: error.message, variant: 'destructive' });
@@ -78,6 +81,7 @@ export default function USSims() {
       toast({ title: 'הסים נוסף', description: `${newCompany} נוסף למערכת` });
       setIsAddOpen(false);
       setNewCompany('T-Mobile');
+      setNewSimNumber('');
       setNewPackage('');
       setNewNotes('');
     }
@@ -176,6 +180,7 @@ export default function USSims() {
             <thead>
               <tr className="border-b border-border/50">
                 <th className="text-right px-4 py-3 text-muted-foreground font-medium">חברה</th>
+                <th className="text-right px-4 py-3 text-muted-foreground font-medium">מספר סים</th>
                 <th className="text-right px-4 py-3 text-muted-foreground font-medium">חבילה</th>
                 <th className="text-right px-4 py-3 text-muted-foreground font-medium">מספר מקומי</th>
                 <th className="text-right px-4 py-3 text-muted-foreground font-medium">מספר ישראלי</th>
@@ -187,7 +192,7 @@ export default function USSims() {
             <tbody>
               {sims.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-16 text-muted-foreground">
+                  <td colSpan={8} className="text-center py-16 text-muted-foreground">
                     אין סימים. לחץ "הוסף סים" כדי להתחיל.
                   </td>
                 </tr>
@@ -195,6 +200,9 @@ export default function USSims() {
                 sims.map((sim) => (
                   <tr key={sim.id} className="border-b border-border/30 hover:bg-muted/20 transition-colors">
                     <td className="px-4 py-3 font-medium">{sim.simCompany}</td>
+                    <td className="px-4 py-3 font-mono text-sm text-muted-foreground" dir="ltr">
+                      {sim.simNumber || '—'}
+                    </td>
                     <td className="px-4 py-3 text-muted-foreground">{sim.package || '—'}</td>
                     <td className="px-4 py-3 font-mono text-sm" dir="ltr">
                       {sim.localNumber || <span className="text-muted-foreground">—</span>}
@@ -262,6 +270,15 @@ export default function USSims() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>מספר סים (אופציונלי)</Label>
+              <Input
+                placeholder='לדוגמה: 89014104...'
+                value={newSimNumber}
+                onChange={e => setNewSimNumber(e.target.value)}
+                dir="ltr"
+              />
             </div>
             <div className="space-y-1.5">
               <Label>חבילה (אופציונלי)</Label>

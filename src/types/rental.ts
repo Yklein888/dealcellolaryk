@@ -173,6 +173,7 @@ export type USSimStatus = 'pending' | 'activating' | 'active' | 'returned';
 export interface USSim {
   id: string;
   simCompany: string;
+  simNumber?: string;
   package?: string;
   localNumber?: string;
   israeliNumber?: string;

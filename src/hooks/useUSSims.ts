@@ -5,6 +5,7 @@ import { USSim, USSimStatus } from '@/types/rental';
 type SimRow = {
   id: string;
   sim_company: string;
+  sim_number: string | null;
   package: string | null;
   local_number: string | null;
   israeli_number: string | null;
@@ -19,6 +20,7 @@ function mapSim(row: SimRow): USSim {
   return {
     id: row.id,
     simCompany: row.sim_company,
+    simNumber: row.sim_number ?? undefined,
     package: row.package ?? undefined,
     localNumber: row.local_number ?? undefined,
     israeliNumber: row.israeli_number ?? undefined,
@@ -83,11 +85,12 @@ export function useUSSims() {
     return () => { simManagerClient.removeChannel(channel); };
   }, [activatorToken, fetchSims]);
 
-  const addSim = useCallback(async (simCompany: string, pkg?: string, notes?: string) => {
+  const addSim = useCallback(async (simCompany: string, simNumber?: string, pkg?: string, notes?: string) => {
     if (!activatorToken) return { error: new Error('No token') };
     const { data, error } = await simManagerClient.rpc('add_sim_by_token', {
       p_token: activatorToken,
       p_company: simCompany,
+      p_sim_number: simNumber || null,
       p_package: pkg || null,
       p_notes: notes || null,
     });
