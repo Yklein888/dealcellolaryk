@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { simManagerClient } from '@/integrations/supabase/simManagerClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -45,7 +45,7 @@ export default function SimActivation() {
 
   const fetchSims = useCallback(async () => {
     if (!token) return;
-    const { data, error } = await supabase.rpc('get_sims_by_token', { p_token: token });
+    const { data, error } = await simManagerClient.rpc('get_sims_by_token', { p_token: token });
     if (error) {
       setTokenInvalid(true);
     } else {
@@ -79,7 +79,7 @@ export default function SimActivation() {
     const pIsraeli  = e?.israeli  || sim.israeli_number  || null;
     const pExpiry   = e?.expiry   || sim.expiry_date     || null;
 
-    const { data, error } = await supabase.rpc('update_sim_activation', {
+    const { data, error } = await simManagerClient.rpc('update_sim_activation', {
       p_id:      sim.id,
       p_token:   token,
       p_local:   pLocal,
