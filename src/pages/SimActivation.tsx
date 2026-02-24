@@ -11,6 +11,7 @@ import { Globe, AlertCircle, CheckCircle } from 'lucide-react';
 interface SimRow {
   id: string;
   sim_company: string;
+  sim_number: string | null;
   package: string | null;
   local_number: string | null;
   israeli_number: string | null;
@@ -156,8 +157,9 @@ export default function SimActivation() {
                     <div className="flex items-start justify-between mb-4">
                       <div>
                         <h3 className="font-bold text-lg text-foreground">{sim.sim_company}</h3>
-                        {sim.package && <p className="text-sm text-muted-foreground">{sim.package}</p>}
-                        {sim.notes   && <p className="text-xs text-muted-foreground mt-0.5">{sim.notes}</p>}
+                        {sim.package && <p className="text-sm text-muted-foreground">חבילה: {sim.package}</p>}
+                        {sim.sim_number && <p className="text-xs text-muted-foreground font-mono mt-0.5">מס' סים: {sim.sim_number}</p>}
+                        {sim.notes   && <p className="text-xs text-muted-foreground mt-0.5">הערות: {sim.notes}</p>}
                       </div>
                       <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${statusColors[sim.status] ?? 'bg-gray-100 text-gray-600'}`}>
                         {statusLabels[sim.status] ?? sim.status}
