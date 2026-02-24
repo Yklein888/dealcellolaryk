@@ -153,20 +153,44 @@ export default function SimActivation() {
               {sims.map(sim => (
                 <div key={sim.id} className="stat-card">
                   <div className="relative z-10">
-                    {/* SIM header */}
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h3 className="font-bold text-lg text-foreground">{sim.sim_company}</h3>
-                        {sim.package && <p className="text-sm text-muted-foreground">חבילה: {sim.package}</p>}
-                        {sim.sim_number && <p className="text-xs text-muted-foreground font-mono mt-0.5">מס' סים: {sim.sim_number}</p>}
-                        {sim.notes   && <p className="text-xs text-muted-foreground mt-0.5">הערות: {sim.notes}</p>}
+                    {/* SIM Info Header - Prominent */}
+                    <div className="bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 rounded-lg p-4 mb-4">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <h3 className="font-bold text-xl text-foreground">{sim.sim_company}</h3>
+                          <p className="text-xs text-muted-foreground mt-1">חברת תקשורת</p>
+                        </div>
+                        <span className={`text-xs font-medium px-3 py-1.5 rounded-full ${statusColors[sim.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                          {statusLabels[sim.status] ?? sim.status}
+                        </span>
                       </div>
-                      <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${statusColors[sim.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                        {statusLabels[sim.status] ?? sim.status}
-                      </span>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        {sim.sim_number && (
+                          <div className="bg-muted/30 rounded p-2.5">
+                            <p className="text-xs text-muted-foreground mb-1">מספר סים (ICCID)</p>
+                            <p className="font-mono text-sm font-bold text-foreground break-all">{sim.sim_number}</p>
+                          </div>
+                        )}
+                        {sim.package && (
+                          <div className="bg-muted/30 rounded p-2.5">
+                            <p className="text-xs text-muted-foreground mb-1">סוג חבילה</p>
+                            <p className="font-bold text-sm text-foreground">{sim.package}</p>
+                          </div>
+                        )}
+                        {sim.notes && (
+                          <div className="bg-muted/30 rounded p-2.5">
+                            <p className="text-xs text-muted-foreground mb-1">הערות</p>
+                            <p className="text-sm text-foreground">{sim.notes}</p>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Editable fields */}
+                    <div className="mb-4">
+                      <p className="text-sm font-semibold text-foreground mb-3">עדכן את הפרטים:</p>
+                    </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
                       <div className="space-y-1.5">
                         <Label className="text-xs">מספר מקומי (US)</Label>
