@@ -125,7 +125,7 @@ export function ActivateAndSwapDialog({
         .insert({ name, phone: newCustomerPhone.trim() || null })
         .select('id, name, phone').single();
       if (error) throw new Error(error.message);
-      const newC = data as Customer;
+      const newC = data as unknown as Customer;
       setSelectedCustomer(newC);
       setSearchTerm(newC.name); setManualName(newC.name);
       setShowAddCustomer(false); setNewCustomerPhone(''); setDropdownOpen(false);
