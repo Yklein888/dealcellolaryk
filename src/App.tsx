@@ -26,6 +26,8 @@ const POS = lazy(() => import("./pages/POS"));
 const CellStation = lazy(() => import("./pages/CellStation"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Install = lazy(() => import("./pages/Install"));
+const USSims = lazy(() => import("./pages/USSims"));
+const SimActivation = lazy(() => import("./pages/SimActivation"));
 
 const queryClient = new QueryClient();
 
@@ -52,6 +54,13 @@ const App = () => (
                     <Install />
                   </Suspense>
                 } />
+
+                {/* Public activator page — no auth required */}
+                <Route path="/activate/:token" element={
+                  <Suspense fallback={<PageFallback />}>
+                    <SimActivation />
+                  </Suspense>
+                } />
                 
                 {/* Protected routes */}
                 <Route path="/*" element={
@@ -70,6 +79,7 @@ const App = () => (
                           <Route path="/invoices" element={<Invoices />} />
                           <Route path="/pos" element={<POS />} />
                           <Route path="/cellstation" element={<CellStation />} />
+                          <Route path="/sims" element={<USSims />} />
                           
                           <Route path="/payment-success" element={<PaymentSuccess />} />
                           <Route path="/payment-error" element={<PaymentError />} />

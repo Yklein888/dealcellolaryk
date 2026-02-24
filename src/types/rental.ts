@@ -166,3 +166,26 @@ export const rentalStatusLabels: Record<Rental['status'], string> = {
   overdue: 'באיחור',
   returned: 'הוחזר',
 };
+
+// ─── US SIMs ──────────────────────────────────────────────
+export type USSimStatus = 'pending' | 'activating' | 'active' | 'returned';
+
+export interface USSim {
+  id: string;
+  simCompany: string;
+  package?: string;
+  localNumber?: string;
+  israeliNumber?: string;
+  expiryDate?: string;
+  status: USSimStatus;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const usSimStatusLabels: Record<USSimStatus, string> = {
+  pending: 'ממתין',
+  activating: 'בהפעלה',
+  active: 'פעיל',
+  returned: 'הוחזר',
+};

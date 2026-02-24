@@ -1009,6 +1009,60 @@ export type Database = {
         }
         Relationships: []
       }
+      us_sims: {
+        Row: {
+          id: string
+          sim_company: string
+          package: string | null
+          local_number: string | null
+          israeli_number: string | null
+          expiry_date: string | null
+          status: string
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          sim_company: string
+          package?: string | null
+          local_number?: string | null
+          israeli_number?: string | null
+          expiry_date?: string | null
+          status?: string
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          sim_company?: string
+          package?: string | null
+          local_number?: string | null
+          israeli_number?: string | null
+          expiry_date?: string | null
+          status?: string
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      app_settings: {
+        Row: {
+          key: string
+          value: string
+        }
+        Insert: {
+          key: string
+          value: string
+        }
+        Update: {
+          key?: string
+          value?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       customers_secure: {
@@ -1110,6 +1164,31 @@ export type Database = {
         Returns: boolean
       }
       is_user_approved: { Args: { _user_id: string }; Returns: boolean }
+      get_sims_by_token: {
+        Args: { p_token: string }
+        Returns: {
+          id: string
+          sim_company: string
+          package: string | null
+          local_number: string | null
+          israeli_number: string | null
+          expiry_date: string | null
+          status: string
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }[]
+      }
+      update_sim_activation: {
+        Args: {
+          p_id: string
+          p_token: string
+          p_local?: string | null
+          p_israeli?: string | null
+          p_expiry?: string | null
+        }
+        Returns: Json
+      }
       register_device: {
         Args: {
           _browser?: string

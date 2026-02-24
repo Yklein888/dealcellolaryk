@@ -28,7 +28,8 @@ import {
   Store,
   Settings,
   Fingerprint,
-  Signal
+  Signal,
+  Globe,
 } from 'lucide-react';
 import { BiometricSettings } from '@/components/settings/BiometricSettings';
 
@@ -41,6 +42,7 @@ const navItems = [
   
   { path: '/repairs', label: 'תיקונים', icon: Wrench, permission: 'view_repairs' as PermissionKey },
   { path: '/cellstation', label: 'סימים', icon: Signal, permission: 'view_sim_cards' as PermissionKey },
+  { path: '/sims', label: 'סימים ארה"ב', icon: Globe, permission: 'view_inventory' as PermissionKey },
   { path: '/payments', label: 'תשלומים', icon: CreditCard, permission: 'view_payments' as PermissionKey },
   { path: '/invoices', label: 'חשבוניות', icon: FileText, permission: 'view_invoices' as PermissionKey },
 ];
