@@ -13,6 +13,9 @@ type SimRow = {
   expiry_date: string | null;
   status: string;
   notes: string | null;
+  renewal_contact: string | null;
+  renewal_method: string | null;
+  includes_israeli_number: boolean | null;
   created_at: string;
   updated_at: string;
 };
@@ -29,6 +32,9 @@ function mapSim(row: SimRow): USSim {
     expiryDate: row.expiry_date ?? undefined,
     status: row.status as USSimStatus,
     notes: row.notes ?? undefined,
+    renewalContact: row.renewal_contact ?? undefined,
+    renewalMethod: row.renewal_method ?? undefined,
+    includesIsraeliNumber: row.includes_israeli_number ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -122,5 +128,20 @@ export function useUSSims() {
     return { error };
   }, [activatorToken, fetchSims]);
 
-  return { sims, loading, activatorToken, addSim, deleteSim, markReturned };
+  const renewSim = useCallback(async (id: string, months: number = 1, contact?: string, method?: string, includesIsraeli?: boolean) => {
+    if (!activatorToken) return { error: new Error('No token') };
+    const { data, error } = await simManagerClient.rpc('renew_sim_by_token', {
+      p_id: id,
+      p_token: activatorToken,
+      p_months: months,
+      p_contact: contact || null,
+      p_method: method || null,
+      p_includes_israeli: includesIsraeli || false,
+    });
+    if (!error) fetchSims();
+    const result = data as { error?: string; new_expiry?: string } | null;
+    return { error: error ?? (result?.error ? new Error(result.error) : null), newExpiry: result?.new_expiry };
+  }, [activatorToken, fetchSims]);
+
+  return { sims, loading, activatorToken, addSim, deleteSim, markReturned, renewSim };
 }

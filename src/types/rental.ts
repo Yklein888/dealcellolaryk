@@ -181,6 +181,9 @@ export interface USSim {
   expiryDate?: string;
   status: USSimStatus;
   notes?: string;
+  renewalContact?: string;
+  renewalMethod?: string; // 'whatsapp', 'email', 'none'
+  includesIsraeliNumber?: boolean;
   createdAt: string;
   updatedAt: string;
 }
