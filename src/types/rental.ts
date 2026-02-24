@@ -175,6 +175,7 @@ export interface USSim {
   simCompany: string;
   simNumber?: string;
   package?: string;
+  pricePerDay?: number;
   localNumber?: string;
   israeliNumber?: string;
   expiryDate?: string;

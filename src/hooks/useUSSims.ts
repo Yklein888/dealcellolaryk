@@ -7,6 +7,7 @@ type SimRow = {
   sim_company: string;
   sim_number: string | null;
   package: string | null;
+  price_per_day: number | null;
   local_number: string | null;
   israeli_number: string | null;
   expiry_date: string | null;
@@ -22,6 +23,7 @@ function mapSim(row: SimRow): USSim {
     simCompany: row.sim_company,
     simNumber: row.sim_number ?? undefined,
     package: row.package ?? undefined,
+    pricePerDay: row.price_per_day ?? undefined,
     localNumber: row.local_number ?? undefined,
     israeliNumber: row.israeli_number ?? undefined,
     expiryDate: row.expiry_date ?? undefined,
@@ -85,7 +87,7 @@ export function useUSSims() {
     return () => { simManagerClient.removeChannel(channel); };
   }, [activatorToken, fetchSims]);
 
-  const addSim = useCallback(async (simCompany: string, simNumber?: string, pkg?: string, notes?: string) => {
+  const addSim = useCallback(async (simCompany: string, simNumber?: string, pkg?: string, notes?: string, price?: number) => {
     if (!activatorToken) return { error: new Error('No token') };
     const { data, error } = await simManagerClient.rpc('add_sim_by_token', {
       p_token: activatorToken,
@@ -93,6 +95,7 @@ export function useUSSims() {
       p_sim_number: simNumber || null,
       p_package: pkg || null,
       p_notes: notes || null,
+      p_price_per_day: price || null,
     });
     if (!error) fetchSims();
     const result = data as { error?: string } | null;

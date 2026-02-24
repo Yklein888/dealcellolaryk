@@ -13,6 +13,7 @@ interface SimRow {
   sim_company: string;
   sim_number: string | null;
   package: string | null;
+  price_per_day: number | null;
   local_number: string | null;
   israeli_number: string | null;
   expiry_date: string | null;
@@ -165,7 +166,7 @@ export default function SimActivation() {
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                         {sim.sim_number && (
                           <div className="bg-muted/30 rounded p-2.5">
                             <p className="text-xs text-muted-foreground mb-1">מספר סים (ICCID)</p>
@@ -176,6 +177,12 @@ export default function SimActivation() {
                           <div className="bg-muted/30 rounded p-2.5">
                             <p className="text-xs text-muted-foreground mb-1">סוג חבילה</p>
                             <p className="font-bold text-sm text-foreground">{sim.package}</p>
+                          </div>
+                        )}
+                        {sim.price_per_day && (
+                          <div className="bg-muted/30 rounded p-2.5">
+                            <p className="text-xs text-muted-foreground mb-1">מחיר ליום</p>
+                            <p className="font-bold text-sm text-foreground">${sim.price_per_day.toFixed(2)}</p>
                           </div>
                         )}
                         {sim.notes && (

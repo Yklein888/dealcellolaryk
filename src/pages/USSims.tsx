@@ -57,6 +57,7 @@ export default function USSims() {
   const [newCompany, setNewCompany] = useState('T-Mobile');
   const [newSimNumber, setNewSimNumber] = useState('');
   const [newPackage, setNewPackage] = useState('');
+  const [newPrice, setNewPrice] = useState('');
   const [newNotes, setNewNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -73,7 +74,8 @@ export default function USSims() {
   const handleAdd = async () => {
     if (!newCompany) return;
     setIsSaving(true);
-    const { error } = await addSim(newCompany, newSimNumber || undefined, newPackage || undefined, newNotes || undefined);
+    const price = newPrice ? parseFloat(newPrice) : undefined;
+    const { error } = await addSim(newCompany, newSimNumber || undefined, newPackage || undefined, newNotes || undefined, price);
     setIsSaving(false);
     if (error) {
       toast({ title: 'שגיאה', description: error.message, variant: 'destructive' });
@@ -83,6 +85,7 @@ export default function USSims() {
       setNewCompany('T-Mobile');
       setNewSimNumber('');
       setNewPackage('');
+      setNewPrice('');
       setNewNotes('');
     }
   };
@@ -182,6 +185,7 @@ export default function USSims() {
                 <th className="text-right px-4 py-3 text-muted-foreground font-medium">חברה</th>
                 <th className="text-right px-4 py-3 text-muted-foreground font-medium">מספר סים</th>
                 <th className="text-right px-4 py-3 text-muted-foreground font-medium">חבילה</th>
+                <th className="text-right px-4 py-3 text-muted-foreground font-medium">מחיר ליום</th>
                 <th className="text-right px-4 py-3 text-muted-foreground font-medium">מספר מקומי</th>
                 <th className="text-right px-4 py-3 text-muted-foreground font-medium">מספר ישראלי</th>
                 <th className="text-right px-4 py-3 text-muted-foreground font-medium">תוקף</th>
@@ -192,7 +196,7 @@ export default function USSims() {
             <tbody>
               {sims.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-16 text-muted-foreground">
+                  <td colSpan={9} className="text-center py-16 text-muted-foreground">
                     אין סימים. לחץ "הוסף סים" כדי להתחיל.
                   </td>
                 </tr>
@@ -204,6 +208,9 @@ export default function USSims() {
                       {sim.simNumber || '—'}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{sim.package || '—'}</td>
+                    <td className="px-4 py-3 font-medium">
+                      {sim.pricePerDay ? `$${sim.pricePerDay.toFixed(2)}` : '—'}
+                    </td>
                     <td className="px-4 py-3 font-mono text-sm" dir="ltr">
                       {sim.localNumber || <span className="text-muted-foreground">—</span>}
                     </td>
@@ -294,6 +301,17 @@ export default function USSims() {
                 placeholder="הערות נוספות..."
                 value={newNotes}
                 onChange={e => setNewNotes(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>מחיר יומי בדולר (אופציונלי)</Label>
+              <Input
+                type="number"
+                placeholder='לדוגמה: 5 או 10.50'
+                value={newPrice}
+                onChange={e => setNewPrice(e.target.value)}
+                step="0.01"
+                min="0"
               />
             </div>
           </div>
