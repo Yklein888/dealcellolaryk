@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { simManagerClient } from '@/integrations/supabase/simManagerClient';
-import { supabase } from '@/integrations/supabase/client';
 import { USSim, USSimStatus } from '@/types/rental';
 
 type SimRow = {
@@ -74,7 +73,8 @@ export function useUSSims() {
             // Status changed - send WhatsApp notification
             try {
               const message = buildStatusChangeMessage(newSim, oldSim.status, newSim.status);
-              await supabase.functions.invoke('send-whatsapp-notification', {
+              // Edge function deployed to sim-manager project
+              await simManagerClient.functions.invoke('send-whatsapp-notification', {
                 body: {
                   phone: whatsappContact,
                   message: message,

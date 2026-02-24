@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { useRental } from '@/hooks/useRental';
+import { useUSSims } from '@/hooks/useUSSims';
 import { PageLoadingSkeleton } from '@/components/PageLoadingSkeleton';
 import { InventoryItem } from '@/types/rental';
+import { PACKAGE_LABELS, USSimPackage } from '@/types/rental';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
 import { CallHistoryBadge } from '@/components/CallHistoryBadge';
@@ -63,18 +65,19 @@ import { DualCurrencyPrice } from '@/components/DualCurrencyPrice';
 
 
 export default function Rentals() {
-  const { 
-    rentals, 
-    customers, 
-    inventory, 
+  const {
+    rentals,
+    customers,
+    inventory,
     addRental,
     addCustomer,
     returnRental,
     deleteRental,
     addInventoryItem,
     getAvailableItems,
-    loading 
+    loading
   } = useRental();
+  const { sims } = useUSSims();
   const { toast } = useToast();
   
   const [searchParams, setSearchParams] = useSearchParams();
@@ -397,7 +400,26 @@ export default function Rentals() {
     return matchesSearch && matchesStatus && matchesCategory;
   });
 
-  const availableItems = getAvailableItems();
+  // Convert active US SIMs from sim-manager project to InventoryItem format
+  // This makes them appear in the rental dialog alongside regular inventory items
+  const activeUSSimsAsInventory = useMemo<InventoryItem[]>(() =>
+    sims
+      .filter(s => s.status === 'active')
+      .map(s => ({
+        id: `us-sim-${s.id}`,
+        category: 'sim_american' as const,
+        name: `${s.simCompany}${s.package ? ` – ${PACKAGE_LABELS[s.package as USSimPackage] ?? s.package}` : ''}`,
+        localNumber: s.localNumber,
+        israeliNumber: s.includesIsraeliNumber ? s.israeliNumber : undefined,
+        expiryDate: s.expiryDate,
+        simNumber: s.simNumber,
+        status: 'available' as const,
+        notes: s.notes,
+      })),
+    [sims]
+  );
+
+  const availableItems = [...getAvailableItems(), ...activeUSSimsAsInventory];
 
   // Handle printing calling instructions for rental cards
   const handlePrintInstructions = async (
