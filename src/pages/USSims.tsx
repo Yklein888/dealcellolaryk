@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { USSimStatus, USSim } from '@/types/rental';
+import { USSimStatus, USSim, USSimPackage, PACKAGE_LABELS } from '@/types/rental';
 import { Plus, Copy, Link2, Trash2, CheckCircle, Globe, RotateCw } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
@@ -57,16 +57,14 @@ export default function USSims() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newCompany, setNewCompany] = useState('T-Mobile');
   const [newSimNumber, setNewSimNumber] = useState('');
-  const [newPackage, setNewPackage] = useState('');
-  const [newPrice, setNewPrice] = useState('');
+  const [newPackage, setNewPackage] = useState<USSimPackage>('calls_only');
   const [newNotes, setNewNotes] = useState('');
+  const [newIncludesIsraeli, setNewIncludesIsraeli] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   // Renewal dialog state
   const [isRenewOpen, setIsRenewOpen] = useState(false);
   const [renewSimId, setRenewSimId] = useState<string | null>(null);
-  const [renewContact, setRenewContact] = useState('');
-  const [renewMethod, setRenewMethod] = useState<'whatsapp' | 'email' | 'none'>('whatsapp');
   const [renewIncludesIsraeli, setRenewIncludesIsraeli] = useState(false);
   const [isRenewSaving, setIsRenewSaving] = useState(false);
 
@@ -83,8 +81,7 @@ export default function USSims() {
   const handleAdd = async () => {
     if (!newCompany) return;
     setIsSaving(true);
-    const price = newPrice ? parseFloat(newPrice) : undefined;
-    const { error } = await addSim(newCompany, newSimNumber || undefined, newPackage || undefined, newNotes || undefined, price);
+    const { error } = await addSim(newCompany, newSimNumber || undefined, newPackage || undefined, newNotes || undefined, newIncludesIsraeli);
     setIsSaving(false);
     if (error) {
       toast({ title: 'שגיאה', description: error.message, variant: 'destructive' });
@@ -93,9 +90,9 @@ export default function USSims() {
       setIsAddOpen(false);
       setNewCompany('T-Mobile');
       setNewSimNumber('');
-      setNewPackage('');
-      setNewPrice('');
+      setNewPackage('calls_only');
       setNewNotes('');
+      setNewIncludesIsraeli(false);
     }
   };
 
@@ -119,25 +116,17 @@ export default function USSims() {
 
   const openRenewDialog = (simId: string) => {
     setRenewSimId(simId);
-    setRenewContact('');
-    setRenewMethod('whatsapp');
     setRenewIncludesIsraeli(false);
     setIsRenewOpen(true);
   };
 
   const handleRenew = async () => {
     if (!renewSimId) return;
-    if (renewMethod !== 'none' && !renewContact) {
-      toast({ title: 'שגיאה', description: 'יש להזין איש קשר' });
-      return;
-    }
 
     setIsRenewSaving(true);
     const { error } = await renewSim(
       renewSimId,
       1, // hardcoded to 1 month as per user requirement
-      renewMethod !== 'none' ? renewContact : undefined,
-      renewMethod !== 'none' ? renewMethod : undefined,
       renewIncludesIsraeli
     );
     setIsRenewSaving(false);
@@ -210,7 +199,6 @@ export default function USSims() {
                 <th className="text-right px-4 py-3 text-muted-foreground font-medium">חברה</th>
                 <th className="text-right px-4 py-3 text-muted-foreground font-medium">מספר סים</th>
                 <th className="text-right px-4 py-3 text-muted-foreground font-medium">חבילה</th>
-                <th className="text-right px-4 py-3 text-muted-foreground font-medium">מחיר ליום</th>
                 <th className="text-right px-4 py-3 text-muted-foreground font-medium">מספר מקומי</th>
                 <th className="text-right px-4 py-3 text-muted-foreground font-medium">מספר ישראלי</th>
                 <th className="text-right px-4 py-3 text-muted-foreground font-medium">תוקף</th>
@@ -232,10 +220,7 @@ export default function USSims() {
                     <td className="px-4 py-3 font-mono text-sm text-muted-foreground" dir="ltr">
                       {sim.simNumber || '—'}
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">{sim.package || '—'}</td>
-                    <td className="px-4 py-3 font-medium">
-                      {sim.pricePerDay ? `$${sim.pricePerDay.toFixed(2)}` : '—'}
-                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">{sim.package ? PACKAGE_LABELS[sim.package] : '—'}</td>
                     <td className="px-4 py-3 font-mono text-sm" dir="ltr">
                       {sim.localNumber || <span className="text-muted-foreground">—</span>}
                     </td>
@@ -324,12 +309,17 @@ export default function USSims() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>חבילה (אופציונלי)</Label>
-              <Input
-                placeholder='לדוגמה: Talk + Text 30$'
-                value={newPackage}
-                onChange={e => setNewPackage(e.target.value)}
-              />
+              <Label>חבילה</Label>
+              <Select value={newPackage} onValueChange={(val) => setNewPackage(val as USSimPackage)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="calls_only">שיחות בלבד</SelectItem>
+                  <SelectItem value="gb_8">8GB</SelectItem>
+                  <SelectItem value="unlimited">ללא הגבלה</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1.5">
               <Label>הערות (אופציונלי)</Label>
@@ -339,16 +329,15 @@ export default function USSims() {
                 onChange={e => setNewNotes(e.target.value)}
               />
             </div>
-            <div className="space-y-1.5">
-              <Label>מחיר יומי בדולר (אופציונלי)</Label>
-              <Input
-                type="number"
-                placeholder='לדוגמה: 5 או 10.50'
-                value={newPrice}
-                onChange={e => setNewPrice(e.target.value)}
-                step="0.01"
-                min="0"
+            <div className="flex items-center space-x-2 space-x-reverse">
+              <Checkbox
+                id="new-includes-israeli"
+                checked={newIncludesIsraeli}
+                onCheckedChange={(checked) => setNewIncludesIsraeli(checked as boolean)}
               />
+              <Label htmlFor="new-includes-israeli" className="font-normal cursor-pointer">
+                כולל מספר ישראלי
+              </Label>
             </div>
           </div>
           <DialogFooter>
@@ -367,73 +356,23 @@ export default function USSims() {
             <DialogTitle>הארך סים לחודש נוסף</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label>דרך התנעה</Label>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2 space-x-reverse">
-                  <input
-                    type="radio"
-                    id="whatsapp"
-                    value="whatsapp"
-                    checked={renewMethod === 'whatsapp'}
-                    onChange={() => setRenewMethod('whatsapp')}
-                    className="w-4 h-4"
-                  />
-                  <Label htmlFor="whatsapp" className="font-normal cursor-pointer">WhatsApp</Label>
-                </div>
-                <div className="flex items-center space-x-2 space-x-reverse">
-                  <input
-                    type="radio"
-                    id="email"
-                    value="email"
-                    checked={renewMethod === 'email'}
-                    onChange={() => setRenewMethod('email')}
-                    className="w-4 h-4"
-                  />
-                  <Label htmlFor="email" className="font-normal cursor-pointer">דוא״ל</Label>
-                </div>
-                <div className="flex items-center space-x-2 space-x-reverse">
-                  <input
-                    type="radio"
-                    id="none"
-                    value="none"
-                    checked={renewMethod === 'none'}
-                    onChange={() => setRenewMethod('none')}
-                    className="w-4 h-4"
-                  />
-                  <Label htmlFor="none" className="font-normal cursor-pointer">ללא הודעה</Label>
-                </div>
-              </div>
-            </div>
-
-            {renewMethod !== 'none' && (
-              <div className="space-y-1.5">
-                <Label>
-                  {renewMethod === 'whatsapp' ? 'מספר WhatsApp' : 'כתובת דוא״ל'}
-                </Label>
-                <Input
-                  placeholder={renewMethod === 'whatsapp' ? '+972501234567' : 'example@example.com'}
-                  value={renewContact}
-                  onChange={e => setRenewContact(e.target.value)}
-                  dir={renewMethod === 'whatsapp' ? 'ltr' : 'auto'}
-                />
-              </div>
-            )}
-
             <div className="flex items-center space-x-2 space-x-reverse">
               <Checkbox
-                id="includes-israeli"
+                id="renewal-includes-israeli"
                 checked={renewIncludesIsraeli}
                 onCheckedChange={(checked) => setRenewIncludesIsraeli(checked as boolean)}
               />
-              <Label htmlFor="includes-israeli" className="font-normal cursor-pointer">
-                כולל מספר ישראלי חדש
+              <Label htmlFor="renewal-includes-israeli" className="font-normal cursor-pointer">
+                להוסיף מספר ישראלי גם לחידוש?
               </Label>
             </div>
+            <p className="text-xs text-muted-foreground">
+              ההודעה תשלח לאיש הקשר בארה״ב דרך WhatsApp
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsRenewOpen(false)}>ביטול</Button>
-            <Button variant="glow" onClick={handleRenew} disabled={isRenewSaving || (renewMethod !== 'none' && !renewContact)}>
+            <Button variant="glow" onClick={handleRenew} disabled={isRenewSaving}>
               {isRenewSaving ? 'מעדכן...' : 'הארך לחודש נוסף'}
             </Button>
           </DialogFooter>

@@ -4,21 +4,23 @@ import { simManagerClient } from '@/integrations/supabase/simManagerClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
 import { Globe, AlertCircle, CheckCircle } from 'lucide-react';
+import { PACKAGE_LABELS } from '@/types/rental';
 
 interface SimRow {
   id: string;
   sim_company: string;
   sim_number: string | null;
   package: string | null;
-  price_per_day: number | null;
   local_number: string | null;
   israeli_number: string | null;
   expiry_date: string | null;
   status: string;
   notes: string | null;
+  includes_israeli_number: boolean | null;
 }
 
 // Edits per SIM id
@@ -175,13 +177,7 @@ export default function SimActivation() {
                         {sim.package && (
                           <div>
                             <p className="text-muted-foreground">חבילה</p>
-                            <p className="font-bold text-foreground">{sim.package}</p>
-                          </div>
-                        )}
-                        {sim.price_per_day && (
-                          <div>
-                            <p className="text-muted-foreground">מחיר</p>
-                            <p className="font-bold text-foreground">${sim.price_per_day.toFixed(2)}</p>
+                            <p className="font-bold text-foreground">{PACKAGE_LABELS[sim.package as any] || sim.package}</p>
                           </div>
                         )}
                         {sim.notes && (
@@ -222,6 +218,16 @@ export default function SimActivation() {
                         />
                       </div>
                     </div>
+
+                    {sim.includes_israeli_number && (
+                      <div className="flex items-center space-x-2 space-x-reverse bg-primary/5 border border-primary/20 rounded-lg p-3 mb-4">
+                        <CheckCircle className="h-4 w-4 text-primary flex-shrink-0" />
+                        <div>
+                          <p className="text-xs font-medium text-foreground">מספר ישראלי כלול</p>
+                          <p className="text-xs text-muted-foreground">(שנבחר על ידי בעלים - לא ניתן לשינוי)</p>
+                        </div>
+                      </div>
+                    )}
 
                     <Button
                       variant="glow"

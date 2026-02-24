@@ -169,20 +169,30 @@ export const rentalStatusLabels: Record<Rental['status'], string> = {
 
 // ─── US SIMs ──────────────────────────────────────────────
 export type USSimStatus = 'pending' | 'activating' | 'active' | 'returned';
+export type USSimPackage = 'calls_only' | 'gb_8' | 'unlimited';
+
+export const PACKAGE_LABELS: Record<USSimPackage, string> = {
+  calls_only: 'שיחות בלבד',
+  gb_8: '8GB',
+  unlimited: 'ללא הגבלה',
+};
+
+export const US_SIM_PRICING = {
+  basePerWeek: 55,              // $55/week
+  additionalWeekCost: 10,       // +$10 per additional week
+  israeliBonusCost: 10,         // +$10 if including Israeli number
+};
 
 export interface USSim {
   id: string;
   simCompany: string;
   simNumber?: string;
-  package?: string;
-  pricePerDay?: number;
+  package?: USSimPackage;
   localNumber?: string;
   israeliNumber?: string;
   expiryDate?: string;
   status: USSimStatus;
   notes?: string;
-  renewalContact?: string;
-  renewalMethod?: string; // 'whatsapp', 'email', 'none'
   includesIsraeliNumber?: boolean;
   createdAt: string;
   updatedAt: string;

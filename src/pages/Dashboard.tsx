@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRental } from '@/hooks/useRental';
+import { useUSSims } from '@/hooks/useUSSims';
 
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -13,11 +14,13 @@ import { BarcodeScanner } from '@/components/BarcodeScanner';
 import { QuickActionDialog } from '@/components/inventory/QuickActionDialog';
 import { InventoryItem } from '@/types/rental';
 import { DashboardSkeleton } from '@/components/dashboard/DashboardSkeleton';
-import { 
+import {
   Search,
   Plus,
   Calculator,
   ScanLine,
+  Globe,
+  ArrowRight,
 } from 'lucide-react';
 import { format, parseISO, isBefore, differenceInDays } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -34,6 +37,7 @@ import { RevenueChart } from '@/components/dashboard/RevenueChart';
 
 export default function Dashboard() {
   const { stats, rentals, repairs, inventory, getUpcomingReturns, loading } = useRental();
+  const { sims, loading: simsLoading } = useUSSims();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isQuickActionsOpen, setIsQuickActionsOpen] = useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
@@ -81,16 +85,29 @@ export default function Dashboard() {
 
   const upcomingReturns = useMemo(() => getUpcomingReturns(), [getUpcomingReturns, rentals]);
 
-  const { activeRentals, overdueRentals, pendingRepairs, readyRepairs } = useMemo(() => {
+  const { activeRentals, overdueRentals, pendingRepairs, readyRepairs, simsStats, rentalsWithUSSims } = useMemo(() => {
     const today = new Date();
     const active = rentals.filter(r => r.status === 'active');
+
+    // US SIMs stats
+    const pendingSims = sims.filter(s => s.status === 'pending').length;
+    const activatingSims = sims.filter(s => s.status === 'activating').length;
+    const activeSims = sims.filter(s => s.status === 'active').length;
+
+    // Rentals with US SIMs
+    const rentalsWithUS = active.filter(r =>
+      r.items.some(item => item.itemCategory === 'sim_american')
+    );
+
     return {
       activeRentals: active,
       overdueRentals: active.filter(r => isBefore(parseISO(r.endDate), today)),
       pendingRepairs: repairs.filter(r => r.status !== 'collected'),
       readyRepairs: repairs.filter(r => r.status === 'ready'),
+      simsStats: { pending: pendingSims, activating: activatingSims, active: activeSims },
+      rentalsWithUSSims: rentalsWithUS,
     };
-  }, [rentals, repairs]);
+  }, [rentals, repairs, sims]);
 
   if (loading) {
     return <DashboardSkeleton />;
@@ -139,6 +156,86 @@ export default function Dashboard() {
 
       <div className="mb-8">
         <RevenueChart rentals={rentals} />
+      </div>
+
+      {/* US SIMs Activations Section */}
+      <div className="mb-8">
+        <div className="stat-card">
+          <div className="relative z-10">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-accent shadow-lg">
+                  <Globe className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-foreground">הפעלות סימים</h2>
+                  <p className="text-xs text-muted-foreground">סימים לארה״ב</p>
+                </div>
+              </div>
+              <Button variant="outline" size="sm" asChild>
+                <a href="/sims" className="gap-2">
+                  <span>נהל</span>
+                  <ArrowRight className="h-3 w-3" />
+                </a>
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-warning">{simsStats.pending}</p>
+                <p className="text-xs text-muted-foreground mt-1">ממתינים</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-orange-500">{simsStats.activating}</p>
+                <p className="text-xs text-muted-foreground mt-1">בהפעלה</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-success">{simsStats.active}</p>
+                <p className="text-xs text-muted-foreground mt-1">פעילים</p>
+              </div>
+            </div>
+          </div>
+          <div className="stat-shimmer" />
+          <div className="stat-bar" />
+        </div>
+      </div>
+
+      {/* Rentals with US SIMs Section */}
+      <div className="mb-8">
+        <div className="stat-card">
+          <div className="relative z-10">
+            <h2 className="text-lg font-bold text-foreground mb-4">השכרות עם סימים לארה״ב</h2>
+
+            {rentalsWithUSSims.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">אין השכרות פעילות עם סימים לארה״ב כרגע</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border/50">
+                      <th className="text-right px-4 py-2 text-muted-foreground font-medium text-xs">לקוח</th>
+                      <th className="text-right px-4 py-2 text-muted-foreground font-medium text-xs">עד תאריך</th>
+                      <th className="text-right px-4 py-2 text-muted-foreground font-medium text-xs">מחיר</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rentalsWithUSSims.slice(0, 5).map(rental => (
+                      <tr key={rental.id} className="border-b border-border/20 hover:bg-muted/10">
+                        <td className="px-4 py-2">{rental.customerName}</td>
+                        <td className="px-4 py-2 text-muted-foreground text-xs">
+                          {format(parseISO(rental.endDate), 'dd/MM/yyyy', { locale: he })}
+                        </td>
+                        <td className="px-4 py-2 font-medium">{rental.currency === 'USD' ? '$' : '₪'}{rental.totalPrice.toFixed(0)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+          <div className="stat-shimmer" />
+          <div className="stat-bar" />
+        </div>
       </div>
 
       <div className="mb-8">
