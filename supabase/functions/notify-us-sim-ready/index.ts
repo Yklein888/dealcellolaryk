@@ -21,14 +21,15 @@ async function notifyCustomerUSSimReady(
   customerId: string,
   customerName: string,
   customerPhone: string,
+  customerEmail: string | undefined,
   simName: string,
   localNumber?: string,
   israeliNumber?: string
 ) {
   try {
-    // Call WhatsApp notification endpoint if numbers are ready
+    // 1. Send WhatsApp notification if numbers are ready
     if ((localNumber || israeliNumber) && customerPhone) {
-      const message = `
+      const whatsappMessage = `
 🎉 סימך מוכן!
 SIM: ${simName}
 מספר ישראלי: ${israeliNumber || "ממתין"}
@@ -45,14 +46,77 @@ SIM: ${simName}
         },
         body: JSON.stringify({
           customerPhone,
-          message,
+          message: whatsappMessage,
           entityType: "rental",
           customerId,
         }),
       }).catch(err => console.log("WhatsApp notification skipped:", err.message));
     }
 
-    // Store notification in database
+    // 2. Send Email notification if customer has email
+    if ((localNumber || israeliNumber) && customerEmail) {
+      const emailBody = `
+<html dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      body { font-family: Arial, sans-serif; direction: rtl; }
+      .container { max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
+      .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px; text-align: center; }
+      .content { background: white; padding: 20px; margin-top: 20px; border-radius: 8px; }
+      .sim-details { background-color: #f0f4ff; padding: 15px; border-radius: 5px; margin: 15px 0; }
+      .number-item { padding: 10px 0; border-bottom: 1px solid #ddd; }
+      .footer { text-align: center; color: #666; font-size: 12px; margin-top: 20px; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>🎉 סימך מוכן!</h1>
+      </div>
+      <div class="content">
+        <p>שלום ${customerName},</p>
+        <p>אנחנו שמחים להודיע שהסים שלך מוכן לשימוש!</p>
+
+        <div class="sim-details">
+          <h3>${simName}</h3>
+          <div class="number-item">
+            <strong>מספר ישראלי:</strong> ${israeliNumber || "ממתין"}
+          </div>
+          <div class="number-item">
+            <strong>מספר מקומי:</strong> ${localNumber || "ממתין"}
+          </div>
+        </div>
+
+        <p>✅ <strong>הסים מוכן לשימוש מיידי</strong></p>
+
+        <p>שאלות? צור קשר אתנו!</p>
+        <p>בברכה,<br/>צוות הנהלת ההשכרות</p>
+      </div>
+      <div class="footer">
+        <p>זו הודעה אוטומטית, אנא אל תשיב ישירות על אימייל זה.</p>
+      </div>
+    </div>
+  </body>
+</html>
+      `.trim();
+
+      await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-email`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          to: customerEmail,
+          subject: `סימך מוכן - ${simName}`,
+          html: emailBody,
+          customerId,
+        }),
+      }).catch(err => console.log("Email notification skipped:", err.message));
+    }
+
+    // 3. Store notification in database
     await supabase
       .from("notifications")
       .insert({
@@ -141,6 +205,7 @@ async function checkAndNotifyUSSimUpdates() {
           customer.id,
           customer.name,
           customer.phone,
+          customer.email,
           item.item_name.replace(/\[(us-sim-[^\]]+)\]\s*/, ""),
           usim.local_number,
           usim.israeli_number
