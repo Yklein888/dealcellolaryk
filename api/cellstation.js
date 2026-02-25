@@ -1,5 +1,4 @@
 import crypto from 'crypto';
-import { createClient } from '@supabase/supabase-js';
 
 const CELLSTATION_BASE = 'https://cellstation.co.il/portal';
 
@@ -28,7 +27,6 @@ class CellStationSession {
   }
 
   extractCookies(headers) {
-    // headers is a Headers object or plain object
     const raw = typeof headers.get === 'function'
       ? headers.get('set-cookie')
       : headers['set-cookie'];
@@ -127,7 +125,6 @@ class CellStationSession {
       });
     }
 
-    // Return a Response-like object with text already read
     return { ok: res.ok, status: res.status, text: async () => text, _text: text };
   }
 
@@ -174,30 +171,35 @@ function normalizeDate(d) {
   return d;
 }
 
-function extractInputFields(html) {
-  const fields = {};
-  const matches = html.match(/<input[^>]*name=["'][^"']+["'][^>]*>/gi) || [];
-  for (const f of matches) {
-    const n = f.match(/name=["']([^"']+)["']/);
-    const v = f.match(/value=["']([^"']*)["']/);
-    if (n) fields[n[1]] = v ? v[1] : '';
-  }
-  return fields;
-}
-
-function extractHiddenFields(html) {
-  const fields = {};
-  const matches = html.match(/<input[^>]*type=["']hidden["'][^>]*>/gi) || [];
-  for (const f of matches) {
-    const n = f.match(/name=["']([^"']+)["']/);
-    const v = f.match(/value=["']([^"']+)["']/);
-    if (n) fields[n[1]] = v ? v[1] : '';
-  }
-  return fields;
-}
-
 function hasError(html) {
   return html.includes('שגיאה') || html.includes('alert-danger') || html.includes('error');
+}
+
+function enrichSims(rawSims) {
+  return rawSims.filter(s => s.iccid).map(sim => {
+    let status = 'available', status_detail = 'unknown';
+    if (sim.status_raw) {
+      const s = sim.status_raw.trim();
+      if (s.startsWith('בשכירות'))                { status = 'rented';    status_detail = 'active';   }
+      else if (s.startsWith('זמין - תקין'))        { status = 'available'; status_detail = 'valid';    }
+      else if (s.startsWith('זמין - קרוב לפקיעה')) { status = 'available'; status_detail = 'expiring'; }
+      else if (s.startsWith('זמין - פג תוקף'))     { status = 'available'; status_detail = 'expired';  }
+    }
+    const parseDate = d => {
+      if (!d) return null;
+      const m = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      return m ? `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}` : d;
+    };
+    return {
+      ...sim,
+      status,
+      status_detail,
+      expiry_date: parseDate(sim.expiry_date),
+      start_date: parseDate(sim.start_date),
+      end_date: parseDate(sim.end_date),
+      customer_name: sim.note,
+    };
+  });
 }
 
 // ── Main Handler ──────────────────────────────────────────────────────────
@@ -209,7 +211,6 @@ export default async function handler(req, res) {
     return;
   }
 
-  // Set CORS on all responses
   Object.entries(CORS).forEach(([k, v]) => res.setHeader(k, v));
   res.setHeader('Content-Type', 'application/json');
 
@@ -220,7 +221,7 @@ export default async function handler(req, res) {
 
   let body;
   try {
-    body = req.body; // Vercel parses JSON automatically
+    body = req.body;
     if (!body) {
       const raw = await new Promise((resolve, reject) => {
         let data = '';
@@ -237,37 +238,6 @@ export default async function handler(req, res) {
 
   const { action, params = {} } = body;
 
-  // ── Supabase DB client ──────────────────────────────────────────────────
-  const SUPABASE_URL = process.env.SUPABASE_URL || 'https://hlswvjyegirbhoszrqyo.supabase.co';
-  const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
-  const db = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-
-  // ── DB-only actions (no CellStation login needed) ───────────────────────
-  if (action === 'get_sims') {
-    const { data, error } = await db.from('cellstation_sims').select('*').order('status').order('expiry_date');
-    if (error) { res.status(500).json({ success: false, error: error.message }); return; }
-    res.status(200).json({ success: true, sims: data || [] });
-    return;
-  }
-
-  if (action === 'update_sim_status') {
-    const { iccid, status, status_detail } = params;
-    const { error } = await db.from('cellstation_sims').update({ status, status_detail }).eq('iccid', iccid);
-    if (error) { res.status(500).json({ success: false, error: error.message }); return; }
-    res.status(200).json({ success: true });
-    return;
-  }
-
-  if (action === 'upsert_sims') {
-    const { records } = params;
-    await db.from('cellstation_sims').delete().not('id', 'is', null);
-    const { error } = await db.from('cellstation_sims').insert(records);
-    if (error) { res.status(500).json({ success: false, error: error.message }); return; }
-    res.status(200).json({ success: true });
-    return;
-  }
-
-  // ── CellStation portal actions ──────────────────────────────────────────
   const session = new CellStationSession();
   const loggedIn = await session.login();
   if (!loggedIn) {
@@ -279,45 +249,15 @@ export default async function handler(req, res) {
     let result;
 
     switch (action) {
+      // get_sims: fetch CSV directly from CellStation and return enriched SIM list
+      case 'get_sims':
       case 'sync_csv': {
         const csvRes = await session.get('content/bh/bh_export_csv.php');
         const csvText = await csvRes.text();
         const rawSims = parseCSV(csvText);
-        console.log(`sync_csv: parsed ${rawSims.length} sims`);
-
-        if (rawSims.length > 0) {
-          await db.from('cellstation_sims').delete().not('id', 'is', null);
-          const now = new Date().toISOString();
-          const records = rawSims.filter(s => s.iccid).map(sim => {
-            let status = 'available', status_detail = 'unknown';
-            if (sim.status_raw) {
-              const s = sim.status_raw.trim();
-              if (s.startsWith('בשכירות'))             { status = 'rented';    status_detail = 'active';   }
-              else if (s.startsWith('זמין - תקין'))     { status = 'available'; status_detail = 'valid';    }
-              else if (s.startsWith('זמין - קרוב לפקיעה')) { status = 'available'; status_detail = 'expiring'; }
-              else if (s.startsWith('זמין - פג תוקף'))  { status = 'available'; status_detail = 'expired';  }
-            }
-            const parseDate = d => {
-              if (!d) return null;
-              const m = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-              return m ? `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}` : d;
-            };
-            return {
-              sim_number: sim.sim_number, uk_number: sim.uk_number,
-              il_number: sim.il_number, iccid: sim.iccid,
-              status, status_detail, status_raw: sim.status_raw,
-              expiry_date: parseDate(sim.expiry_date),
-              plan: sim.plan,
-              start_date: parseDate(sim.start_date),
-              end_date: parseDate(sim.end_date),
-              customer_name: sim.note,
-              last_sync: now,
-            };
-          });
-          await db.from('cellstation_sims').insert(records);
-        }
-
-        result = { success: true, action: 'sync_csv', sims: rawSims, count: rawSims.length };
+        const sims = enrichSims(rawSims);
+        console.log(`${action}: fetched ${sims.length} sims from CellStation`);
+        result = { success: true, action, sims, count: sims.length };
         break;
       }
 
@@ -338,7 +278,6 @@ export default async function handler(req, res) {
         const startRental = normalizeDate(params.start_rental || '');
         const endRental   = normalizeDate(params.end_rental   || '');
 
-        // Send POST directly to index.php?page=bh/index (without fetch_BHsim_details.php)
         const submitRes = await session.post('index.php?page=bh/index', {
           product: params.product || '',
           start_rental: startRental,
@@ -351,22 +290,17 @@ export default async function handler(req, res) {
         const errored = hasError(submitHtml);
         const success = !errored && submitRes.status === 200;
 
-        if (success) {
-          await db.from('cellstation_sims').update({ status: 'rented', status_detail: 'active' }).eq('iccid', iccid);
-        }
-
         result = { success, action: 'activate_sim', hasError: errored, error: errored ? submitHtml.slice(0, 500) : undefined };
         break;
       }
 
       case 'swap_sim': {
-        const { swap_iccid, current_iccid, swap_msisdn, current_sim } = params;
+        const { swap_iccid, swap_msisdn, current_sim } = params;
         if (!swap_iccid || swap_iccid.length < 19 || swap_iccid.length > 20) {
           result = { success: false, error: 'ICCID must be 19-20 digits' };
           break;
         }
 
-        // Send POST directly to index.php?page=bh/index (without fetch_BHsim_details.php)
         const swapSubmitRes = await session.post('index.php?page=bh/index', {
           current_sim: current_sim || '',
           swap_iccid,
@@ -387,7 +321,6 @@ export default async function handler(req, res) {
           break;
         }
 
-        // Part A: Activate new SIM ONLY (do not swap yet)
         console.log(`[activate_and_swap] Step 1: Activating new SIM ${newIccid}`);
         const startAS = normalizeDate(params.start_rental || '');
         const endAS   = normalizeDate(params.end_rental   || '');
@@ -411,21 +344,20 @@ export default async function handler(req, res) {
         console.log('[activate_and_swap] Step 2: Activation successful, waiting 20s for portal to process...');
         await new Promise(r => setTimeout(r, 20000));
 
-        // Return "ready_to_swap" status - frontend should now refresh SIMs list and allow swap
         console.log('[activate_and_swap] Step 3: Ready for swap. Frontend should refresh SIMs list.');
         result = {
           success: true,
           action: 'activate_and_swap',
           status: 'ready_to_swap',
           message: 'SIM activated successfully. Refresh SIMs list and perform swap separately.',
-          newIccid: newIccid,
-          nextAction: 'Call swap_sim with the new ICCID'
+          newIccid,
+          nextAction: 'Call swap_sim with the new ICCID',
         };
         break;
       }
 
       default:
-        result = { success: false, error: `Unknown action: ${action}`, available: ['get_sims', 'sync_csv', 'activate_sim', 'swap_sim', 'activate_and_swap', 'update_sim_status', 'upsert_sims', 'check_sim_status'] };
+        result = { success: false, error: `Unknown action: ${action}`, available: ['get_sims', 'sync_csv', 'activate_sim', 'swap_sim', 'activate_and_swap', 'check_sim_status'] };
     }
 
     res.status(200).json(result);
