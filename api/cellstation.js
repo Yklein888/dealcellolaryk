@@ -290,9 +290,8 @@ export default async function handler(req, res) {
         });
         const submitHtml = await submitRes.text();
         const errored = hasError(submitHtml);
-        const success = !errored && submitRes.status === 200;
 
-        result = { success, action: 'activate_sim', hasError: errored, error: errored ? submitHtml.slice(0, 500) : undefined };
+        result = { success: !errored, action: 'activate_sim', hasError: errored, error: errored ? submitHtml.slice(0, 300) : undefined };
         break;
       }
 
@@ -310,9 +309,8 @@ export default async function handler(req, res) {
         });
         const swapHtml = await swapSubmitRes.text();
         const swapError = hasError(swapHtml);
-        const swapSuccess = !swapError && swapSubmitRes.status === 200;
 
-        result = { success: swapSuccess, action: 'swap_sim', hasError: swapError, error: swapError ? swapHtml.slice(0, 500) : undefined };
+        result = { success: !swapError, action: 'swap_sim', hasError: swapError, error: swapError ? swapHtml.slice(0, 300) : undefined };
         break;
       }
 
@@ -323,12 +321,13 @@ export default async function handler(req, res) {
           break;
         }
 
-        console.log(`[activate_and_swap] Step 1: Activating new SIM ${newIccid}`);
+        // Step 1: Activate new SIM
+        console.log(`[activate_and_swap] Step 1: Activating SIM ${newIccid}`);
         const startAS = normalizeDate(params.start_rental || '');
         const endAS   = normalizeDate(params.end_rental   || '');
 
         const actRes = await session.post('index.php?page=bh/index', {
-          product: params.product || '',
+          product: params.product || newIccid,  // ICCID is the product identifier in CellStation
           start_rental: startAS,
           end_rental: endAS,
           deler4cus_price: params.price || '',
@@ -336,24 +335,30 @@ export default async function handler(req, res) {
           note: params.note || '',
         });
         const actHtml = await actRes.text();
-        const actSuccess = !hasError(actHtml) && actRes.status === 200;
 
-        if (!actSuccess) {
-          result = { success: false, action: 'activate_and_swap', step: 'activation', error: 'Activation failed: ' + actHtml.slice(0, 500) };
+        // Only fail on explicit CellStation error in Hebrew - not on generic HTML pages
+        if (hasError(actHtml)) {
+          console.error('[activate_and_swap] Activation error:', actHtml.slice(0, 200));
+          result = { success: false, action: 'activate_and_swap', step: 'activation',
+            error: 'CellStation error during activation', debug: actHtml.slice(0, 300) };
           break;
         }
 
-        console.log('[activate_and_swap] Step 2: Activation successful, waiting 20s for portal to process...');
+        // Step 2: Wait 20s for CellStation portal to process the activation
+        console.log('[activate_and_swap] Step 2: Waiting 20s for portal to process...');
         await new Promise(r => setTimeout(r, 20000));
 
-        console.log('[activate_and_swap] Step 3: Ready for swap. Frontend should refresh SIMs list.');
+        // Step 3: Refresh the CellStation BH portal page (required before swap)
+        console.log('[activate_and_swap] Step 3: Refreshing CellStation BH page...');
+        await session.get('index.php?page=bh/index');
+
+        // Step 4: Ready to swap
         result = {
           success: true,
           action: 'activate_and_swap',
           status: 'ready_to_swap',
-          message: 'SIM activated successfully. Refresh SIMs list and perform swap separately.',
+          message: 'SIM activated. CellStation portal refreshed. Ready to swap.',
           newIccid,
-          nextAction: 'Call swap_sim with the new ICCID',
         };
         break;
       }
