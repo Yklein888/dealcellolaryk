@@ -288,44 +288,34 @@ Deno.serve(async (req) => {
           result = { success: false, error: "Invalid old ICCID format.", action: "activate_and_swap" }; break;
         }
         await (await session.get("index.php?page=bh/index")).text();
-        const detailsAS = await session.get("content/dashboard/rentals/fetch_BHsim_details.php?zehut=" + encodeURIComponent(iccidAS));
-        const detailsHtmlAS = await detailsAS.text();
-        const allFieldsAS = detailsHtmlAS.match(/<input[^>]*name=["'][^"']+["'][^>]*>/gi) || [];
-        const discoveredValsAS: Record<string, string> = {};
-        for (const field of allFieldsAS) {
-          const n = field.match(/name=["']([^"']+)["']/); const v = field.match(/value=["']([^"']*)["']/);
-          if (n) discoveredValsAS[n[1]] = v ? v[1] : "";
-        }
+
+        // Send POST directly to index.php?page=bh/index (like the old working version)
         let startRentalAS = params.start_rental || "", endRentalAS = params.end_rental || "";
         const ddmmAS = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
         const smAS = startRentalAS.match(ddmmAS);
         if (smAS) startRentalAS = `${smAS[3]}-${smAS[2].padStart(2,'0')}-${smAS[1].padStart(2,'0')}`;
         const emAS = endRentalAS.match(ddmmAS);
         if (emAS) endRentalAS = `${emAS[3]}-${emAS[2].padStart(2,'0')}-${emAS[1].padStart(2,'0')}`;
-        await (await session.post("content/dashboard/rentals/calculate_days.php", {
-          start_rental: startRentalAS, end_rental: endRentalAS,
-          product: discoveredValsAS['product'] || "", exp: discoveredValsAS['exp'] || "",
-        })).text();
-        const actSubmit = await session.post("dynamic/submit.php", {
-          ...discoveredValsAS, start_rental: startRentalAS, end_rental: endRentalAS,
-          deler4cus_price: params.price || "", note: params.note || "",
+
+        const actSubmit = await session.post("index.php?page=bh/index", {
+          product: params.product || "",
+          start_rental: startRentalAS,
+          end_rental: endRentalAS,
+          deler4cus_price: params.price || "",
+          note: params.note || "",
         });
         const actResult = await actSubmit.text();
         const actSuccess = !actResult.includes('שגיאה') && !actResult.includes('alert-danger') && actSubmit.status === 200;
         if (!actSuccess) { result = { success: false, action: "activate_and_swap", error: "שגיאה בהפעלה: " + parseCellStationError(actResult) }; break; }
-        console.log('activate_and_swap: waiting 60s...');
-        await new Promise(r => setTimeout(r, 60000));
+        console.log('activate_and_swap: waiting 20s...');
+        await new Promise(r => setTimeout(r, 20000));
+
+        // Swap the SIM
         await (await session.get("index.php?page=bh/index")).text();
-        const swapDetailsAS = await session.get("content/dashboard/rentals/fetch_BHsim_details.php?zehut=" + encodeURIComponent(oldIccid));
-        const swapDetailsHtmlAS = await swapDetailsAS.text();
-        const swapFieldsAS = swapDetailsHtmlAS.match(/<input[^>]*type=["']hidden["'][^>]*>/gi) || [];
-        const swapValsAS: Record<string, string> = {};
-        for (const field of swapFieldsAS) {
-          const n = field.match(/name=["']([^"']+)["']/); const v = field.match(/value=["']([^"']+)["']/);
-          if (n) swapValsAS[n[1]] = v ? v[1] : "";
-        }
-        const swapSubmitAS = await session.post("dynamic/submit.php", {
-          ...swapValsAS, swap_iccid: iccidAS, swap_msisdn: "", current_sim: params.current_sim || "",
+        const swapSubmitAS = await session.post("index.php?page=bh/index", {
+          current_sim: params.current_sim || "",
+          swap_iccid: iccidAS,
+          swap_msisdn: params.swap_msisdn || "",
         });
         const swapResultAS = await swapSubmitAS.text();
         const swapSuccessAS = !swapResultAS.includes('שגיאה') && !swapResultAS.includes('alert-danger') && swapSubmitAS.status === 200;

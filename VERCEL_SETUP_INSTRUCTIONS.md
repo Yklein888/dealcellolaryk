@@ -100,8 +100,17 @@ Once redeployment completes:
 The updated API:
 - ✅ **activate_sim**: Activates a new SIM without fetch_BHsim_details.php errors
 - ✅ **swap_sim**: Swaps an active SIM to a new one
-- ✅ **activate_and_swap**: Activates a new SIM, waits 60s, then swaps
+- ✅ **activate_and_swap**: Activates a new SIM, waits 20s, refreshes SIMs list, then user performs swap
 - ✅ All actions bypass the problematic fetch_BHsim_details.php endpoint
+
+### activate_and_swap Flow:
+1. API activates the new SIM
+2. API waits 20 seconds ⏳
+3. API returns `ready_to_swap` status
+4. **Frontend refreshes SIMs list** - new SIM now appears as ACTIVE
+5. User clicks SWAP button on the active rental
+6. **Frontend calls swap_sim** with the new ICCID
+7. ✅ Done!
 
 ---
 

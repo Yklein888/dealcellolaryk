@@ -408,8 +408,8 @@ export default async function handler(req, res) {
           break;
         }
 
-        console.log('[activate_and_swap] Step 2: Activation successful, waiting 60s for portal to process...');
-        await new Promise(r => setTimeout(r, 60000));
+        console.log('[activate_and_swap] Step 2: Activation successful, waiting 20s for portal to process...');
+        await new Promise(r => setTimeout(r, 20000));
 
         // Return "ready_to_swap" status - frontend should now refresh SIMs list and allow swap
         console.log('[activate_and_swap] Step 3: Ready for swap. Frontend should refresh SIMs list.');
