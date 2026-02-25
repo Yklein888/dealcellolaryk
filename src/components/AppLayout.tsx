@@ -3,6 +3,7 @@ import { AppSidebar } from './AppSidebar';
 import { MobileBottomNav } from './MobileBottomNav';
 import { ConnectionStatusIndicator } from './ConnectionStatusIndicator';
 import { ConnectionStatusProvider } from '@/hooks/useConnectionStatus';
+import { useUSSimNotificationSync } from '@/hooks/useUSSimNotificationSync';
 import { Smartphone } from 'lucide-react';
 import { PWAInstallPrompt } from './PWAInstallPrompt';
 
@@ -11,6 +12,9 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ children }: AppLayoutProps) {
+  // Sync US SIM notifications when numbers become available
+  useUSSimNotificationSync();
+
   return (
     <ConnectionStatusProvider>
       <div className="min-h-screen bg-background">
