@@ -335,32 +335,18 @@ export default async function handler(req, res) {
           break;
         }
 
-        await (await session.get('index.php?page=bh/index')).text();
-
-        const detailsRes = await session.get(`content/dashboard/rentals/fetch_BHsim_details.php?zehut=${encodeURIComponent(iccid)}`);
-        const detailsHtml = await detailsRes.text();
-        const discovered = extractInputFields(detailsHtml);
-
         const startRental = normalizeDate(params.start_rental || '');
         const endRental   = normalizeDate(params.end_rental   || '');
 
-        await (await session.post('content/dashboard/rentals/calculate_days.php', {
-          start_rental: startRental,
-          end_rental: endRental,
-          product: discovered['product'] || params.product || '',
-          exp: discovered['exp'] || '',
-        })).text();
-
-        const formData = {
-          ...discovered,
+        // Send POST directly to index.php?page=bh/index (without fetch_BHsim_details.php)
+        const submitRes = await session.post('index.php?page=bh/index', {
+          product: params.product || '',
           start_rental: startRental,
           end_rental: endRental,
           deler4cus_price: params.price || '',
           calculated_days_input: params.days || '',
           note: params.note || '',
-        };
-
-        const submitRes = await session.post('dynamic/submit.php', formData);
+        });
         const submitHtml = await submitRes.text();
         const errored = hasError(submitHtml);
         const success = !errored && submitRes.status === 200;
@@ -380,17 +366,11 @@ export default async function handler(req, res) {
           break;
         }
 
-        await (await session.get('index.php?page=bh/index')).text();
-
-        const swapDetailsRes = await session.get(`content/dashboard/rentals/fetch_BHsim_details.php?zehut=${encodeURIComponent(current_iccid)}`);
-        const swapDetailsHtml = await swapDetailsRes.text();
-        const hiddenFields = extractHiddenFields(swapDetailsHtml);
-
-        const swapSubmitRes = await session.post('dynamic/submit.php', {
-          ...hiddenFields,
+        // Send POST directly to index.php?page=bh/index (without fetch_BHsim_details.php)
+        const swapSubmitRes = await session.post('index.php?page=bh/index', {
+          current_sim: current_sim || '',
           swap_iccid,
           swap_msisdn: swap_msisdn || '',
-          current_sim: current_sim || '',
         });
         const swapHtml = await swapSubmitRes.text();
         const swapError = hasError(swapHtml);
@@ -413,59 +393,47 @@ export default async function handler(req, res) {
           break;
         }
 
-        // Part A: activate new SIM
-        await (await session.get('index.php?page=bh/index')).text();
-        const detailsAS = await session.get(`content/dashboard/rentals/fetch_BHsim_details.php?zehut=${encodeURIComponent(newIccid)}`);
-        const detailsHtmlAS = await detailsAS.text();
-        const discoveredAS = extractInputFields(detailsHtmlAS);
-
+        // Part A: Activate new SIM (POST directly to index.php?page=bh/index)
+        console.log(`[activate_and_swap] Activating new SIM ${newIccid}`);
         const startAS = normalizeDate(params.start_rental || '');
         const endAS   = normalizeDate(params.end_rental   || '');
 
-        await (await session.post('content/dashboard/rentals/calculate_days.php', {
-          start_rental: startAS, end_rental: endAS,
-          product: discoveredAS['product'] || params.product || '',
-          exp: discoveredAS['exp'] || '',
-        })).text();
-
-        const actRes = await session.post('dynamic/submit.php', {
-          ...discoveredAS,
-          start_rental: startAS, end_rental: endAS,
+        const actRes = await session.post('index.php?page=bh/index', {
+          product: params.product || '',
+          start_rental: startAS,
+          end_rental: endAS,
           deler4cus_price: params.price || '',
+          calculated_days_input: params.days || '',
           note: params.note || '',
         });
         const actHtml = await actRes.text();
         const actSuccess = !hasError(actHtml) && actRes.status === 200;
 
         if (!actSuccess) {
-          result = { success: false, action: 'activate_and_swap', error: 'Activation failed: ' + actHtml.slice(0, 500) };
+          result = { success: false, action: 'activate_and_swap', step: 'activation', error: 'Activation failed: ' + actHtml.slice(0, 500) };
           break;
         }
 
         // Wait 60 seconds for portal processing
-        console.log('Waiting 60 seconds for portal...');
+        console.log('[activate_and_swap] Activation successful, waiting 60s before swap...');
         await new Promise(r => setTimeout(r, 60000));
 
-        // Part B: swap old SIM to new ICCID
-        await (await session.get('index.php?page=bh/index')).text();
-        const swapDetailsAS = await session.get(`content/dashboard/rentals/fetch_BHsim_details.php?zehut=${encodeURIComponent(oldIccid)}`);
-        const swapHtmlAS = await swapDetailsAS.text();
-        const swapHiddenAS = extractHiddenFields(swapHtmlAS);
-
-        const swapResAS = await session.post('dynamic/submit.php', {
-          ...swapHiddenAS,
-          swap_iccid: newIccid,
-          swap_msisdn: '',
+        // Part B: Swap old SIM to new ICCID (POST directly to index.php?page=bh/index)
+        console.log(`[activate_and_swap] Swapping from ${oldIccid} to ${newIccid}`);
+        const swapResAS = await session.post('index.php?page=bh/index', {
           current_sim: params.current_sim || '',
+          swap_iccid: newIccid,
+          swap_msisdn: params.swap_msisdn || '',
         });
         const swapResultAS = await swapResAS.text();
         const swapSuccessAS = !hasError(swapResultAS) && swapResAS.status === 200;
 
         if (!swapSuccessAS) {
-          result = { success: false, action: 'activate_and_swap', error: 'Activation OK but swap failed: ' + swapResultAS.slice(0, 500) };
+          result = { success: false, action: 'activate_and_swap', step: 'swap', error: 'Activation OK but swap failed: ' + swapResultAS.slice(0, 500) };
           break;
         }
 
+        console.log('[activate_and_swap] Success!');
         result = { success: true, action: 'activate_and_swap' };
         break;
       }
