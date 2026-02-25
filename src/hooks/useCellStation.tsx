@@ -107,53 +107,22 @@ export function useCellStation() {
   const syncSims = useCallback(async () => {
     setIsSyncing(true);
     try {
-      console.log('🚀 Starting sync with CellStation...');
       const data = await csInvoke('sync_csv', {});
-      console.log('📦 sync_csv response:', data);
-
       if (!data?.success) throw new Error(data?.error || 'Sync failed');
-
       const sims = data.sims || [];
-      console.log(`✅ Received ${sims.length} SIMs from CellStation`);
-
       if (sims.length === 0) {
         toast({ title: "אין סימים", description: "לא התקבלו סימים מ-CellStation.", variant: "destructive" });
         return;
       }
-
-      // Cross-reference with inventory
-      const now = new Date().toISOString();
-      const records = sims.map((sim: any) => {
-        const { status, status_detail } = parseStatusRaw(sim.status_raw);
-        return {
-          iccid: sim.iccid,
-          sim_number: sim.sim_number,
-          uk_number: sim.uk_number,
-          il_number: sim.il_number,
-          status,
-          status_detail,
-          expiry_date: parseDate(sim.expiry_date),
-          plan: sim.plan,
-          start_date: parseDate(sim.start_date),
-          end_date: parseDate(sim.end_date),
-          customer_name: extractCustomerName(sim.note),
-          last_sync: now,
-        };
-      }).filter((r: any) => r.iccid);
-
-      if (records.length > 0) {
-        await csInvoke('upsert_sims', { records });
-      }
-
-      toast({ title: 'סנכרון הושלם', description: `${records.length} סימים עודכנו` });
-      simsCache = null; // Invalidate cache after sync
-      await fetchSims();
+      simsCache = { data: sims as CellStationSim[], ts: Date.now() };
+      setSimCards(sims as CellStationSim[]);
+      toast({ title: 'סנכרון הושלם', description: `${sims.length} סימים נטענו` });
     } catch (e: any) {
       toast({ title: 'שגיאת סנכרון', description: e.message, variant: 'destructive' });
     } finally {
       setIsSyncing(false);
     }
-  }, [fetchSims, toast]);
+  }, [toast]);
 
   const activateSim = useCallback(async (params: {
     iccid: string; product: string; start_rental: string; end_rental: string;
@@ -181,11 +150,9 @@ export function useCellStation() {
     try {
       const data = await csInvoke('activate_sim', { ...params, product: '' });
       if (!data?.success) throw new Error(data?.error || 'Activation failed');
-      // עדכן סטטוס דרך Edge Function
-      await csInvoke('update_sim_status', { iccid: params.iccid, status: 'rented', status_detail: 'active' });
-      toast({ title: 'הסים הופעל בהצלחה ועבר למושכרים ✅' });
-      simsCache = null; // Invalidate cache after activation
-      await fetchSims();
+      toast({ title: 'הסים הופעל בהצלחה ✅' });
+      simsCache = null;
+      await fetchSims(true);
       return { success: true };
     } catch (e: any) {
       toast({ title: 'שגיאה בהפעלת סים', description: e.message, variant: 'destructive' });
@@ -218,29 +185,49 @@ export function useCellStation() {
     note: string; current_sim: string; current_iccid: string; swap_iccid: string;
   }, onProgress?: (step: string, percent: number) => void) => {
     try {
-      onProgress?.('מפעיל סים...', 10);
-      setActivateAndSwapProgress('מפעיל סים...');
+      // Step 1: Activate new SIM (API waits 20s internally)
+      onProgress?.('מפעיל סים חדש...', 5);
+      setActivateAndSwapProgress('מפעיל סים חדש...');
+
       const startTime = Date.now();
-      const totalWait = 80000;
       const progressInterval = setInterval(() => {
         const elapsed = Date.now() - startTime;
-        const percent = Math.min(90, Math.round((elapsed / totalWait) * 90));
-        if (elapsed < 10000) { onProgress?.('מפעיל סים...', percent); setActivateAndSwapProgress('מפעיל סים...'); }
-        else if (elapsed < 65000) { onProgress?.('ממתין 60 שניות...', percent); setActivateAndSwapProgress('ממתין 60 שניות...'); }
-        else { onProgress?.('מחליף סים...', percent); setActivateAndSwapProgress('מחליף סים...'); }
-      }, 1000);
+        const pct = Math.min(55, Math.round((elapsed / 25000) * 55));
+        onProgress?.('מפעיל סים חדש...', 5 + pct);
+        setActivateAndSwapProgress('מפעיל סים חדש...');
+      }, 500);
+
       let data: any;
       try {
         data = await csInvoke('activate_and_swap', params);
       } finally {
         clearInterval(progressInterval);
       }
-      if (!data?.success) throw new Error(data?.error || 'Activate and swap failed');
+
+      if (!data?.success) throw new Error(data?.error || 'Activation failed');
+
+      // Step 2: Refresh SIMs list so new SIM appears as active
+      onProgress?.('מרענן רשימת סימים...', 65);
+      setActivateAndSwapProgress('מרענן רשימת סימים...');
+      simsCache = null;
+      await fetchSims(true);
+
+      // Step 3: Perform the swap
+      onProgress?.('מבצע החלפת סים...', 78);
+      setActivateAndSwapProgress('מבצע החלפת סים...');
+      const swapData = await csInvoke('swap_sim', {
+        current_sim: params.current_sim,
+        swap_iccid: params.swap_iccid,
+        swap_msisdn: '',
+      });
+
+      if (!swapData?.success) throw new Error(swapData?.error || 'Swap failed');
+
       onProgress?.('הושלם!', 100);
       setActivateAndSwapProgress('הושלם!');
-      toast({ title: 'הפעלה והחלפה הושלמו בהצלחה!' });
-      simsCache = null; // Invalidate cache after activate+swap
-      await fetchSims();
+      toast({ title: 'הפעלה והחלפה הושלמו בהצלחה! ✅' });
+      simsCache = null;
+      await fetchSims(true);
       return data;
     } catch (e: any) {
       setActivateAndSwapProgress(null);

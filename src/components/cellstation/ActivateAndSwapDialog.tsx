@@ -471,7 +471,7 @@ export function ActivateAndSwapDialog({
               <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 text-sm">
                 <p className="font-bold text-amber-800 dark:text-amber-200 mb-1">⚠️ שים לב</p>
                 <p className="text-amber-700 dark:text-amber-300 text-xs leading-relaxed">
-                  תהליך זה לוקח כ-70 שניות: הפעלת הסים החדש, המתנה של 30 שניות, ולאחר מכן החלפה. אל תסגור את החלון.
+                  תהליך זה לוקח כ-35 שניות: הפעלת הסים החדש, המתנה של 20 שניות, ולאחר מכן החלפה. אל תסגור את החלון.
                 </p>
               </div>
             </div>
