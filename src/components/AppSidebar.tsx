@@ -210,7 +210,7 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
 
       {/* Settings Dialog */}
       <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Settings className="h-5 w-5" />
@@ -218,25 +218,12 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-4">
-            {/* Personal Settings */}
-            <div>
-              <h3 className="text-sm font-semibold mb-3 text-muted-foreground">הגדרות אישיות</h3>
-              <div className="space-y-3">
-                <BiometricSettings />
-                <ThemeSettings />
-                <LanguageSettings />
-                <NotificationSettings />
-              </div>
-            </div>
-
-            {/* Business Settings */}
-            <div>
-              <h3 className="text-sm font-semibold mb-3 text-muted-foreground">הגדרות עסקיות</h3>
-              <div className="space-y-3">
-                <BusinessSettings />
-                <APIKeysSettings />
-              </div>
-            </div>
+            <BiometricSettings />
+            <ThemeSettings />
+            <LanguageSettings />
+            <NotificationSettings />
+            <BusinessSettings />
+            <APIKeysSettings />
           </div>
         </DialogContent>
       </Dialog>
