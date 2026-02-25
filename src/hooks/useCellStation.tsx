@@ -182,7 +182,9 @@ export function useCellStation() {
 
   const activateAndSwap = useCallback(async (params: {
     product: string; start_rental: string; end_rental: string; price: string;
-    note: string; current_sim: string; current_iccid: string; swap_iccid: string;
+    days?: string; note: string;
+    current_sim: string; current_iccid: string; swap_iccid: string;
+    swap_msisdn?: string;
   }, onProgress?: (step: string, percent: number) => void) => {
     try {
       // Step 1: Activate new SIM (API waits 20s internally)

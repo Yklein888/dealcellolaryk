@@ -38,12 +38,19 @@ function parseFormFields(html) {
 
 // ── Get a hidden field value by id (no name attr) ────────────────────────
 function getValueById(html, id) {
-  // Try value before id
-  let m = html.match(new RegExp(`<input[^>]*value="([^"]*)"[^>]*id="${id}"[^>]*>`, 'i'));
-  if (m) return m[1];
-  // Try id before value
-  m = html.match(new RegExp(`<input[^>]*id="${id}"[^>]*value="([^"]*)"[^>]*>`, 'i'));
-  if (m) return m[1];
+  const esc = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Try all combinations of attribute order and quote style
+  // Note: [^>]* matches any char except > (including \n) so multi-line attrs work
+  const patterns = [
+    new RegExp(`<input[^>]*\\bvalue="([^"]*)"[^>]*\\bid="${esc}"[^>]*>`, 'i'),
+    new RegExp(`<input[^>]*\\bid="${esc}"[^>]*\\bvalue="([^"]*)"[^>]*>`, 'i'),
+    new RegExp(`<input[^>]*\\bvalue='([^']*)'[^>]*\\bid="${esc}"[^>]*>`, 'i'),
+    new RegExp(`<input[^>]*\\bid="${esc}"[^>]*\\bvalue='([^']*)'[^>]*>`, 'i'),
+  ];
+  for (const re of patterns) {
+    const m = html.match(re);
+    if (m) return m[1];
+  }
   return null;
 }
 
@@ -248,15 +255,57 @@ function enrichSims(rawSims) {
 }
 
 // ── Find CellStation rental order_id by old SIM's ICCID ──────────────────
-// Scans the BH index HTML for the active rentals table
+// Scans the BH index HTML for the active rentals table.
+// Uses three strategies in order:
+//   A) Find the enclosing <tr>...</tr> containing the ICCID and search inside it
+//   B) Wide 3000-char window around the ICCID occurrence
+//   C) Reverse-scan: collect all rental_details links and check if ICCID is near each one
 function findOrderIdByIccid(bhHtml, iccid) {
   if (!iccid) return null;
-  const idx = bhHtml.indexOf(iccid);
-  if (idx === -1) return null;
-  // Look for rental_details link within 600 chars before or after the ICCID
-  const window = bhHtml.substring(Math.max(0, idx - 600), Math.min(bhHtml.length, idx + 600));
-  const linkMatch = window.match(/rental_details[^"]*id=(\d+)/i);
-  return linkMatch ? linkMatch[1] : null;
+  const cleanIccid = iccid.replace(/\D/g, '');
+  const searchTerms = [...new Set([iccid, cleanIccid].filter(Boolean))];
+
+  for (const term of searchTerms) {
+    const idx = bhHtml.indexOf(term);
+    if (idx === -1) continue;
+
+    // Strategy A: Find enclosing <tr>...</tr> and look for rental_details inside
+    const trStart = bhHtml.lastIndexOf('<tr', idx);
+    const trEnd   = bhHtml.indexOf('</tr>', idx);
+    if (trStart !== -1 && trEnd !== -1 && (trEnd - trStart) < 10000) {
+      const rowHtml = bhHtml.substring(trStart, trEnd + 5);
+      const m = rowHtml.match(/rental_details[^"'<]*id=(\d+)/i);
+      if (m) {
+        console.log(`[findOrderIdByIccid] Strategy A (TR): found order_id=${m[1]} for iccid=${term}`);
+        return m[1];
+      }
+    }
+
+    // Strategy B: Wide 3000-char window
+    const chunk = bhHtml.substring(Math.max(0, idx - 3000), Math.min(bhHtml.length, idx + 3000));
+    const m2 = chunk.match(/rental_details[^"'<]*id=(\d+)/i);
+    if (m2) {
+      console.log(`[findOrderIdByIccid] Strategy B (window): found order_id=${m2[1]} for iccid=${term}`);
+      return m2[1];
+    }
+  }
+
+  // Strategy C: Collect all rental_details links and check if ICCID is anywhere nearby
+  const linkRe = /rental_details[^"'<]*id=(\d+)/gi;
+  let lm;
+  while ((lm = linkRe.exec(bhHtml)) !== null) {
+    const chunk = bhHtml.substring(
+      Math.max(0, lm.index - 4000),
+      Math.min(bhHtml.length, lm.index + 4000)
+    );
+    if (searchTerms.some(t => chunk.includes(t))) {
+      console.log(`[findOrderIdByIccid] Strategy C (reverse scan): found order_id=${lm[1]}`);
+      return lm[1];
+    }
+  }
+
+  console.log(`[findOrderIdByIccid] NOT FOUND. Searched for: ${searchTerms.join(', ')}`);
+  return null;
 }
 
 // ── Main Handler ──────────────────────────────────────────────────────────
@@ -367,28 +416,32 @@ export default async function handler(req, res) {
           note: params.note || '',
         });
         const submitHtml = await submitRes.text();
-        const errored = hasError(submitHtml);
 
-        if (errored) {
-          console.error('[activate_sim] CellStation error:', submitHtml.slice(0, 300));
-        } else {
-          console.log('[activate_sim] Activation successful');
-        }
+        // Portal returns "הזמנת ההפעלה נשמרה בהצלחה" on success — require it
+        const activated = submitHtml.includes('הזמנת ההפעלה נשמרה בהצלחה');
+        const errored   = hasError(submitHtml) || !activated;
+        console.log(`[activate_sim] activated=${activated}, hasError=${hasError(submitHtml)}, response: ${submitHtml.slice(0, 300)}`);
 
         result = {
           success: !errored,
           action: 'activate_sim',
-          hasError: errored,
-          error: errored ? submitHtml.slice(0, 300) : undefined,
+          error: errored
+            ? (hasError(submitHtml) ? submitHtml.slice(0, 300) : `לא התקבל אישור הפעלה מ-CellStation. תגובה: ${submitHtml.slice(0, 200)}`)
+            : undefined,
         };
         break;
       }
 
       // ── swap_sim ──────────────────────────────────────────────────────
       // Correct flow:
-      //   1. GET BH index page → find active rental by old SIM's ICCID → extract order_id
+      //   1. GET BH index page → find active rental by old SIM account/msisdn → extract order_id
       //   2. GET rental details page → extract phone_id and other required swap fields
       //   3. POST JSON to content/dashboard/rentals/sim_swap.php
+      //
+      // IMPORTANT: The BH index typically does NOT show the ICCID column in its table.
+      // Therefore we cannot rely on ICCID appearing in the HTML to confirm a match.
+      // Instead: when we do a filtered search (by account name or msisdn) and get back
+      // ANY rental_details link, we treat it as the correct rental.
       case 'swap_sim': {
         const { swap_iccid, current_iccid, current_sim, swap_msisdn } = params;
 
@@ -401,18 +454,114 @@ export default async function handler(req, res) {
           break;
         }
 
-        // Step 1: GET BH index to find the active rental with old ICCID
-        console.log(`[swap_sim] Looking for rental with old ICCID: ${current_iccid}`);
-        const bhRes = await session.get('index.php?page=bh/index');
-        const bhHtml = await bhRes.text();
+        const cleanOldIccid = current_iccid.replace(/\D/g, '');
+        console.log(`[swap_sim] Finding rental: ICCID=${current_iccid}, account="${current_sim}", msisdn="${swap_msisdn}"`);
 
-        const orderId = findOrderIdByIccid(bhHtml, current_iccid);
+        // Helper: extract first rental_details link from a page (filtered search results)
+        const extractFirstOrderId = (html) => {
+          const m = html.match(/rental_details[^"'<]*id=(\d+)/i);
+          return m ? m[1] : null;
+        };
+
+        let orderId = null;
+        let bhHtml = '';
+
+        // ── Attempt A: POST search by account name (sim_number) ──────────────
+        if (current_sim && !orderId) {
+          const sRes = await session.post('index.php?page=bh/index', { sim_lookup_search: current_sim });
+          const sHtml = await sRes.text();
+          const hasRentals = sHtml.includes('rental_details');
+          const iccidVisible = sHtml.includes(current_iccid) || sHtml.includes(cleanOldIccid);
+          console.log(`[swap_sim] Search by account "${current_sim}": hasRentals=${hasRentals}, iccidVisible=${iccidVisible}, len=${sHtml.length}`);
+
+          if (hasRentals) {
+            // Try ICCID-precise match first, then fall back to first result
+            // (BH index often doesn't show ICCID column, so iccidVisible may be false even for correct rental)
+            const precise = findOrderIdByIccid(sHtml, current_iccid);
+            if (precise) {
+              orderId = precise;
+              console.log(`[swap_sim] A: ICCID-precise match → orderId=${orderId}`);
+            } else {
+              orderId = extractFirstOrderId(sHtml);
+              console.log(`[swap_sim] A: first rental from account search (ICCID not in index) → orderId=${orderId}`);
+            }
+            if (orderId) bhHtml = sHtml;
+          }
+        }
+
+        // ── Attempt B: POST search by UK number (msisdn) ─────────────────────
+        if (!orderId && swap_msisdn) {
+          const sRes2 = await session.post('index.php?page=bh/index', { sim_lookup_search: swap_msisdn });
+          const sHtml2 = await sRes2.text();
+          const hasRentals2 = sHtml2.includes('rental_details');
+          const iccidVisible2 = sHtml2.includes(current_iccid) || sHtml2.includes(cleanOldIccid);
+          console.log(`[swap_sim] Search by msisdn "${swap_msisdn}": hasRentals=${hasRentals2}, iccidVisible=${iccidVisible2}, len=${sHtml2.length}`);
+
+          if (hasRentals2) {
+            const precise2 = findOrderIdByIccid(sHtml2, current_iccid);
+            if (precise2) {
+              orderId = precise2;
+              console.log(`[swap_sim] B: ICCID-precise match → orderId=${orderId}`);
+            } else {
+              orderId = extractFirstOrderId(sHtml2);
+              console.log(`[swap_sim] B: first rental from msisdn search → orderId=${orderId}`);
+            }
+            if (orderId) bhHtml = sHtml2;
+          }
+        }
+
+        // ── Attempt C: Full BH index GET — search by ICCID, account name, msisdn ──
         if (!orderId) {
-          console.error('[swap_sim] Could not find active rental for ICCID:', current_iccid);
+          console.log('[swap_sim] A+B failed — fetching full BH index...');
+          const bhRes = await session.get('index.php?page=bh/index');
+          bhHtml = await bhRes.text();
+
+          // Try ICCID (precise)
+          orderId = findOrderIdByIccid(bhHtml, current_iccid);
+          if (orderId) {
+            console.log(`[swap_sim] C: ICCID match in full index → orderId=${orderId}`);
+          }
+
+          // Try account name proximity match
+          if (!orderId && current_sim) {
+            const idx = bhHtml.indexOf(current_sim);
+            if (idx !== -1) {
+              const chunk = bhHtml.substring(Math.max(0, idx - 2000), Math.min(bhHtml.length, idx + 2000));
+              const m = chunk.match(/rental_details[^"'<]*id=(\d+)/i);
+              if (m) {
+                orderId = m[1];
+                console.log(`[swap_sim] C: account name proximity in full index → orderId=${orderId}`);
+              }
+            }
+          }
+
+          // Try msisdn proximity match
+          if (!orderId && swap_msisdn) {
+            const idx2 = bhHtml.indexOf(swap_msisdn);
+            if (idx2 !== -1) {
+              const chunk2 = bhHtml.substring(Math.max(0, idx2 - 2000), Math.min(bhHtml.length, idx2 + 2000));
+              const m2 = chunk2.match(/rental_details[^"'<]*id=(\d+)/i);
+              if (m2) {
+                orderId = m2[1];
+                console.log(`[swap_sim] C: msisdn proximity in full index → orderId=${orderId}`);
+              }
+            }
+          }
+
+          console.log(`[swap_sim] Full index: ICCID_in_html=${bhHtml.includes(current_iccid)||bhHtml.includes(cleanOldIccid)}, account_in_html=${bhHtml.includes(current_sim||'')}, orderId=${orderId}, len=${bhHtml.length}`);
+        }
+
+        if (!orderId) {
+          console.error('[swap_sim] Could not find rental for ICCID:', current_iccid);
+          const debugSnippet = bhHtml.substring(0, 600);
           result = {
             success: false,
-            error: `No active rental found for SIM ${current_iccid} on CellStation. The SIM may not be active yet (try waiting longer after activation) or the ICCID is wrong.`,
+            error: `לא נמצאה השכרה פעילה עבור סים ${current_iccid} ב-CellStation. ייתכן שהסים טרם הופעל (נסה שוב עוד מעט), או שה-ICCID שגוי.`,
             action: 'swap_sim',
+            debug_account_in_html: bhHtml.includes(current_sim || ''),
+            debug_msisdn_in_html: bhHtml.includes(swap_msisdn || ''),
+            debug_iccid_in_html: bhHtml.includes(current_iccid) || bhHtml.includes(cleanOldIccid),
+            debug_snippet: debugSnippet,
           };
           break;
         }
@@ -430,11 +579,17 @@ export default async function handler(req, res) {
 
         if (!phoneId) {
           console.error('[swap_sim] Could not extract phone_id from rental details page');
+          // Log what IDs we CAN find to help diagnose
+          const foundIds = ['phone_id','account_name_swap','order_id_swap','c_nu_swap','store_id_swap']
+            .map(id => `${id}=${getValueById(rentalHtml, id) ?? 'NOT_FOUND'}`).join(', ');
+          console.error('[swap_sim] Field scan:', foundIds);
           result = {
             success: false,
-            error: 'Could not get phone_id from CellStation rental details',
+            error: `לא ניתן לחלץ phone_id מפרטי ההשכרה (order_id=${orderId}). ייתכן בעיית הרשאות בדף.`,
             action: 'swap_sim',
-            debug: rentalHtml.slice(0, 300),
+            debug_order_id: orderId,
+            debug_fields: foundIds,
+            debug_html: rentalHtml.slice(0, 400),
           };
           break;
         }
@@ -452,20 +607,25 @@ export default async function handler(req, res) {
         });
 
         const swapText = await swapRes.text();
+        console.log(`[swap_sim] sim_swap.php raw response (first 400): ${swapText.slice(0, 400)}`);
         let swapData;
         try {
           swapData = JSON.parse(swapText);
         } catch {
-          console.error('[swap_sim] Non-JSON response:', swapText.slice(0, 300));
-          swapData = { success: false, message: swapText.slice(0, 200) };
+          console.error('[swap_sim] Non-JSON response from sim_swap.php:', swapText.slice(0, 300));
+          swapData = { success: false, message: `שגיאה לא ידועה מ-CellStation: ${swapText.slice(0, 150)}` };
         }
 
         console.log(`[swap_sim] Result: success=${swapData.success}, message=${swapData.message}`);
+
+        // CellStation returns { success: true/false, message: "..." }
+        // Treat success=1 or success="true" or success=true all as truthy
+        const isSuccess = swapData.success === true || swapData.success === 1 || swapData.success === 'true' || swapData.success === '1';
         result = {
-          success: !!swapData.success,
+          success: isSuccess,
           action: 'swap_sim',
           message: swapData.message || '',
-          error: swapData.success ? undefined : (swapData.message || 'Swap failed'),
+          error: isSuccess ? undefined : (swapData.message || swapData.error || 'Swap failed on CellStation'),
         };
         break;
       }
@@ -514,18 +674,23 @@ export default async function handler(req, res) {
         });
         const actHtml = await actRes.text();
 
-        if (hasError(actHtml)) {
-          console.error('[activate_and_swap] Activation error from CellStation:', actHtml.slice(0, 200));
+        // Portal returns "הזמנת ההפעלה נשמרה בהצלחה" on success — require it
+        const actSucceeded = actHtml.includes('הזמנת ההפעלה נשמרה בהצלחה');
+        console.log(`[activate_and_swap] Activation result: succeeded=${actSucceeded}, response: ${actHtml.slice(0, 300)}`);
+
+        if (!actSucceeded) {
           result = {
             success: false,
             action: 'activate_and_swap',
             step: 'activation',
-            error: 'CellStation error during activation',
+            error: hasError(actHtml)
+              ? `CellStation שגיאה בהפעלה: ${actHtml.slice(0, 200)}`
+              : `הפעלה לא אושרה על ידי CellStation. תגובה: ${actHtml.slice(0, 200)}`,
             debug: actHtml.slice(0, 300),
           };
           break;
         }
-        console.log('[activate_and_swap] Activation submitted successfully');
+        console.log('[activate_and_swap] Activation confirmed by CellStation ✅');
 
         // Step 2: Wait 20s for CellStation portal to process the activation
         console.log('[activate_and_swap] Step 2: Waiting 20s for portal to process...');
