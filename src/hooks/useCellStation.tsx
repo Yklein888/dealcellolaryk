@@ -216,9 +216,10 @@ export function useCellStation() {
       onProgress?.('מבצע החלפת סים...', 78);
       setActivateAndSwapProgress('מבצע החלפת סים...');
       const swapData = await csInvoke('swap_sim', {
-        current_sim: params.current_sim,
-        swap_iccid: params.swap_iccid,
-        swap_msisdn: '',
+        current_sim: params.current_sim,        // old SIM's sim_number (account_name)
+        current_iccid: params.current_iccid,    // old SIM's ICCID (to find rental on CellStation)
+        swap_iccid: params.swap_iccid,          // new SIM's ICCID
+        swap_msisdn: params.swap_msisdn || '',  // old SIM's UK number (for CellStation sim_swap.php)
       });
 
       if (!swapData?.success) throw new Error(swapData?.error || 'Swap failed');

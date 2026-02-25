@@ -192,10 +192,22 @@ export function ActivateAndSwapDialog({
       setProgressPercent(30);
       setProgressStep('מפעיל ומחליף סים ב-CellStation...');
 
+      // Look up the new SIM in availableSims to get its plan name (used for activation)
+      const newSimData = availableSims.find(s => s.iccid?.replace(/\D/g, '') === cleanIccid);
+
       await onActivateAndSwap(
-        { product: '', start_rental: startDate, end_rental: endDate,
-          price: String(totalPrice), note: customerName,
-          current_sim: oldSim.sim_number || '', current_iccid: oldSim.iccid || '', swap_iccid: cleanIccid },
+        {
+          product: newSimData?.plan || '',        // plan name e.g. "10 גיגה גלישה" (CellStation product ID lookup)
+          start_rental: startDate,
+          end_rental: endDate,
+          price: String(totalPrice),
+          days: String(days),
+          note: customerName,
+          current_sim: oldSim.sim_number || '',   // old SIM's account_name on CellStation
+          current_iccid: oldSim.iccid || '',      // old SIM's ICCID (to find rental on CellStation)
+          swap_iccid: cleanIccid,                 // new SIM's ICCID
+          swap_msisdn: oldSim.uk_number || '',    // OLD SIM's UK number (msisdn for CellStation swap form)
+        },
         (stepName, percent) => {
           setProgressStep(stepName);
           setProgressPercent(30 + Math.round(percent * 0.7));
