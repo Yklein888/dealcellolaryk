@@ -382,19 +382,13 @@ export default async function handler(req, res) {
 
       case 'activate_and_swap': {
         const newIccid = params.swap_iccid || params.iccid || '';
-        const oldIccid = params.current_iccid || '';
-
         if (!newIccid || newIccid.length < 19 || newIccid.length > 20 || !/^\d+$/.test(newIccid)) {
           result = { success: false, error: 'Invalid new ICCID', action: 'activate_and_swap' };
           break;
         }
-        if (!oldIccid || oldIccid.length < 19 || oldIccid.length > 20) {
-          result = { success: false, error: 'Invalid old ICCID', action: 'activate_and_swap' };
-          break;
-        }
 
-        // Part A: Activate new SIM (POST directly to index.php?page=bh/index)
-        console.log(`[activate_and_swap] Activating new SIM ${newIccid}`);
+        // Part A: Activate new SIM ONLY (do not swap yet)
+        console.log(`[activate_and_swap] Step 1: Activating new SIM ${newIccid}`);
         const startAS = normalizeDate(params.start_rental || '');
         const endAS   = normalizeDate(params.end_rental   || '');
 
@@ -414,27 +408,19 @@ export default async function handler(req, res) {
           break;
         }
 
-        // Wait 60 seconds for portal processing
-        console.log('[activate_and_swap] Activation successful, waiting 60s before swap...');
+        console.log('[activate_and_swap] Step 2: Activation successful, waiting 60s for portal to process...');
         await new Promise(r => setTimeout(r, 60000));
 
-        // Part B: Swap old SIM to new ICCID (POST directly to index.php?page=bh/index)
-        console.log(`[activate_and_swap] Swapping from ${oldIccid} to ${newIccid}`);
-        const swapResAS = await session.post('index.php?page=bh/index', {
-          current_sim: params.current_sim || '',
-          swap_iccid: newIccid,
-          swap_msisdn: params.swap_msisdn || '',
-        });
-        const swapResultAS = await swapResAS.text();
-        const swapSuccessAS = !hasError(swapResultAS) && swapResAS.status === 200;
-
-        if (!swapSuccessAS) {
-          result = { success: false, action: 'activate_and_swap', step: 'swap', error: 'Activation OK but swap failed: ' + swapResultAS.slice(0, 500) };
-          break;
-        }
-
-        console.log('[activate_and_swap] Success!');
-        result = { success: true, action: 'activate_and_swap' };
+        // Return "ready_to_swap" status - frontend should now refresh SIMs list and allow swap
+        console.log('[activate_and_swap] Step 3: Ready for swap. Frontend should refresh SIMs list.');
+        result = {
+          success: true,
+          action: 'activate_and_swap',
+          status: 'ready_to_swap',
+          message: 'SIM activated successfully. Refresh SIMs list and perform swap separately.',
+          newIccid: newIccid,
+          nextAction: 'Call swap_sim with the new ICCID'
+        };
         break;
       }
 
