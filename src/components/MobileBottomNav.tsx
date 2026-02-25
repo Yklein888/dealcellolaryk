@@ -18,11 +18,23 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { Wrench, CreditCard, FileText, Shield, LogOut } from 'lucide-react';
+import { Wrench, CreditCard, FileText, Shield, LogOut, Settings } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useRole } from '@/hooks/useRole';
 import { usePermissions } from '@/hooks/usePermissions';
 import { Button } from './ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { BiometricSettings } from '@/components/settings/BiometricSettings';
+import { NotificationSettings } from '@/components/NotificationSettings';
+import { LanguageSettings } from '@/components/settings/LanguageSettings';
+import { BusinessSettings } from '@/components/settings/BusinessSettings';
+import { ThemeSettings } from '@/components/settings/ThemeSettings';
+import { APIKeysSettings } from '@/components/settings/APIKeysSettings';
 
 const mainNavItems = [
   { path: '/', label: 'ראשי', icon: LayoutDashboard, permission: 'view_dashboard' as const },
@@ -50,6 +62,7 @@ export function MobileBottomNav() {
   const { isAdmin } = useRole();
   const { hasPermission } = usePermissions();
   const [isMoreOpen, setIsMoreOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -170,6 +183,20 @@ export function MobileBottomNav() {
               )}
             </div>
 
+            {/* Settings Button */}
+            <button
+              onClick={() => {
+                setIsMoreOpen(false);
+                setIsSettingsOpen(true);
+              }}
+              className="flex items-center gap-4 p-4 rounded-2xl transition-all duration-200 w-full hover:bg-muted active:bg-muted/70"
+            >
+              <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-muted">
+                <Settings className="h-5 w-5" />
+              </div>
+              <span className="font-medium text-base">הגדרות</span>
+            </button>
+
             {/* User Section */}
             <div className="border-t border-border pt-4 pb-2">
               <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/50">
@@ -190,6 +217,26 @@ export function MobileBottomNav() {
           </SheetContent>
         </Sheet>
       </div>
+
+      {/* Settings Dialog */}
+      <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+        <DialogContent className="max-w-sm max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              הגדרות
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <BiometricSettings />
+            <ThemeSettings />
+            <LanguageSettings />
+            <NotificationSettings />
+            <BusinessSettings />
+            <APIKeysSettings />
+          </div>
+        </DialogContent>
+      </Dialog>
     </nav>
   );
 }
