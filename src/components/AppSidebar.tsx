@@ -32,6 +32,11 @@ import {
   Globe,
 } from 'lucide-react';
 import { BiometricSettings } from '@/components/settings/BiometricSettings';
+import { NotificationSettings } from '@/components/NotificationSettings';
+import { LanguageSettings } from '@/components/settings/LanguageSettings';
+import { BusinessSettings } from '@/components/settings/BusinessSettings';
+import { ThemeSettings } from '@/components/settings/ThemeSettings';
+import { APIKeysSettings } from '@/components/settings/APIKeysSettings';
 
 const navItems = [
   { path: '/', label: 'דאשבורד', icon: LayoutDashboard, permission: 'view_dashboard' as PermissionKey },
@@ -205,7 +210,7 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
 
       {/* Settings Dialog */}
       <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Settings className="h-5 w-5" />
@@ -213,7 +218,25 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-4">
-            <BiometricSettings />
+            {/* Personal Settings */}
+            <div>
+              <h3 className="text-sm font-semibold mb-3 text-muted-foreground">הגדרות אישיות</h3>
+              <div className="space-y-3">
+                <BiometricSettings />
+                <ThemeSettings />
+                <LanguageSettings />
+                <NotificationSettings />
+              </div>
+            </div>
+
+            {/* Business Settings */}
+            <div>
+              <h3 className="text-sm font-semibold mb-3 text-muted-foreground">הגדרות עסקיות</h3>
+              <div className="space-y-3">
+                <BusinessSettings />
+                <APIKeysSettings />
+              </div>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
