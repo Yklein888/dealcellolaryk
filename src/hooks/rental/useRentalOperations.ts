@@ -14,17 +14,23 @@ export function createRentalOperations(deps: RentalOperationsDeps) {
 
   const addRental = async (rental: Omit<Rental, 'id' | 'createdAt'>) => {
     // Step 1: Collect all non-generic inventory item IDs
-    const nonGenericItemIds = rental.items
+    // Separate real inventory items from virtual US SIM IDs
+    const allNonGenericItemIds = rental.items
       .filter(item => !item.isGeneric && item.inventoryItemId)
       .map(item => item.inventoryItemId);
 
-    // Step 2: Verify all items are still available in the database
-    if (nonGenericItemIds.length > 0) {
+    // Virtual US SIM IDs start with 'us-sim-' and don't need inventory checks
+    const isVirtualUSSimId = (id: string) => id.startsWith('us-sim-');
+    const realInventoryIds = allNonGenericItemIds.filter(id => !isVirtualUSSimId(id));
+    const virtualUSSimIds = allNonGenericItemIds.filter(id => isVirtualUSSimId(id));
+
+    // Step 2: Verify all REAL items are still available in the database
+    if (realInventoryIds.length > 0) {
       const { data: currentInventory, error: checkError } = await supabase
         .from('inventory')
         .select('id, status, name')
-        .in('id', nonGenericItemIds);
-      
+        .in('id', realInventoryIds);
+
       if (checkError) {
         console.error('Error checking inventory availability:', checkError);
         throw new Error('שגיאה בבדיקת זמינות המלאי');
@@ -33,7 +39,7 @@ export function createRentalOperations(deps: RentalOperationsDeps) {
       const unavailableItems = currentInventory?.filter(
         item => item.status !== 'available'
       );
-      
+
       if (unavailableItems && unavailableItems.length > 0) {
         const itemNames = unavailableItems.map(i => i.name).join(', ');
         throw new Error(`הפריטים הבאים כבר לא זמינים: ${itemNames}`);
@@ -88,13 +94,14 @@ export function createRentalOperations(deps: RentalOperationsDeps) {
       }
     }
 
-    // Step 4: Update ALL inventory items to rented in a single batch operation
-    if (nonGenericItemIds.length > 0) {
+    // Step 4: Update REAL inventory items to rented in a single batch operation
+    // Virtual US SIM IDs don't need to be updated in inventory table
+    if (realInventoryIds.length > 0) {
       const { error: updateError } = await supabase
         .from('inventory')
         .update({ status: 'rented' })
-        .in('id', nonGenericItemIds);
-      
+        .in('id', realInventoryIds);
+
       if (updateError) {
         console.error('Error updating inventory status:', updateError);
         throw new Error('שגיאה בעדכון סטטוס המלאי');
@@ -136,7 +143,8 @@ export function createRentalOperations(deps: RentalOperationsDeps) {
     const rental = rentals.data.find(r => r.id === id);
     if (rental) {
       for (const item of rental.items) {
-        if (!item.isGeneric && item.inventoryItemId) {
+        // Only update real inventory items, not virtual US SIM IDs
+        if (!item.isGeneric && item.inventoryItemId && !item.inventoryItemId.startsWith('us-sim-')) {
           await updateInventoryItem(item.inventoryItemId, { status: 'available' });
         }
       }
