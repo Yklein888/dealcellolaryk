@@ -1,5 +1,32 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
+// Strip HTML tags and return clean text, max 200 chars
+function stripHtml(html: string): string {
+  return html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .substring(0, 200);
+}
+
+// Parse CellStation error from HTML response
+function parseCellStationError(html: string): string {
+  if (html.includes('Curl error') || html.includes('Could not resolve host')) {
+    return 'שגיאת חיבור ל-CellStation. יש לנסות שוב מאוחר יותר.';
+  }
+  if (html.includes('alert-danger') || html.includes('שגיאה')) {
+    const clean = stripHtml(html);
+    return clean || 'שגיאה בביצוע הפעולה ב-CellStation';
+  }
+  return stripHtml(html) || 'שגיאה לא ידועה';
+}
+
 const CELLSTATION_BASE = "https://cellstation.co.il/portal";
 const SUPABASE_URL = "https://hlswvjyegirbhoszrqyo.supabase.co";
 const SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhsc3d2anllZ2lyYmhvc3pycXlvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MDc5ODgxMCwiZXhwIjoyMDg2Mzc0ODEwfQ.C_0heApIB-wQvh2QM6-BqDakOyRcqiVhexuKAdwUrKI";
@@ -226,7 +253,7 @@ Deno.serve(async (req) => {
         const hasError = submitHtml.includes('שגיאה') || submitHtml.includes('alert-danger') || submitHtml.includes('error');
         const success = !hasError && submitResponse.status === 200;
         if (success) await db.from("cellstation_sims").update({ status: 'rented', status_detail: 'active' }).eq("iccid", iccid);
-        result = { success, action: "activate_sim", hasError, error: hasError ? submitHtml.substring(0, 500) : undefined };
+        result = { success, action: "activate_sim", hasError, error: hasError ? parseCellStationError(submitHtml) : undefined };
         break;
       }
       case "swap_sim": {
@@ -248,7 +275,7 @@ Deno.serve(async (req) => {
         const swapSubmitHtml = await swapSubmitResp.text();
         const swapHasError = swapSubmitHtml.includes('שגיאה') || swapSubmitHtml.includes('alert-danger');
         const swapSuccess = !swapHasError && swapSubmitResp.status === 200;
-        result = { success: swapSuccess, action: "swap_sim", hasError: swapHasError, error: swapHasError ? swapSubmitHtml.substring(0, 500) : undefined };
+        result = { success: swapSuccess, action: "swap_sim", hasError: swapHasError, error: swapHasError ? parseCellStationError(swapSubmitHtml) : undefined };
         break;
       }
       case "activate_and_swap": {
@@ -285,7 +312,7 @@ Deno.serve(async (req) => {
         });
         const actResult = await actSubmit.text();
         const actSuccess = !actResult.includes('שגיאה') && !actResult.includes('alert-danger') && actSubmit.status === 200;
-        if (!actSuccess) { result = { success: false, action: "activate_and_swap", error: "Activation failed: " + actResult.substring(0, 500) }; break; }
+        if (!actSuccess) { result = { success: false, action: "activate_and_swap", error: "שגיאה בהפעלה: " + parseCellStationError(actResult) }; break; }
         console.log('activate_and_swap: waiting 60s...');
         await new Promise(r => setTimeout(r, 60000));
         await (await session.get("index.php?page=bh/index")).text();
@@ -302,7 +329,7 @@ Deno.serve(async (req) => {
         });
         const swapResultAS = await swapSubmitAS.text();
         const swapSuccessAS = !swapResultAS.includes('שגיאה') && !swapResultAS.includes('alert-danger') && swapSubmitAS.status === 200;
-        if (!swapSuccessAS) { result = { success: false, action: "activate_and_swap", error: "Swap failed: " + swapResultAS.substring(0, 500) }; break; }
+        if (!swapSuccessAS) { result = { success: false, action: "activate_and_swap", error: "שגיאה בהחלפה: " + parseCellStationError(swapResultAS) }; break; }
         result = { success: true, action: "activate_and_swap" };
         break;
       }

@@ -47,18 +47,23 @@ export default defineConfig(({ mode }) => ({
         ],
       },
       workbox: {
+        // skipWaiting + clientsClaim = new SW takes over immediately after deploy
+        // This prevents white screen after redeployment
+        skipWaiting: true,
+        clientsClaim: true,
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MiB
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         runtimeCaching: [
           {
-            // API calls - StaleWhileRevalidate for faster perceived performance
+            // Supabase API - NetworkFirst: always fetch fresh, fallback to cache
             urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
-            handler: "StaleWhileRevalidate",
+            handler: "NetworkFirst",
             options: {
               cacheName: "supabase-api-cache",
+              networkTimeoutSeconds: 10,
               expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 30, // 30 minutes
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 5, // 5 min only
               },
               cacheableResponse: {
                 statuses: [0, 200],
@@ -66,7 +71,7 @@ export default defineConfig(({ mode }) => ({
             },
           },
           {
-            // Static assets - CacheFirst for optimal performance
+            // Images/fonts - CacheFirst is fine (don't change often)
             urlPattern: /\.(?:png|jpg|jpeg|svg|gif|ico|woff2)$/,
             handler: "CacheFirst",
             options: {
@@ -78,14 +83,15 @@ export default defineConfig(({ mode }) => ({
             },
           },
           {
-            // JS/CSS bundles - StaleWhileRevalidate
+            // JS/CSS bundles - NetworkFirst: always get latest after deploy
             urlPattern: /\.(?:js|css)$/,
-            handler: "StaleWhileRevalidate",
+            handler: "NetworkFirst",
             options: {
               cacheName: "static-resources",
+              networkTimeoutSeconds: 5,
               expiration: {
                 maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24 * 7, // 7 days
+                maxAgeSeconds: 60 * 60, // 1 hour only
               },
             },
           },
