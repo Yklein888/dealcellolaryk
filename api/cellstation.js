@@ -172,7 +172,9 @@ function normalizeDate(d) {
 }
 
 function hasError(html) {
-  return html.includes('שגיאה') || html.includes('alert-danger') || html.includes('error');
+  // Only check for specific CellStation error indicators - NOT generic 'error'
+  // because any full HTML page contains 'error' somewhere in CSS/JS
+  return html.includes('שגיאה') || html.includes('alert-danger');
 }
 
 function enrichSims(rawSims) {
