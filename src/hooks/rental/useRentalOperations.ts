@@ -77,15 +77,25 @@ export function createRentalOperations(deps: RentalOperationsDeps) {
       const { error: itemsError } = await supabase
         .from('rental_items')
         .insert(
-          rental.items.map(item => ({
-            rental_id: rentalData.id,
-            inventory_item_id: item.isGeneric ? null : item.inventoryItemId,
-            item_category: item.itemCategory as any,
-            item_name: item.itemName,
-            price_per_day: item.pricePerDay || null,
-            has_israeli_number: item.hasIsraeliNumber || false,
-            is_generic: item.isGeneric || false,
-          }))
+          rental.items.map(item => {
+            // For virtual US SIM IDs (us-sim-*), store as null in inventory_item_id
+            // and encode the ID in the item_name prefixed with [US-SIM-ID]
+            const isVirtualUSim = item.inventoryItemId?.startsWith('us-sim-');
+            const actualInventoryId = isVirtualUSim ? null : (item.isGeneric ? null : item.inventoryItemId);
+            const itemNameWithVirtualId = isVirtualUSim
+              ? `[${item.inventoryItemId}] ${item.itemName}`
+              : item.itemName;
+
+            return {
+              rental_id: rentalData.id,
+              inventory_item_id: actualInventoryId,
+              item_category: item.itemCategory as any,
+              item_name: itemNameWithVirtualId,
+              price_per_day: item.pricePerDay || null,
+              has_israeli_number: item.hasIsraeliNumber || false,
+              is_generic: item.isGeneric || false,
+            };
+          })
         );
 
       if (itemsError) {

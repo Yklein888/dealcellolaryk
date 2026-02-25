@@ -239,14 +239,25 @@ export function RentalProvider({ children }: { children: ReactNode }) {
           id: r.id,
           customerId: r.customer_id || '',
           customerName: r.customer_name,
-          items: (itemsByRental[r.id] || []).map((item: any) => ({
-            inventoryItemId: item.inventory_item_id || '',
-            itemCategory: item.item_category as ItemCategory,
-            itemName: item.item_name,
-            pricePerDay: item.price_per_day ? Number(item.price_per_day) : undefined,
-            hasIsraeliNumber: item.has_israeli_number || false,
-            isGeneric: item.is_generic || false,
-          })),
+          items: (itemsByRental[r.id] || []).map((item: any) => {
+            // Extract virtual US SIM ID from item_name if encoded with [us-sim-*]
+            let inventoryItemId = item.inventory_item_id || '';
+            let itemName = item.item_name;
+            const virtualSimMatch = itemName.match(/^\[(us-sim-[^\]]+)\]\s*(.*)/);
+            if (virtualSimMatch) {
+              inventoryItemId = virtualSimMatch[1];
+              itemName = virtualSimMatch[2];
+            }
+
+            return {
+              inventoryItemId,
+              itemCategory: item.item_category as ItemCategory,
+              itemName,
+              pricePerDay: item.price_per_day ? Number(item.price_per_day) : undefined,
+              hasIsraeliNumber: item.has_israeli_number || false,
+              isGeneric: item.is_generic || false,
+            };
+          }),
           startDate: r.start_date,
           endDate: r.end_date,
           totalPrice: Number(r.total_price),
