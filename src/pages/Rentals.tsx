@@ -135,12 +135,11 @@ export default function Rentals() {
       const message = `שלום ${rental.customerName}, תזכורת להחזרת הציוד המושכר. תאריך ההחזרה הוא ${format(parseISO(rental.endDate), 'dd/MM/yyyy', { locale: he })}. תודה רבה.`;
       
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/yemot-call`,
+        `/api/yemot-call`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           },
           body: JSON.stringify({
             phone: customerPhone,
@@ -303,11 +302,16 @@ export default function Rentals() {
         paymentBody.cvv = paymentFormData.cvv;
       }
 
-      const { data, error } = await supabase.functions.invoke('pelecard-pay', {
-        body: paymentBody,
+      const response = await fetch('/api/pelecard-pay', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(paymentBody),
       });
 
-      if (error) throw error;
+      const data = response.ok ? await response.json() : null;
+      if (!response.ok) throw new Error(data?.error || 'Payment failed');
 
       if (data?.success) {
         toast({

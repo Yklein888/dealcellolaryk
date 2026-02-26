@@ -15,7 +15,7 @@ const formatPhoneNumber = (num: string | undefined): string => {
   return num;
 };
 
-// Fetch PDF from the backend Edge Function
+// Fetch PDF from the backend API Route
 const fetchCallingInstructionsPdf = async (
   israeliNumber: string | undefined,
   localNumber: string | undefined,
@@ -26,12 +26,11 @@ const fetchCallingInstructionsPdf = async (
   simNumber?: string
 ): Promise<Blob> => {
   const response = await fetch(
-    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-calling-instructions`,
+    `/api/generate-calling-instructions`,
     {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
       },
       body: JSON.stringify({
         israeliNumber,

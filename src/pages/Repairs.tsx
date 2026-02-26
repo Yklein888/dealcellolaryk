@@ -78,12 +78,11 @@ export default function Repairs() {
       const message = `שלום ${repair.customerName}, המכשיר שלך מספר ${repair.repairNumber} מוכן לאיסוף. תודה רבה.`;
       
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/yemot-call`,
+        `/api/yemot-call`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           },
           body: JSON.stringify({
             phone: repair.customerPhone,

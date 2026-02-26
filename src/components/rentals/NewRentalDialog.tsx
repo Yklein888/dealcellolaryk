@@ -243,14 +243,18 @@ export function NewRentalDialog({
           const inventoryItem = inventory.find(i => i.id === simItem.inventoryItemId);
           if (inventoryItem?.simNumber) {
             try {
-              await supabase.functions.invoke('sim-activation-request', {
-                body: {
+              await fetch('/api/sim-activation-request', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
                   sim_number: inventoryItem.simNumber,
                   customer_id: customer.id,
                   customer_name: customer.name,
                   start_date: format(startDate, 'yyyy-MM-dd'),
                   end_date: format(endDate, 'yyyy-MM-dd'),
-                }
+                }),
               });
             } catch (err) {
               console.error('Error auto-activating SIM:', err);

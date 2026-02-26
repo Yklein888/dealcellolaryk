@@ -11,13 +11,18 @@ export function useUSSimNotificationSync() {
 
     const checkUSSimUpdates = async () => {
       try {
-        const { data, error } = await supabase.functions.invoke('notify-us-sim-ready', {
-          body: { action: 'check-updates' },
+        const response = await fetch('/api/notify-us-sim-ready', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ action: 'check-updates' }),
         });
 
-        if (error) {
-          console.error('Error checking US SIM updates:', error);
+        if (!response.ok) {
+          console.error('Error checking US SIM updates:', response.statusText);
         } else {
+          const data = await response.json();
           console.log('[US SIM Sync] Update check result:', data);
         }
       } catch (err) {

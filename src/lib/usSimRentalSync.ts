@@ -101,16 +101,21 @@ export async function sendSimStatusNotification(
       message = `📱 סים ${simCompany}: ${newStatus}`;
     }
 
-    // Call edge function to send WhatsApp message
-    const { error } = await supabase.functions.invoke('send-whatsapp-notification', {
-      body: {
+    // Call API route to send WhatsApp message
+    const response = await fetch('/api/send-whatsapp', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
         phone: activatorWhatsApp,
         message: message,
-      },
+      }),
     });
 
-    if (error) {
-      return { sent: false, error: error.message };
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return { sent: false, error: errorData.error || 'Failed to send WhatsApp message' };
     }
 
     return { sent: true };

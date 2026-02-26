@@ -124,8 +124,12 @@ export default function Customers() {
         
         if (targetCustomerId) {
           try {
-            const { data, error } = await supabase.functions.invoke('pelecard-pay', {
-              body: {
+            const response = await fetch('/api/pelecard-pay', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
                 amount: 1, // Minimal amount for token validation
                 customerName: formData.name,
                 customerId: targetCustomerId,
@@ -135,10 +139,11 @@ export default function Customers() {
                 cvv: formData.cvv,
                 saveTokenOnly: true, // Custom flag to indicate token-only operation
                 transactionId: `token-${targetCustomerId}-${Date.now()}`,
-              },
+              }),
             });
 
-            if (error) throw error;
+            const data = response.ok ? await response.json() : null;
+            if (!response.ok) throw new Error(data?.error || 'Payment failed');
 
             if (data?.success || data?.tokenSaved) {
               toast({
