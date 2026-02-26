@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.cellstation-api]
 verify_jwt = false
+
+[functions.notify-us-sim-ready]
+verify_jwt = false
