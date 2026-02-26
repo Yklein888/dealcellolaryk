@@ -1,5 +1,6 @@
 // Secondary Supabase client - user's own sim-manager project (hlswvjyegirbhoszrqyo)
 // Used for US SIMs feature with token-based authentication (no login required)
+// URL and key are hardcoded intentionally - no env vars needed for this public anon client
 import { createClient } from '@supabase/supabase-js';
 
 const SIMM_URL = 'https://hlswvjyegirbhoszrqyo.supabase.co';
