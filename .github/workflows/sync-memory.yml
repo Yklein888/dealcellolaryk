@@ -1,0 +1,56 @@
+name: Sync Memory with Git Commits
+
+on:
+  schedule:
+    # Run every hour at minute 0
+    - cron: '0 * * * *'
+  push:
+    paths:
+      - 'api/**'
+      - 'src/**'
+      - 'package.json'
+  workflow_dispatch:
+
+jobs:
+  sync-memory:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+      
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "Memory Bot"
+          git config --global user.email "memory-bot@github.com"
+
+      - name: Run memory sync script
+        run: |
+          bash mcp/sync-memory.sh
+        continue-on-error: true
+
+      - name: Check for changes
+        id: check_changes
+        run: |
+          if git diff --quiet; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit changes
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: |
+          git add MEMORY.md
+          git commit -m "[AUTO] Update MEMORY.md with recent commits" || true
+
+      - name: Push changes
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: |
+          git push origin main || echo "Nothing to push"
