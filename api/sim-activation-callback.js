@@ -1,4 +1,4 @@
-const { createClient } = require('@supabase/supabase-js');
+import { createClient } from '@supabase/supabase-js';
 
 const API_KEY = process.env.SIM_ACTIVATION_API_KEY || 'sim-activation-secret-key';
 

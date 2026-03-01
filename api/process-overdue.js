@@ -1,4 +1,4 @@
-const { createClient } = require('@supabase/supabase-js');
+import { createClient } from '@supabase/supabase-js';
 
 // Merged from process-overdue-calls.js + process-overdue-charges.js
 // Use ?type=calls or ?type=charges to select action
