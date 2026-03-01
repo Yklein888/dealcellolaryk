@@ -6,10 +6,7 @@
     "api/yemot-call.js": {
       "maxDuration": 60
     },
-    "api/yemot-sms.js": {
-      "maxDuration": 30
-    },
-    "api/yemot-callback.js": {
+"api/yemot-callback.js": {
       "maxDuration": 30
     },
     "api/exchange-rate.js": {
@@ -30,10 +27,7 @@
     "api/notify-us-sim-ready.js": {
       "maxDuration": 60
     },
-    "api/process-overdue-calls.js": {
-      "maxDuration": 300
-    },
-    "api/process-overdue-charges.js": {
+    "api/process-overdue.js": {
       "maxDuration": 300
     },
     "api/sim-activation-request.js": {
