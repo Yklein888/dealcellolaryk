@@ -21,16 +21,28 @@ export default async function handler(req, res) {
     const password = process.env.PELECARD_PASSWORD;
     const supabaseUrl = process.env.MAIN_SUPABASE_URL;
     const supabaseServiceKey = process.env.MAIN_SUPABASE_SERVICE_KEY;
+    const supabaseAnonKey = process.env.MAIN_SUPABASE_ANON_KEY;
 
     if (!terminal || !user || !password) {
       return res.status(500).json({ error: 'Pelecard credentials not configured' });
     }
 
-    if (!supabaseUrl || !supabaseServiceKey) {
+    if (!supabaseUrl || (!supabaseServiceKey && !supabaseAnonKey)) {
       return res.status(500).json({ error: 'Supabase configuration missing' });
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Use service key if available, otherwise use anon key + user JWT from frontend
+    const supabaseKey = supabaseServiceKey || supabaseAnonKey;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // If using anon key, set user auth from JWT passed by frontend
+    if (!supabaseServiceKey) {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const userJwt = authHeader.replace('Bearer ', '');
+        supabase.auth.setSession({ access_token: userJwt, refresh_token: '' });
+      }
+    }
 
     const {
       amount,
