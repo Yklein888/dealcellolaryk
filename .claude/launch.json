@@ -2,10 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "main",
-      "runtimeExecutable": "/Users/yitzi/.local/node/bin/npm",
+      "name": "dealcellularyk",
+      "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
-      "port": 8080
+      "port": 5173
     }
   ]
 }
