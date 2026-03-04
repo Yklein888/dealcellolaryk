@@ -18,7 +18,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { phone, message, entityType, entityId, customerId } = req.body;
+    const { phone, message, entityType, entityId, customerId, campaignType } = req.body;
 
     if (!phone || !message) {
       return res.status(400).json({ error: 'Phone and message are required' });
@@ -38,7 +38,10 @@ export default async function handler(req, res) {
     yemotUrl.searchParams.set('token', `${systemNumber}:${password}`);
     yemotUrl.searchParams.set('phones', cleanPhone);
     yemotUrl.searchParams.set('tts', message);
-    yemotUrl.searchParams.set('templateId', '1267261');
+    // Only use rental_reminder template for rental calls - repairs use TTS only
+    if (campaignType === 'rental_reminder' || entityType === 'rental') {
+      yemotUrl.searchParams.set('templateId', '1267261');
+    }
 
     console.log('Calling Yemot for phone:', cleanPhone);
 
