@@ -83,13 +83,16 @@ export function ItemSelector({
     return order[aStatus] - order[bStatus];
   });
 
+  const validateForm = () => {
+    const newErrors: typeof errors = {};
+    if (!quickAddData.name) newErrors.name = VALIDATION_ERRORS.required;
+    if (isSim(quickAddData.category) && !quickAddData.simNumber) newErrors.simNumber = VALIDATION_ERRORS.required;
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleQuickAdd = () => {
-    if (!quickAddData.name) {
-      toast({ title: 'שגיאה', description: 'יש להזין שם לפריט', variant: 'destructive' });
-      return;
-    }
-    if (isSim(quickAddData.category) && !quickAddData.simNumber) {
-      toast({ title: 'שגיאה', description: 'יש להזין מספר סים (ICCID) לפריט מסוג סים', variant: 'destructive' });
+    if (!validateForm()) {
       return;
     }
     onAddInventoryItem({
