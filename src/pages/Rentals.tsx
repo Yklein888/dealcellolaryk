@@ -405,10 +405,10 @@ export default function Rentals() {
     return matchesSearch && matchesStatus && matchesCategory;
   });
 
-  // Convert active US SIMs from sim-manager project to InventoryItem format
+  // Convert active US SIMs to InventoryItem format
   // This makes them appear in the rental dialog alongside regular inventory items
   const activeUSSimsAsInventory = useMemo<InventoryItem[]>(() =>
-    sims
+    usSims
       .filter(s => s.status === 'active')
       .map(s => ({
         id: `us-sim-${s.id}`,
@@ -421,7 +421,7 @@ export default function Rentals() {
         status: 'available' as const,
         notes: s.notes,
       })),
-    [sims]
+    [usSims]
   );
 
   const availableItems = [...getAvailableItems(), ...activeUSSimsAsInventory];
