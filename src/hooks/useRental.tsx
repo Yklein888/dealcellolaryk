@@ -111,8 +111,12 @@ interface RentalContextType {
   inventory: InventoryItem[];
   rentals: Rental[];
   repairs: Repair[];
+  usSims: USSim[];
   stats: DashboardStats;
   loading: boolean;
+  usSimsLoading: boolean;
+  activatorToken: string | null;
+  whatsappContact: string | null;
   addCustomer: (customer: Omit<Customer, 'id' | 'createdAt'>) => Promise<void>;
   updateCustomer: (id: string, customer: Partial<Customer>) => Promise<void>;
   deleteCustomer: (id: string) => Promise<void>;
@@ -131,6 +135,12 @@ interface RentalContextType {
   getAvailableItems: (category?: ItemCategory) => InventoryItem[];
   getUpcomingReturns: () => Rental[];
   refreshData: () => Promise<void>;
+  // US SIMs operations
+  addSim: (simCompany: string, simNumber?: string, pkg?: string, notes?: string, includesIsraeli?: boolean) => Promise<{ error: Error | null }>;
+  deleteSim: (id: string) => Promise<{ error: any }>;
+  markSimReturned: (id: string) => Promise<{ error: any }>;
+  renewSim: (id: string, months?: number, includesIsraeli?: boolean) => Promise<{ error: Error | null; newExpiry?: string }>;
+  updateWhatsappContact: (phone: string) => Promise<{ error: any }>;
 }
 
 const RentalContext = createContext<RentalContextType | undefined>(undefined);
