@@ -183,7 +183,6 @@
   /* ─── Card hover glow ────────────────────────────── */
   .card-glow {
     position: relative;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
   }
 
   .card-glow:hover {
@@ -199,14 +198,13 @@
     border-radius: inherit;
     z-index: -1;
     opacity: 0;
-    transition: opacity 0.3s ease;
   }
 
   .card-glow:hover::after {
     opacity: 1;
   }
 
-  /* ─── Stat card ──────────────────────────────────── */
+  /* ─── Stat card ────────────────────────────────── */
   .stat-card {
     @apply relative overflow-hidden rounded-2xl p-4 sm:p-6;
     background: hsl(var(--glass-bg));
@@ -214,7 +212,6 @@
     -webkit-backdrop-filter: blur(var(--glass-blur));
     border: 1px solid hsl(var(--glass-border));
     box-shadow: var(--shadow-glass);
-    transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
   }
 
   /* Corner glow orb */
@@ -224,7 +221,6 @@
     background: var(--gradient-primary);
     filter: blur(60px);
     border-radius: 50%;
-    transition: opacity 0.3s ease;
   }
 
   .stat-card:hover {
@@ -253,7 +249,7 @@
   }
 
   .stat-card:hover .stat-shimmer {
-    animation: shimmerSweep 0.65s ease-out forwards;
+    /* Shimmer animation removed for performance */
   }
 
   /* Bottom accent bar child element */
@@ -266,7 +262,6 @@
     background: var(--gradient-primary);
     transform: scaleX(0);
     transform-origin: right;
-    transition: transform 0.35s ease;
     border-radius: 0 0 0.25rem 0.25rem;
     pointer-events: none;
     z-index: 2;

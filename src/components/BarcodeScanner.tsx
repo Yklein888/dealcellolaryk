@@ -349,7 +349,7 @@ export function BarcodeScanner({ isOpen, onClose, onScan }: BarcodeScannerProps)
           {/* Loading State */}
           {(state === 'idle' || state === 'requesting') && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-10">
-              <Loader2 className="h-12 w-12 text-primary animate-spin mb-4" />
+              <Loader2 className="h-12 w-12 text-primary mb-4" />
               <p className="text-white text-center">
                 {state === 'requesting' ? 'מבקש גישה למצלמה...' : 'טוען סורק...'}
               </p>

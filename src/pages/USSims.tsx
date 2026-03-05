@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useUSSims } from '@/hooks/useUSSims';
 import { useRental } from '@/hooks/useRental';
 import { PageHeader } from '@/components/PageHeader';
+import { PageLoadingSkeleton } from '@/components/PageLoadingSkeleton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -304,11 +305,7 @@ export default function USSims() {
   // ── Loading ────────────────────────────────────────────────────────────────
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <PageLoadingSkeleton columns={6} rows={3} />;
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -358,7 +355,7 @@ export default function USSims() {
           <button
             key={label}
             onClick={() => setActiveTab(tab)}
-            className="stat-card text-center cursor-pointer hover:scale-105 transition-transform"
+            className="stat-card text-center cursor-pointer hover:scale-105"
           >
             <div className="relative z-10">
               <p className={`text-2xl font-bold ${color}`}>{count}</p>

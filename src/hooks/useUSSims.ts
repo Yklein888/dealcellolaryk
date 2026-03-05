@@ -51,8 +51,40 @@ function buildStatusChangeMessage(
   return `📱 סים ${sim.simCompany}: ${newStatus}`;
 }
 
+// ── Cache helpers ────────────────────────────────────────────────────────
+const CACHE_KEY = 'dealcellular_us_sims_cache';
+const CACHE_EXPIRY_KEY = 'dealcellular_us_sims_cache_expiry';
+const CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
+
+function getCachedSims(): USSim[] | null {
+  try {
+    const cached = localStorage.getItem(CACHE_KEY);
+    const expiry = localStorage.getItem(CACHE_EXPIRY_KEY);
+
+    if (cached && expiry && Date.now() < parseInt(expiry)) {
+      return JSON.parse(cached);
+    }
+
+    // Clear expired cache
+    localStorage.removeItem(CACHE_KEY);
+    localStorage.removeItem(CACHE_EXPIRY_KEY);
+  } catch (e) {
+    console.warn('Failed to read US SIMs cache:', e);
+  }
+  return null;
+}
+
+function setCachedSims(sims: USSim[]): void {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(sims));
+    localStorage.setItem(CACHE_EXPIRY_KEY, (Date.now() + CACHE_EXPIRY_MS).toString());
+  } catch (e) {
+    console.warn('Failed to cache US SIMs:', e);
+  }
+}
+
 export function useUSSims() {
-  const [sims, setSims] = useState<USSim[]>([]);
+  const [sims, setSims] = useState<USSim[]>(() => getCachedSims() ?? []);
   const [loading, setLoading] = useState(true);
   const [activatorToken, setActivatorToken] = useState<string | null>(null);
   const [whatsappContact, setWhatsappContact] = useState<string | null>(null);
@@ -64,6 +96,9 @@ export function useUSSims() {
     const { data, error } = await simManagerClient.rpc('get_sims_by_token', { p_token: t });
     if (!error && data) {
       const newSims = (data as SimRow[]).map(mapSim);
+
+      // Cache the results
+      setCachedSims(newSims);
 
       // Detect status changes and send WhatsApp notifications
       if (whatsappContact && previousSimsRef.current.length > 0) {
