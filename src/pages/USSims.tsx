@@ -170,7 +170,7 @@ export default function USSims() {
   };
 
   const handleMarkReturned = async (id: string, company: string) => {
-    const { error } = await markReturned(id);
+    const { error } = await markSimReturned(id);
     if (error) {
       toast({ title: 'שגיאה', description: error.message, variant: 'destructive' });
     } else {
