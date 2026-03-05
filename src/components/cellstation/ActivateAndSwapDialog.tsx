@@ -475,7 +475,11 @@ export function ActivateAndSwapDialog({
               </div>
 
               <div className="space-y-3">
-                <Label className="text-sm font-semibold">ICCID של הסים החדש</Label>
+                <FormFieldHelper
+                  label="ICCID של הסים החדש"
+                  required
+                  hint="מספר סים ייחודי 19-20 ספרות"
+                />
                 <Input
                   placeholder="הכנס 19-20 ספרות..."
                   value={newIccid}
