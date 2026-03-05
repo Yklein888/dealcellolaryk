@@ -151,4 +151,4 @@ export const CallHistoryBadge = memo(function CallHistoryBadge({ entityType, ent
       </PopoverContent>
     </Popover>
   );
-}
+});
