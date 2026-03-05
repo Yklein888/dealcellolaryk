@@ -487,6 +487,50 @@ export function RentalProvider({ children }: { children: ReactNode }) {
     }, 1000);
   }, []);
 
+  // Fetch US SIMs by token
+  const fetchUSSims = useCallback(async (token?: string) => {
+    const t = token ?? activatorToken;
+    if (!t) return;
+
+    try {
+      const { data, error } = await supabase.rpc('get_sims_by_token', { p_token: t });
+
+      if (!error && data) {
+        const newSims = (data as SimRow[]).map(mapSim);
+
+        // Cache the results
+        setCachedUSSims(newSims);
+
+        // Detect status changes and send WhatsApp notifications
+        if (whatsappContact && previousUSSimsRef.current.length > 0) {
+          for (const newSim of newSims) {
+            const oldSim = previousUSSimsRef.current.find(s => s.id === newSim.id);
+            if (oldSim && oldSim.status !== newSim.status) {
+              // Status changed - send WhatsApp notification
+              try {
+                const message = buildStatusChangeMessage(newSim, oldSim.status, newSim.status);
+                // Edge function available on main supabase project
+                await supabase.functions.invoke('send-whatsapp-notification', {
+                  body: {
+                    phone: whatsappContact,
+                    message: message,
+                  },
+                });
+              } catch (err) {
+                console.warn('Failed to send WhatsApp notification:', err);
+              }
+            }
+          }
+        }
+
+        previousUSSimsRef.current = newSims;
+        setUSSims(newSims);
+      }
+    } catch (err) {
+      console.error('Error fetching US SIMs:', err);
+    }
+  }, [activatorToken, whatsappContact]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
