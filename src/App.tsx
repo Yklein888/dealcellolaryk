@@ -65,11 +65,12 @@ const App = () => (
                 
                 {/* Protected routes */}
                 <Route path="/*" element={
-                  <ProtectedRoute>
-                    <SessionManager />
-                    <AppLayout>
-                      <Suspense fallback={<PageFallback />}>
-                        <Routes>
+                  <ErrorBoundary>
+                    <ProtectedRoute>
+                      <SessionManager />
+                      <AppLayout>
+                        <Suspense fallback={<PageFallback />}>
+                          <Routes>
                           <Route path="/" element={<Dashboard />} />
                           <Route path="/rentals" element={<Rentals />} />
                           <Route path="/customers" element={<Customers />} />
@@ -88,7 +89,8 @@ const App = () => (
                         </Routes>
                       </Suspense>
                     </AppLayout>
-                  </ProtectedRoute>
+                    </ProtectedRoute>
+                  </ErrorBoundary>
                 } />
               </Routes>
             </BrowserRouter>
