@@ -151,7 +151,7 @@ export default function Dashboard() {
       </PageHeader>
 
       <DashboardStatsGrid stats={stats} inventory={inventory} />
-      <QuickStatsRow 
+      <QuickStatsRow
         rentals={rentals}
         repairs={repairs}
         readyRepairs={readyRepairs}
@@ -159,14 +159,18 @@ export default function Dashboard() {
         isSubscribed={isSubscribed}
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <InventoryChart inventory={inventory} />
-        <RentalsActivityChart rentals={rentals} />
-      </div>
+      <Suspense fallback={<div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8"><ChartSkeleton /><ChartSkeleton /></div>}>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <InventoryChart inventory={inventory} />
+          <RentalsActivityChart rentals={rentals} />
+        </div>
+      </Suspense>
 
-      <div className="mb-8">
-        <RevenueChart rentals={rentals} />
-      </div>
+      <Suspense fallback={<div className="mb-8"><ChartSkeleton /></div>}>
+        <div className="mb-8">
+          <RevenueChart rentals={rentals} />
+        </div>
+      </Suspense>
 
       {/* US SIMs Activations Section */}
       <div className="mb-8">
