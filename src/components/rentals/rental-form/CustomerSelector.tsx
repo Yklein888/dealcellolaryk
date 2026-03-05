@@ -114,15 +114,26 @@ export function CustomerSelector({
           </DialogHeader>
           <div className="space-y-4 mt-4">
             <div className="space-y-2">
-              <Label>שם *</Label>
+              <FormFieldHelper
+                label="שם"
+                required
+                hint={FIELD_HINTS.name}
+              />
               <Input value={quickData.name} onChange={(e) => setQuickData({ ...quickData, name: e.target.value })} placeholder="שם הלקוח" />
             </div>
             <div className="space-y-2">
-              <Label>טלפון *</Label>
+              <FormFieldHelper
+                label="טלפון"
+                required
+                hint={FIELD_HINTS.phone}
+              />
               <Input value={quickData.phone} onChange={(e) => setQuickData({ ...quickData, phone: e.target.value })} placeholder="050-0000000" />
             </div>
             <div className="space-y-2">
-              <Label>כתובת</Label>
+              <FormFieldHelper
+                label="כתובת"
+                hint={FIELD_HINTS.address}
+              />
               <Input value={quickData.address} onChange={(e) => setQuickData({ ...quickData, address: e.target.value })} placeholder="כתובת (אופציונלי)" />
             </div>
             <Button onClick={handleQuickAdd} className="w-full">הוסף לקוח</Button>
