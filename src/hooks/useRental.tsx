@@ -151,14 +151,20 @@ export function RentalProvider({ children }: { children: ReactNode }) {
   const [inventory, setInventory] = useState<InventoryItem[]>(() => loadCachedData<InventoryItem>(CACHE_KEYS.inventory));
   const [rentals, setRentals] = useState<Rental[]>(() => loadCachedData<Rental>(CACHE_KEYS.rentals));
   const [repairs, setRepairs] = useState<Repair[]>(() => loadCachedData<Repair>(CACHE_KEYS.repairs));
+  const [usSims, setUSSims] = useState<USSim[]>(() => getCachedUSSims() ?? []);
   const [loading, setLoading] = useState(true);
+  const [usSimsLoading, setUSSimsLoading] = useState(true);
+  const [activatorToken, setActivatorToken] = useState<string | null>(null);
+  const [whatsappContact, setWhatsappContact] = useState<string | null>(null);
   const { toast } = useToast();
-  
+
   // Background retry state
   const backgroundRetryRef = useRef(0);
   const backgroundRetryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // Debounce ref for realtime updates
   const realtimeDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  // Track previous US SIMs for status change detection
+  const previousUSSimsRef = useRef<USSim[]>([]);
 
   // Save functions that also update cache
   const saveCustomers = useCallback((data: Customer[]) => {
