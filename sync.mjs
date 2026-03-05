@@ -16,7 +16,7 @@ const IGNORE         = [/node_modules/, /\.git/, /dist/, /\.local$/, /\.log$/];
 // ── Git helper ───────────────────────────────────────────────
 function git(args) {
   try {
-    return execSync(`"C:\\Program Files\\Git\\bin\\git.exe" ${args}`, {
+    return execSync(`git ${args}`, {
       cwd: __dirname, encoding: 'utf8', timeout: 30000
     }).trim();
   } catch (e) {
