@@ -41,7 +41,7 @@ const valueVariantStyles = {
   destructive: 'text-destructive value-glow-destructive',
 };
 
-export function StatCard({ title, value, icon: Icon, trend, variant = 'default', href, onClick }: StatCardProps) {
+export const StatCard = memo(function StatCard({ title, value, icon: Icon, trend, variant = 'default', href, onClick }: StatCardProps) {
   const navigate = useNavigate();
   const isClickable = !!href || !!onClick;
 
@@ -98,4 +98,4 @@ export function StatCard({ title, value, icon: Icon, trend, variant = 'default',
       </div>
     </div>
   );
-}
+});
