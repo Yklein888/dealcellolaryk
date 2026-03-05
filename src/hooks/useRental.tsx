@@ -655,6 +655,20 @@ export function RentalProvider({ children }: { children: ReactNode }) {
     };
   }, [debouncedFetchData]);
 
+  // Real-time subscription for US SIMs
+  useEffect(() => {
+    if (!activatorToken) return;
+
+    const channel = supabase
+      .channel('us_sims_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'us_sims' }, () => fetchUSSims())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activatorToken, fetchUSSims]);
+
   // Stats calculation with useMemo
   const stats = useMemo(() => calculateStats(customers, inventory, rentals, repairs), [customers, inventory, rentals, repairs]);
 
