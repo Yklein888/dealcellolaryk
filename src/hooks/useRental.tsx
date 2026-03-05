@@ -701,6 +701,64 @@ export function RentalProvider({ children }: { children: ReactNode }) {
     await fetchData();
   }, []);
 
+  // US SIMs operations
+  const addSim = useCallback(async (simCompany: string, simNumber?: string, pkg?: string, notes?: string, includesIsraeli?: boolean) => {
+    if (!activatorToken) return { error: new Error('No token') };
+    const { data, error } = await supabase.rpc('add_sim_by_token', {
+      p_token: activatorToken,
+      p_company: simCompany,
+      p_sim_number: simNumber || null,
+      p_package: pkg || null,
+      p_notes: notes || null,
+      p_includes_israeli: includesIsraeli || false,
+    });
+    if (!error) fetchUSSims();
+    const result = data as { error?: string } | null;
+    return { error: error ?? (result?.error ? new Error(result.error) : null) };
+  }, [activatorToken, fetchUSSims]);
+
+  const deleteSim = useCallback(async (id: string) => {
+    if (!activatorToken) return { error: new Error('No token') };
+    const { error } = await supabase.rpc('delete_sim_by_token', {
+      p_id: id,
+      p_token: activatorToken,
+    });
+    if (!error) fetchUSSims();
+    return { error };
+  }, [activatorToken, fetchUSSims]);
+
+  const markSimReturned = useCallback(async (id: string) => {
+    if (!activatorToken) return { error: new Error('No token') };
+    const { error } = await supabase.rpc('mark_sim_returned_by_token', {
+      p_id: id,
+      p_token: activatorToken,
+    });
+    if (!error) fetchUSSims();
+    return { error };
+  }, [activatorToken, fetchUSSims]);
+
+  const renewSim = useCallback(async (id: string, months: number = 1, includesIsraeli?: boolean) => {
+    if (!activatorToken) return { error: new Error('No token') };
+    const { data, error } = await supabase.rpc('renew_sim_by_token', {
+      p_id: id,
+      p_token: activatorToken,
+      p_months: months,
+      p_includes_israeli: includesIsraeli || false,
+    });
+    if (!error) fetchUSSims();
+    const result = data as { error?: string; new_expiry?: string } | null;
+    return { error: error ?? (result?.error ? new Error(result.error) : null), newExpiry: result?.new_expiry };
+  }, [activatorToken, fetchUSSims]);
+
+  const updateWhatsappContact = useCallback(async (phone: string) => {
+    const { error } = await supabase
+      .from('app_settings')
+      .update({ value: phone })
+      .eq('key', 'us_activator_whatsapp');
+    if (!error) setWhatsappContact(phone);
+    return { error };
+  }, []);
+
   const contextValue = useMemo(() => ({
     customers,
     inventory,
