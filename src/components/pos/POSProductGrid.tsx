@@ -49,14 +49,15 @@ export function POSProductGrid({
           className={cn(
             "h-28 flex flex-col items-center justify-center gap-2 p-3",
             "hover:bg-primary hover:text-primary-foreground",
-            "transition-all duration-200 text-wrap"
+            "transition-colors duration-150 text-wrap"
           )}
           onClick={() => onProductClick(product)}
         >
           {product.image_url ? (
-            <img 
-              src={product.image_url} 
+            <img
+              src={product.image_url}
               alt={product.name}
+              loading="lazy"
               className="h-10 w-10 object-cover rounded"
             />
           ) : (
