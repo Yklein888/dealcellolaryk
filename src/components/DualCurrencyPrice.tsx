@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { useExchangeRate, convertUsdToIls } from '@/hooks/useExchangeRate';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -9,7 +10,7 @@ interface DualCurrencyPriceProps {
   showTooltip?: boolean;
 }
 
-export function DualCurrencyPrice({
+export const DualCurrencyPrice = memo(function DualCurrencyPrice({
   amount,
   currency,
   className = '',
@@ -58,4 +59,4 @@ export function DualCurrencyPrice({
       </Tooltip>
     </TooltipProvider>
   );
-}
+});
