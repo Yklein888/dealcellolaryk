@@ -303,7 +303,7 @@ export default function USSims() {
 
   // ── Loading ────────────────────────────────────────────────────────────────
 
-  if (loading) {
+  if (usSimsLoading) {
     return <PageLoadingSkeleton columns={6} rows={3} />;
   }
 
