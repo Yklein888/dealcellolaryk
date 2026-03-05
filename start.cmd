@@ -1,10 +1,16 @@
 @echo off
-echo ================================
-echo   Deal Cellular - Starting Up
-echo ================================
+title Deal Cellular
 echo.
-echo [1/2] Pulling latest from Git...
-git pull
+echo  ================================
+echo    Deal Cellular - Starting Up
+echo  ================================
 echo.
-echo [2/2] Starting dev server...
-npm run dev
+
+cd /d "%~dp0"
+
+echo  [1/2] Starting auto-sync (background)...
+start "Deal Cellular SYNC" /min C:\PROGRA~1\nodejs\node.exe sync.mjs
+
+echo  [2/2] Starting dev server...
+echo.
+C:\PROGRA~1\nodejs\npm.cmd run dev
