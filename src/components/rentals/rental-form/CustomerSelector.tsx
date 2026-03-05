@@ -125,24 +125,46 @@ export function CustomerSelector({
               <FormFieldHelper
                 label="שם"
                 required
-                hint={FIELD_HINTS.name}
+                hint={!errors.name ? FIELD_HINTS.name : undefined}
+                error={errors.name}
               />
-              <Input value={quickData.name} onChange={(e) => setQuickData({ ...quickData, name: e.target.value })} placeholder="שם הלקוח" />
+              <Input
+                value={quickData.name}
+                onChange={(e) => {
+                  setQuickData({ ...quickData, name: e.target.value });
+                  if (errors.name) setErrors({ ...errors, name: undefined });
+                }}
+                placeholder="שם הלקוח"
+                className={errors.name ? 'border-destructive' : ''}
+              />
             </div>
             <div className="space-y-2">
               <FormFieldHelper
                 label="טלפון"
                 required
-                hint={FIELD_HINTS.phone}
+                hint={!errors.phone ? FIELD_HINTS.phone : undefined}
+                error={errors.phone}
               />
-              <Input value={quickData.phone} onChange={(e) => setQuickData({ ...quickData, phone: e.target.value })} placeholder="050-0000000" />
+              <Input
+                value={quickData.phone}
+                onChange={(e) => {
+                  setQuickData({ ...quickData, phone: e.target.value });
+                  if (errors.phone) setErrors({ ...errors, phone: undefined });
+                }}
+                placeholder="050-0000000"
+                className={errors.phone ? 'border-destructive' : ''}
+              />
             </div>
             <div className="space-y-2">
               <FormFieldHelper
                 label="כתובת"
                 hint={FIELD_HINTS.address}
               />
-              <Input value={quickData.address} onChange={(e) => setQuickData({ ...quickData, address: e.target.value })} placeholder="כתובת (אופציונלי)" />
+              <Input
+                value={quickData.address}
+                onChange={(e) => setQuickData({ ...quickData, address: e.target.value })}
+                placeholder="כתובת (אופציונלי)"
+              />
             </div>
             <Button onClick={handleQuickAdd} className="w-full">הוסף לקוח</Button>
           </div>
