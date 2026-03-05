@@ -475,24 +475,23 @@ export default function Inventory() {
       {/* Inventory by Category */}
       {filteredInventory.length === 0 ? (
         inventory.length === 0 ? (
-          <div className="rounded-2xl border border-border/50 bg-card text-center py-16 px-6 shadow-sm">
-            <div className="flex h-20 w-20 mx-auto mb-5 items-center justify-center rounded-3xl bg-gradient-to-br from-primary/20 to-accent/10">
-              <Package className="h-10 w-10 text-primary" />
-            </div>
-            <h3 className="text-xl font-bold text-foreground mb-2">המלאי ריק</h3>
-            <p className="text-muted-foreground mb-6 max-w-xs mx-auto">הוסף פריטים למלאי כדי להתחיל להשכיר ולנהל את הציוד שלך</p>
-            <Button variant="glow" onClick={() => setIsAddDialogOpen(true)}>
-              <Plus className="h-4 w-4" />
-              הוסף פריט ראשון
-            </Button>
-          </div>
+          <EmptyState
+            icon={Package}
+            title="המלאי ריק"
+            description="הוסף פריטים למלאי כדי להתחיל להשכיר ולנהל את הציוד שלך"
+            action={{
+              label: 'הוסף פריט ראשון',
+              onClick: () => setIsAddDialogOpen(true),
+            }}
+            iconColor="primary"
+          />
         ) : (
-          <div className="rounded-2xl border border-border/50 bg-card text-center py-12 px-6 shadow-sm">
-            <Package className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
-            <p className="text-lg font-medium text-foreground">לא נמצאו פריטים</p>
-            <p className="text-sm text-muted-foreground">נסה לשנות את מילות החיפוש</p>
-          </div>
-        )
+          <EmptyState
+            icon={Package}
+            title="לא נמצאו פריטים"
+            description="נסה לשנות את מילות החיפוש"
+            iconColor="muted"
+          />
       ) : (
         <div className="space-y-3 sm:space-y-4">
           {categoryOrder
