@@ -1,7 +1,7 @@
 # Deal Cellular - Memory & Status
 
 ## 📌 Last Updated
-March 1, 2026
+March 5, 2026
 
 ---
 
@@ -118,6 +118,40 @@ WHATSAPP_TOKEN=optional
 - **Database:** Supabase PostgreSQL
 - **Storage:** Supabase Storage (PDF templates at `templates/` bucket)
 - **❌ NOT using:** Supabase Edge Functions (all moved to Vercel)
+
+---
+
+## 💻 Multi-Computer Setup (Added March 5, 2026)
+
+### Working Computers
+| מחשב | תיקייה | Branch | סטטוס |
+|------|--------|--------|-------|
+| מחשב ראשי (עובד מלא) | `Documents\dealcellolaryk` | `main` | ✅ |
+| מחשב שני | `C:\Users\1\Documents\dealcellolaryk` | `main` | ✅ (אחרי תיקון) |
+
+### כלל חשוב: תמיד `git pull` לפני התחלת עבודה!
+```cmd
+cd C:\Users\1\Documents\dealcellolaryk
+git pull
+npm run dev
+```
+
+### מה התגלה במחשב השני (5 מרץ 2026)
+- **בעיה:** המחשב היה מאחור ב-2 קומיטים → חסרים 11 מתוך 12 API routes
+- **פתרון:** `git pull` פשוט תיקן הכל
+- **שורש הבעיה:** הקוד היה על branch ישן של `main` שלא עודכן
+
+### הערות על מחשב שני
+- **Node.js ו-Git מותקנים:** `C:\Program Files\nodejs` + `C:\Program Files\Git`
+- **להרצה: תמיד דרך CMD** (לא PowerShell) — `npm run dev` עובד מ-CMD
+- **3 תיקיות בשגגה:** קיימות `dealcellolaryk-fresh` ו-`dealcellolaryk_clean` — **להתעלם מהן, לעבוד רק מ-`dealcellolaryk`**
+
+### אם שוב "חלק מהפונקציות לא עובדות"
+1. פתח CMD
+2. `cd C:\Users\1\Documents\dealcellolaryk`
+3. `git pull`
+4. `npm run dev`
+זהו. כנראה פשוט צריך git pull.
 
 ---
 

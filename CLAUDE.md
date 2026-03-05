@@ -69,7 +69,14 @@ WHATSAPP_TOKEN=... (optional)
 - **Purpose:** Long-term memory of decisions, bugs, solutions
 - **Update when:** Major changes, discovered bugs, important decisions
 
+## Multi-Computer Setup
+- **תמיד** תתחיל עם `git pull` לפני כל עבודה
+- **מחשב שני:** עבוד מ-`C:\Users\1\Documents\dealcellolaryk` בלבד (יש שם תיקיות ישנות — התעלם מהן)
+- **הרצה מקומית:** דרך CMD (לא PowerShell): `npm run dev`
+- **אם פונקציות חסרות:** בצע `git pull` — זה הפתרון הראשון לנסות
+
 ## If Confused During Work
 1. Stop and re-read this file
 2. Check MEMORY.md for context
-3. Ask user for clarification if needed
+3. **תעשה `git pull` — כנראה המחשב מאחור**
+4. Ask user for clarification if needed
