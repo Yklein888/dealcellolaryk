@@ -543,6 +543,48 @@ export function RentalProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Initialize US SIMs
+  useEffect(() => {
+    let mounted = true;
+
+    const initUSSims = async () => {
+      try {
+        // Load token and WhatsApp contact (anon can read app_settings)
+        const { data: settings } = await supabase
+          .from('app_settings')
+          .select('key, value');
+
+        if (!mounted) return;
+
+        const tokenSetting = settings?.find(s => s.key === 'us_activator_token');
+        const whatsappSetting = settings?.find(s => s.key === 'us_activator_whatsapp');
+
+        if (tokenSetting?.value) {
+          setActivatorToken(tokenSetting.value);
+          if (whatsappSetting?.value) {
+            setWhatsappContact(whatsappSetting.value);
+          }
+
+          const { data, error } = await supabase.rpc('get_sims_by_token', { p_token: tokenSetting.value });
+          if (mounted && !error && data) {
+            const mappedSims = (data as SimRow[]).map(mapSim);
+            saveUSSims(mappedSims);
+            previousUSSimsRef.current = mappedSims;
+          }
+        }
+      } catch (err) {
+        console.error('Error initializing US SIMs:', err);
+      } finally {
+        if (mounted) setUSSimsLoading(false);
+      }
+    };
+
+    initUSSims();
+    return () => {
+      mounted = false;
+    };
+  }, [saveUSSims]);
+
   // Initial fetch
   useEffect(() => {
     fetchData();
