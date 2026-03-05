@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useRental } from '@/hooks/useRental';
 import { PageLoadingSkeleton } from '@/components/PageLoadingSkeleton';
+import { EmptyState } from '@/components/EmptyState';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
