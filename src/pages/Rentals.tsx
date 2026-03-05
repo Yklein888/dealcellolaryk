@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { useRental } from '@/hooks/useRental';
 import { PageLoadingSkeleton } from '@/components/PageLoadingSkeleton';
+import { EmptyState } from '@/components/EmptyState';
 import { InventoryItem } from '@/types/rental';
 import { PACKAGE_LABELS, USSimPackage } from '@/types/rental';
 import { PageHeader } from '@/components/PageHeader';
