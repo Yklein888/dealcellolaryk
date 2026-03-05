@@ -223,7 +223,12 @@ export default function Dashboard() {
             <h2 className="text-lg font-bold text-foreground mb-4">השכרות עם סימים לארה״ב</h2>
 
             {rentalsWithUSSims.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-6">אין השכרות פעילות עם סימים לארה״ב כרגע</p>
+              <EmptyState
+                icon={Globe}
+                title="אין השכרות עם סימים לארה״ב"
+                description="כל השכרה עם סימים לארה״ב תופיע כאן"
+                iconColor="muted"
+              />
             ) : (
               <SortableTable<typeof rentalsWithUSSims[0]>
                 columns={useMemo(() => [
