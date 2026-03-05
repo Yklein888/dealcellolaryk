@@ -10,6 +10,7 @@ import { RoleProvider } from "@/hooks/useRole";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { SessionManager } from "@/components/SessionManager";
 import { AppLayout } from "@/components/AppLayout";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 // Lazy-loaded pages for code splitting
 const Dashboard = lazy(() => import("./pages/Dashboard"));
