@@ -311,7 +311,11 @@ export function QuickRentalDialog({ sim, isOpen, onClose, onActivate, onSuccess 
                       </button>
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">שם לקוח *</Label>
+                      <FormFieldHelper
+                        label="שם לקוח"
+                        required
+                        hint={FIELD_HINTS.name}
+                      />
                       <Input
                         value={manualName}
                         onChange={e => setManualName(e.target.value)}
@@ -321,7 +325,10 @@ export function QuickRentalDialog({ sim, isOpen, onClose, onActivate, onSuccess 
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">טלפון (אופציונלי)</Label>
+                      <FormFieldHelper
+                        label="טלפון"
+                        hint={FIELD_HINTS.phone}
+                      />
                       <Input
                         value={newCustomerPhone}
                         onChange={e => setNewCustomerPhone(e.target.value)}
