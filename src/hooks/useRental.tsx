@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef, createContext, useContext, ReactNode, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { 
-  Customer, 
-  InventoryItem, 
-  Rental, 
-  Repair, 
+import {
+  Customer,
+  InventoryItem,
+  Rental,
+  Repair,
   DashboardStats,
-  ItemCategory 
+  ItemCategory,
+  USSim,
+  USSimStatus
 } from '@/types/rental';
 import { useToast } from '@/hooks/use-toast';
 
