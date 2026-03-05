@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { simManagerClient } from '@/integrations/supabase/simManagerClient';
+import { supabase } from '@/integrations/supabase/client';
 import { USSim, USSimStatus } from '@/types/rental';
 
 type SimRow = {
@@ -93,7 +93,7 @@ export function useUSSims() {
   const fetchSims = useCallback(async (token?: string) => {
     const t = token ?? activatorToken;
     if (!t) return;
-    const { data, error } = await simManagerClient.rpc('get_sims_by_token', { p_token: t });
+    const { data, error } = await supabase.rpc('get_sims_by_token', { p_token: t });
     if (!error && data) {
       const newSims = (data as SimRow[]).map(mapSim);
 
@@ -109,7 +109,7 @@ export function useUSSims() {
             try {
               const message = buildStatusChangeMessage(newSim, oldSim.status, newSim.status);
               // Edge function deployed to sim-manager project
-              await simManagerClient.functions.invoke('send-whatsapp-notification', {
+              await supabase.functions.invoke('send-whatsapp-notification', {
                 body: {
                   phone: whatsappContact,
                   message: message,
@@ -132,7 +132,7 @@ export function useUSSims() {
 
     const init = async () => {
       // Load token and WhatsApp contact (anon can read app_settings)
-      const { data: settings } = await simManagerClient
+      const { data: settings } = await supabase
         .from('app_settings')
         .select('key, value');
 
@@ -147,7 +147,7 @@ export function useUSSims() {
           setWhatsappContact(whatsappSetting.value);
         }
 
-        const { data, error } = await simManagerClient.rpc('get_sims_by_token', { p_token: tokenSetting.value });
+        const { data, error } = await supabase.rpc('get_sims_by_token', { p_token: tokenSetting.value });
         if (mounted && !error && data) {
           const mappedSims = (data as SimRow[]).map(mapSim);
           setSims(mappedSims);
@@ -165,17 +165,17 @@ export function useUSSims() {
   useEffect(() => {
     if (!activatorToken) return;
 
-    const channel = simManagerClient
+    const channel = supabase
       .channel('us_sims_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'us_sims' }, () => fetchSims())
       .subscribe();
 
-    return () => { simManagerClient.removeChannel(channel); };
+    return () => { supabase.removeChannel(channel); };
   }, [activatorToken, fetchSims]);
 
   const addSim = useCallback(async (simCompany: string, simNumber?: string, pkg?: string, notes?: string, includesIsraeli?: boolean) => {
     if (!activatorToken) return { error: new Error('No token') };
-    const { data, error } = await simManagerClient.rpc('add_sim_by_token', {
+    const { data, error } = await supabase.rpc('add_sim_by_token', {
       p_token: activatorToken,
       p_company: simCompany,
       p_sim_number: simNumber || null,
@@ -190,7 +190,7 @@ export function useUSSims() {
 
   const deleteSim = useCallback(async (id: string) => {
     if (!activatorToken) return { error: new Error('No token') };
-    const { error } = await simManagerClient.rpc('delete_sim_by_token', {
+    const { error } = await supabase.rpc('delete_sim_by_token', {
       p_id: id,
       p_token: activatorToken,
     });
@@ -200,7 +200,7 @@ export function useUSSims() {
 
   const markReturned = useCallback(async (id: string) => {
     if (!activatorToken) return { error: new Error('No token') };
-    const { error } = await simManagerClient.rpc('mark_sim_returned_by_token', {
+    const { error } = await supabase.rpc('mark_sim_returned_by_token', {
       p_id: id,
       p_token: activatorToken,
     });
@@ -210,7 +210,7 @@ export function useUSSims() {
 
   const renewSim = useCallback(async (id: string, months: number = 1, includesIsraeli?: boolean) => {
     if (!activatorToken) return { error: new Error('No token') };
-    const { data, error } = await simManagerClient.rpc('renew_sim_by_token', {
+    const { data, error } = await supabase.rpc('renew_sim_by_token', {
       p_id: id,
       p_token: activatorToken,
       p_months: months,
@@ -222,7 +222,7 @@ export function useUSSims() {
   }, [activatorToken, fetchSims]);
 
   const updateWhatsappContact = useCallback(async (phone: string) => {
-    const { error } = await simManagerClient
+    const { error } = await supabase
       .from('app_settings')
       .update({ value: phone })
       .eq('key', 'us_activator_whatsapp');

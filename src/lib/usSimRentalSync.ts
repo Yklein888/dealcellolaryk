@@ -1,4 +1,4 @@
-import { simManagerClient } from '@/integrations/supabase/simManagerClient';
+// Removed simManagerClient import - now using main supabase client
 import { supabase } from '@/integrations/supabase/client';
 import { InventoryItem } from '@/types/rental';
 
@@ -9,7 +9,7 @@ import { InventoryItem } from '@/types/rental';
 export async function syncActiveUSSimsToInventory(activatorToken: string): Promise<{ synced: number; error?: string }> {
   try {
     // Fetch active US SIMs from sim-manager project
-    const { data: sims, error: fetchError } = await simManagerClient.rpc(
+    const { data: sims, error: fetchError } = await supabase.rpc(
       'get_sims_by_token',
       { p_token: activatorToken }
     );
