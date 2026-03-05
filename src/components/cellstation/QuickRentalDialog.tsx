@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { FormFieldHelper, FIELD_HINTS, VALIDATION_ERRORS } from '@/components/FormFieldHelper';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { calculateRentalPrice } from '@/lib/pricing';
