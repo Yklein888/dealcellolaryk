@@ -461,7 +461,10 @@ export function EditRentalDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label>הערות</Label>
+              <FormFieldHelper
+                label="הערות"
+                hint="הוסף הערות נוספות על ההשכרה"
+              />
               <Input
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
