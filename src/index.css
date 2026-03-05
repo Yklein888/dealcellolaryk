@@ -271,15 +271,15 @@
     transform: scaleX(1);
   }
 
-  /* ─── Stagger entry delays ────────────────────────── */
-  .stagger-1 { animation-delay:  40ms; }
-  .stagger-2 { animation-delay:  90ms; }
-  .stagger-3 { animation-delay: 140ms; }
-  .stagger-4 { animation-delay: 190ms; }
-  .stagger-5 { animation-delay: 240ms; }
-  .stagger-6 { animation-delay: 290ms; }
+  /* ─── Stagger entry delays (reduced for performance) ────────── */
+  .stagger-1 { animation-delay:  10ms; }
+  .stagger-2 { animation-delay:  20ms; }
+  .stagger-3 { animation-delay:  30ms; }
+  .stagger-4 { animation-delay:  40ms; }
+  .stagger-5 { animation-delay:  50ms; }
+  .stagger-6 { animation-delay:  60ms; }
 
-  /* ─── Sidebar active shimmer ─────────────────────── */
+  /* ─── Sidebar active shimmer (disabled for performance) ─────────────────────── */
   .sidebar-active-shimmer {
     position: relative;
     overflow: hidden;
@@ -296,7 +296,7 @@
       transparent 100%
     );
     background-size: 200% 100%;
-    animation: gradientShift 3s linear infinite;
+    /* animation: gradientShift 3s linear infinite; Disabled for performance */
     pointer-events: none;
     border-radius: inherit;
   }
