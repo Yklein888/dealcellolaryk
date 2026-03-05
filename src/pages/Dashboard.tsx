@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback, lazy, Suspense } from 'react
 import { useRental } from '@/hooks/useRental';
 
 import { PageHeader } from '@/components/PageHeader';
+import { SortableTable, Column } from '@/components/SortableTable';
 import { Button } from '@/components/ui/button';
 import { GlobalSearch } from '@/components/GlobalSearch';
 import { QuickActions } from '@/components/QuickActions';
