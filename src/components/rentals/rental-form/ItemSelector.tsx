@@ -67,6 +67,7 @@ export function ItemSelector({
     expiryDate: '',
     simNumber: '',
   });
+  const [errors, setErrors] = useState<{ name?: string; simNumber?: string }>({});
 
   const filtered = availableItems.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
