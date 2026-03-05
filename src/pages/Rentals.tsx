@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { useRental } from '@/hooks/useRental';
-import { useUSSims } from '@/hooks/useUSSims';
 import { PageLoadingSkeleton } from '@/components/PageLoadingSkeleton';
 import { InventoryItem } from '@/types/rental';
 import { PACKAGE_LABELS, USSimPackage } from '@/types/rental';
@@ -75,9 +74,9 @@ export default function Rentals() {
     deleteRental,
     addInventoryItem,
     getAvailableItems,
-    loading
+    loading,
+    usSims
   } = useRental();
-  const { sims } = useUSSims();
   const { toast } = useToast();
   
   const [searchParams, setSearchParams] = useSearchParams();
