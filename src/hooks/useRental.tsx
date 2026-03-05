@@ -764,8 +764,12 @@ export function RentalProvider({ children }: { children: ReactNode }) {
     inventory,
     rentals,
     repairs,
+    usSims,
     stats,
     loading,
+    usSimsLoading,
+    activatorToken,
+    whatsappContact,
     ...customerOps,
     ...inventoryOps,
     ...rentalOps,
@@ -773,7 +777,12 @@ export function RentalProvider({ children }: { children: ReactNode }) {
     ...repairOps,
     ...validation,
     refreshData,
-  }), [customers, inventory, rentals, repairs, stats, loading, customerOps, inventoryOps, rentalOps, rentalItemOps, repairOps, validation, refreshData]);
+    addSim,
+    deleteSim,
+    markSimReturned,
+    renewSim,
+    updateWhatsappContact,
+  }), [customers, inventory, rentals, repairs, usSims, stats, loading, usSimsLoading, activatorToken, whatsappContact, customerOps, inventoryOps, rentalOps, rentalItemOps, repairOps, validation, refreshData, addSim, deleteSim, markSimReturned, renewSim, updateWhatsappContact]);
 
   return (
     <RentalContext.Provider value={contextValue}>
