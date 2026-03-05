@@ -303,23 +303,25 @@
 
   /* ─── Animation classes ──────────────────────────── */
   .animate-fade-in {
-    animation: fadeIn 0.5s ease-out both;
+    animation: fadeIn 0.3s ease-out both;
   }
 
   .animate-slide-up {
-    animation: slideUp 0.5s ease-out both;
+    animation: slideUp 0.3s ease-out both;
   }
 
   .animate-scale-in {
-    animation: scaleIn 0.3s ease-out both;
+    animation: scaleIn 0.2s ease-out both;
   }
 
   .animate-float {
-    animation: float 6s ease-in-out infinite;
+    /* Disabled for performance */
+    /* animation: float 6s ease-in-out infinite; */
   }
 
   .animate-pulse-glow {
-    animation: pulseGlow 2.5s ease-in-out infinite;
+    /* Disabled for performance */
+    /* animation: pulseGlow 2.5s ease-in-out infinite; */
   }
 
   /* ─── Keyframes ──────────────────────────────────── */
