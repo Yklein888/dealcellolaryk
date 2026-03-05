@@ -28,15 +28,23 @@ export function CustomerSelector({
   const [searchTerm, setSearchTerm] = useState('');
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [quickData, setQuickData] = useState({ name: '', phone: '', address: '' });
+  const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});
 
   const filtered = customers.filter(c => {
     const q = searchTerm.toLowerCase();
     return c.name.toLowerCase().includes(q) || c.phone.includes(searchTerm);
   });
 
+  const validateForm = () => {
+    const newErrors: typeof errors = {};
+    if (!quickData.name) newErrors.name = VALIDATION_ERRORS.required;
+    if (!quickData.phone) newErrors.phone = VALIDATION_ERRORS.required;
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleQuickAdd = async () => {
-    if (!quickData.name || !quickData.phone) {
-      toast({ title: 'שגיאה', description: 'יש להזין שם וטלפון', variant: 'destructive' });
+    if (!validateForm()) {
       return;
     }
     try {
