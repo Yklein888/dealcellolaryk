@@ -452,7 +452,10 @@ export function EditRentalDialog({
           {/* Deposit & Notes */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>פיקדון</Label>
+              <FormFieldHelper
+                label="פיקדון"
+                hint={FIELD_HINTS.currency}
+              />
               <Input
                 type="number"
                 value={deposit}
@@ -479,7 +482,10 @@ export function EditRentalDialog({
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>סכום ליום איחור (₪)</Label>
+                <FormFieldHelper
+                  label="סכום ליום איחור (₪)"
+                  hint="סכום שיחויב לכל יום איחור"
+                />
                 <Input
                   type="number"
                   value={overdueDailyRate}
@@ -489,7 +495,10 @@ export function EditRentalDialog({
                 />
               </div>
               <div className="space-y-2">
-                <Label>ימי חסד</Label>
+                <FormFieldHelper
+                  label="ימי חסד"
+                  hint="מספר ימים שיוצפו לפני החיוב האוטומטי"
+                />
                 <Input
                   type="number"
                   value={overdueGraceDays}
