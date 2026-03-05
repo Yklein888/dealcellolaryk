@@ -411,11 +411,17 @@ export function QuickRentalDialog({ sim, isOpen, onClose, onActivate, onSuccess 
               {/* Dates */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-sm font-semibold">תאריך התחלה</Label>
+                  <FormFieldHelper
+                    label="תאריך התחלה"
+                    hint={FIELD_HINTS.date}
+                  />
                   <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="h-13 text-base" style={{ height: '52px' }} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-sm font-semibold">תאריך סיום</Label>
+                  <FormFieldHelper
+                    label="תאריך סיום"
+                    hint={FIELD_HINTS.date}
+                  />
                   <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="h-13 text-base" style={{ height: '52px' }} />
                 </div>
               </div>
