@@ -88,9 +88,9 @@ export default function Dashboard() {
     const active = rentals.filter(r => r.status === 'active');
 
     // US SIMs stats
-    const pendingSims = sims.filter(s => s.status === 'pending').length;
-    const activatingSims = sims.filter(s => s.status === 'activating').length;
-    const activeSims = sims.filter(s => s.status === 'active').length;
+    const pendingSims = usSims.filter(s => s.status === 'pending').length;
+    const activatingSims = usSims.filter(s => s.status === 'activating').length;
+    const activeSims = usSims.filter(s => s.status === 'active').length;
 
     // Rentals with US SIMs
     const rentalsWithUS = active.filter(r =>
@@ -105,7 +105,7 @@ export default function Dashboard() {
       simsStats: { pending: pendingSims, activating: activatingSims, active: activeSims },
       rentalsWithUSSims: rentalsWithUS,
     };
-  }, [rentals, repairs, sims]);
+  }, [rentals, repairs, usSims]);
 
   if (loading) {
     return <DashboardSkeleton />;
