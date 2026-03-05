@@ -51,8 +51,9 @@ export default defineConfig(({ mode }) => ({
         // This prevents white screen after redeployment
         skipWaiting: true,
         clientsClaim: true,
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2,woff}"],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
             // Supabase API - NetworkFirst: always fetch fresh, fallback to cache
