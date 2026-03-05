@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { cn } from '@/lib/utils';
 
 interface StatusBadgeProps {
@@ -13,7 +14,7 @@ const variantStyles = {
   info: 'bg-primary/20 text-primary border-primary/30',
 };
 
-export function StatusBadge({ status, variant = 'default' }: StatusBadgeProps) {
+export const StatusBadge = memo(function StatusBadge({ status, variant = 'default' }: StatusBadgeProps) {
   return (
     <span className={cn(
       'inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border',
@@ -22,4 +23,4 @@ export function StatusBadge({ status, variant = 'default' }: StatusBadgeProps) {
       {status}
     </span>
   );
-}
+});
