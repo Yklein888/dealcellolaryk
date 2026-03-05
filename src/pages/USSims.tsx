@@ -81,17 +81,17 @@ type DashboardTab = 'all' | 'pending' | 'activating' | 'active' | 'rented' | 're
 
 export default function USSims() {
   const {
-    sims,
-    loading,
+    usSims,
+    usSimsLoading,
     activatorToken,
     whatsappContact,
     addSim,
     deleteSim,
-    markReturned,
+    markSimReturned,
     renewSim,
     updateWhatsappContact,
-  } = useUSSims();
-  const { rentals } = useRental();
+    rentals,
+  } = useRental();
   const { toast } = useToast();
 
   // ── Tab & Search ────────────────────────────────────────────────────────────
