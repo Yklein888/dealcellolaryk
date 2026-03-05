@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { memo, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -42,7 +42,7 @@ const callTypeLabels = {
   automatic: 'אוטומטי',
 };
 
-export function CallHistoryBadge({ entityType, entityId, className }: CallHistoryBadgeProps) {
+export const CallHistoryBadge = memo(function CallHistoryBadge({ entityType, entityId, className }: CallHistoryBadgeProps) {
   const [callLogs, setCallLogs] = useState<CallLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
