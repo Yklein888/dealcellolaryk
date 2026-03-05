@@ -35,8 +35,7 @@ import { OverdueAlert } from '@/components/dashboard/OverdueAlert';
 import { RevenueChart } from '@/components/dashboard/RevenueChart';
 
 export default function Dashboard() {
-  const { stats, rentals, repairs, inventory, getUpcomingReturns, loading } = useRental();
-  const { sims, loading: simsLoading } = useUSSims();
+  const { stats, rentals, repairs, inventory, getUpcomingReturns, loading, usSims, usSimsLoading } = useRental();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isQuickActionsOpen, setIsQuickActionsOpen] = useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
