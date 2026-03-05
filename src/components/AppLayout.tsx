@@ -1,9 +1,12 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState, useCallback } from 'react';
 import { AppSidebar } from './AppSidebar';
 import { MobileBottomNav } from './MobileBottomNav';
 import { ConnectionStatusIndicator } from './ConnectionStatusIndicator';
 import { ConnectionStatusProvider } from '@/hooks/useConnectionStatus';
 import { useUSSimNotificationSync } from '@/hooks/useUSSimNotificationSync';
+import { useKeyboardShortcuts, KeyboardShortcut } from '@/hooks/useKeyboardShortcuts';
+import { KeyboardShortcutsDialog } from './KeyboardShortcutsDialog';
+import { GlobalSearch } from './GlobalSearch';
 import { Smartphone } from 'lucide-react';
 import { PWAInstallPrompt } from './PWAInstallPrompt';
 
