@@ -288,7 +288,10 @@ export function ActivateAndSwapDialog({
               placeholder="שם מלא..." className="h-12 text-base bg-background" autoFocus />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">טלפון (אופציונלי)</Label>
+            <FormFieldHelper
+              label="טלפון"
+              hint={FIELD_HINTS.phone}
+            />
             <Input value={newCustomerPhone} onChange={e => setNewCustomerPhone(e.target.value)}
               placeholder="05X-XXXXXXX" type="tel" inputMode="tel" dir="ltr"
               className="h-12 text-base text-left bg-background" />
