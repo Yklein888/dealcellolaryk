@@ -24,4 +24,4 @@ export const PageHeader = memo(function PageHeader({ title, description, childre
       )}
     </div>
   );
-}
+});
