@@ -77,6 +77,23 @@ export function AppLayout({ children }: AppLayoutProps) {
 
         {/* PWA Install Prompt */}
         <PWAInstallPrompt />
+
+        {/* Keyboard Shortcuts Dialog */}
+        <KeyboardShortcutsDialog
+          open={isHelpOpen}
+          onOpenChange={setIsHelpOpen}
+          shortcuts={[
+            { keys: ['Control', 'k'], description: 'חיפוש גלובלי' },
+            { keys: ['Escape'], description: 'סגור דיאלוג' },
+            { keys: ['?'], description: 'הצג עזרה זו' },
+          ]}
+        />
+
+        {/* Global Search */}
+        <GlobalSearch
+          isOpen={isSearchOpen}
+          onClose={() => setIsSearchOpen(false)}
+        />
       </div>
     </ConnectionStatusProvider>
   );
