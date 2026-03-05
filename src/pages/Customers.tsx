@@ -364,24 +364,23 @@ export default function Customers() {
       {/* Customers Grid */}
       {filteredCustomers.length === 0 ? (
         customers.length === 0 ? (
-          <div className="rounded-2xl border border-border/50 bg-card text-center py-16 px-6 shadow-sm">
-            <div className="flex h-20 w-20 mx-auto mb-5 items-center justify-center rounded-3xl bg-gradient-to-br from-primary/20 to-accent/10">
-              <Users className="h-10 w-10 text-primary" />
-            </div>
-            <h3 className="text-xl font-bold text-foreground mb-2">אין לקוחות עדיין</h3>
-            <p className="text-muted-foreground mb-6 max-w-xs mx-auto">הוסף לקוח ראשון כדי להתחיל לנהל את הקשרים עם הלקוחות שלך</p>
-            <Button variant="glow" onClick={() => setIsAddDialogOpen(true)}>
-              <Plus className="h-4 w-4" />
-              הוסף לקוח ראשון
-            </Button>
-          </div>
+          <EmptyState
+            icon={Users}
+            title="אין לקוחות עדיין"
+            description="הוסף לקוח ראשון כדי להתחיל לנהל את הקשרים עם הלקוחות שלך"
+            action={{
+              label: 'הוסף לקוח ראשון',
+              onClick: () => setIsAddDialogOpen(true),
+            }}
+            iconColor="primary"
+          />
         ) : (
-          <div className="rounded-2xl border border-border/50 bg-card text-center py-12 px-6 shadow-sm">
-            <Users className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
-            <p className="text-lg font-medium text-foreground">לא נמצאו לקוחות</p>
-            <p className="text-sm text-muted-foreground">נסה לשנות את מילות החיפוש</p>
-          </div>
-        )
+          <EmptyState
+            icon={Users}
+            title="לא נמצאו לקוחות"
+            description="נסה לשנות את מילות החיפוש"
+            iconColor="muted"
+          />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {filteredCustomers.map((customer) => (
