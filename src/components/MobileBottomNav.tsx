@@ -38,7 +38,6 @@ import { APIKeysSettings } from '@/components/settings/APIKeysSettings';
 
 const mainNavItems = [
   { path: '/', label: 'ראשי', icon: LayoutDashboard, permission: 'view_dashboard' as const },
-  { path: '/pos', label: 'קופה', icon: Store, permission: 'view_pos' as const },
   { path: '/rentals', label: 'השכרות', icon: ShoppingCart, permission: 'view_rentals' as const },
   { path: '/customers', label: 'לקוחות', icon: Users, permission: 'view_customers' as const },
 ];
