@@ -187,6 +187,11 @@ export function RentalProvider({ children }: { children: ReactNode }) {
     saveToCache(CACHE_KEYS.repairs, data);
   }, []);
 
+  const saveUSSims = useCallback((data: USSim[]) => {
+    setUSSims(data);
+    setCachedUSSims(data);
+  }, []);
+
   // Schedule a background retry after 30 seconds
   const scheduleBackgroundRetry = useCallback(() => {
     if (backgroundRetryTimeoutRef.current) {
