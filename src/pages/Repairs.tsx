@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useRental } from '@/hooks/useRental';
 import { PageLoadingSkeleton } from '@/components/PageLoadingSkeleton';
+import { EmptyState } from '@/components/EmptyState';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
 import { CallHistoryBadge } from '@/components/CallHistoryBadge';
