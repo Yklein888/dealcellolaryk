@@ -18,6 +18,33 @@ export function AppLayout({ children }: AppLayoutProps) {
   // Sync US SIM notifications when numbers become available
   useUSSimNotificationSync();
 
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  // Define keyboard shortcuts
+  const shortcuts: KeyboardShortcut[] = [
+    {
+      keys: ['Control', 'k'],
+      description: 'חיפוש גלובלי',
+      action: () => setIsSearchOpen(true),
+    },
+    {
+      keys: ['?'],
+      description: 'עזרה ושוורטקטים',
+      action: () => setIsHelpOpen(true),
+    },
+    {
+      keys: ['Escape'],
+      description: 'סגור',
+      action: () => {
+        setIsHelpOpen(false);
+        setIsSearchOpen(false);
+      },
+    },
+  ];
+
+  useKeyboardShortcuts(shortcuts);
+
   return (
     <ConnectionStatusProvider>
       <div className="min-h-screen bg-background">
