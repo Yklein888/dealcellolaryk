@@ -279,7 +279,11 @@ export function ActivateAndSwapDialog({
             </button>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">שם לקוח *</Label>
+            <FormFieldHelper
+              label="שם לקוח"
+              required
+              hint={FIELD_HINTS.name}
+            />
             <Input value={manualName} onChange={e => setManualName(e.target.value)}
               placeholder="שם מלא..." className="h-12 text-base bg-background" autoFocus />
           </div>
