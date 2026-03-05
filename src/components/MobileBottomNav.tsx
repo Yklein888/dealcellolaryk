@@ -98,6 +98,18 @@ export function MobileBottomNav() {
           );
         })}
 
+        {/* Settings Button */}
+        <button
+          onClick={() => setIsSettingsOpen(true)}
+          className={cn(
+            'flex flex-col items-center justify-center flex-1 py-2 mx-0.5 rounded-xl transition-all duration-200',
+            'text-muted-foreground hover:text-foreground active:bg-muted/50'
+          )}
+        >
+          <Settings className="h-5 w-5 mb-1" />
+          <span className="text-[10px] font-semibold leading-tight">הגדרות</span>
+        </button>
+
         {/* More Menu */}
         <Sheet open={isMoreOpen} onOpenChange={setIsMoreOpen}>
           <SheetTrigger asChild>
