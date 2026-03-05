@@ -99,28 +99,37 @@ export function QuickActivateDialog({ sim, isOpen, onClose, onActivate, isActiva
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label>תאריך התחלה</Label>
+                <FormFieldHelper
+                  label="תאריך התחלה"
+                  hint={FIELD_HINTS.date}
+                />
                 <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
               </div>
               <div className="space-y-1">
-                <Label>תאריך סיום</Label>
+                <FormFieldHelper
+                  label="תאריך סיום"
+                  hint={FIELD_HINTS.date}
+                />
                 <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label>מחיר (₪)</Label>
+                <FormFieldHelper
+                  label="מחיר (₪)"
+                  hint={FIELD_HINTS.currency}
+                />
                 <Input type="number" placeholder="0" value={price} onChange={e => setPrice(e.target.value)} />
               </div>
               <div className="space-y-1">
-                <Label>ימים</Label>
+                <FormFieldHelper label="ימים" />
                 <Input value={days} readOnly className="bg-muted" />
               </div>
             </div>
 
             <div className="space-y-1">
-              <Label>הערה</Label>
+              <FormFieldHelper label="הערה" />
               <Input placeholder="הערה אופציונלית..." value={note} onChange={e => setNote(e.target.value)} />
             </div>
 
