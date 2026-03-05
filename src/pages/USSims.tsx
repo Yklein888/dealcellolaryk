@@ -192,7 +192,7 @@ export default function USSims() {
     if (error) {
       toast({ title: 'שגיאה', description: error.message, variant: 'destructive' });
     } else {
-      const sim = sims.find((s) => s.id === renewSimId);
+      const sim = usSims.find((s) => s.id === renewSimId);
       toast({ title: 'הורחק', description: `${sim?.simCompany} הורחק לחודש נוסף` });
       setIsRenewOpen(false);
     }
@@ -212,7 +212,7 @@ export default function USSims() {
 
   const enrichedSims = useMemo<EnrichedUSSim[]>(() => {
     const today = new Date();
-    return sims.map((sim) => {
+    return usSims.map((sim) => {
       const virtualId = `us-sim-${sim.id}`;
       const linkedRental =
         rentals.find(
@@ -244,7 +244,7 @@ export default function USSims() {
         daysUntilExpiry,
       };
     });
-  }, [sims, rentals]);
+  }, [usSims, rentals]);
 
   // ── Stats ──────────────────────────────────────────────────────────────────
 
