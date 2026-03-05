@@ -281,14 +281,40 @@ export function ItemSelector({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>שם הפריט</Label>
-              <Input value={quickAddData.name} onChange={(e) => setQuickAddData({ ...quickAddData, name: e.target.value })} placeholder="לדוגמה: סים אירופאי #002" />
+              <FormFieldHelper
+                label="שם הפריט"
+                required
+                error={errors.name}
+                hint={!errors.name ? "למשל: סים אירופאי #002" : undefined}
+              />
+              <Input
+                value={quickAddData.name}
+                onChange={(e) => {
+                  setQuickAddData({ ...quickAddData, name: e.target.value });
+                  if (errors.name) setErrors({ ...errors, name: undefined });
+                }}
+                placeholder="לדוגמה: סים אירופאי #002"
+                className={errors.name ? 'border-destructive' : ''}
+              />
             </div>
             {isSim(quickAddData.category) && (
               <>
                 <div className="space-y-2">
-                  <Label>מספר סים (ICCID) <span className="text-destructive">*</span></Label>
-                  <Input value={quickAddData.simNumber} onChange={(e) => setQuickAddData({ ...quickAddData, simNumber: e.target.value })} placeholder="89972..." />
+                  <FormFieldHelper
+                    label="מספר סים (ICCID)"
+                    required
+                    error={errors.simNumber}
+                    hint={!errors.simNumber ? "מספר סים ייחודי (ICCID) - החל ב-89" : undefined}
+                  />
+                  <Input
+                    value={quickAddData.simNumber}
+                    onChange={(e) => {
+                      setQuickAddData({ ...quickAddData, simNumber: e.target.value });
+                      if (errors.simNumber) setErrors({ ...errors, simNumber: undefined });
+                    }}
+                    placeholder="89972..."
+                    className={errors.simNumber ? 'border-destructive' : ''}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>מספר מקומי</Label>
