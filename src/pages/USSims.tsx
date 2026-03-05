@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react';
-import { useUSSims } from '@/hooks/useUSSims';
 import { useRental } from '@/hooks/useRental';
 import { PageHeader } from '@/components/PageHeader';
 import { PageLoadingSkeleton } from '@/components/PageLoadingSkeleton';
