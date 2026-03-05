@@ -195,20 +195,6 @@ export function MobileBottomNav() {
               )}
             </div>
 
-            {/* Settings Button */}
-            <button
-              onClick={() => {
-                setIsMoreOpen(false);
-                setIsSettingsOpen(true);
-              }}
-              className="flex items-center gap-4 p-4 rounded-2xl transition-all duration-200 w-full hover:bg-muted active:bg-muted/70"
-            >
-              <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-muted">
-                <Settings className="h-5 w-5" />
-              </div>
-              <span className="font-medium text-base">הגדרות</span>
-            </button>
-
             {/* User Section */}
             <div className="border-t border-border pt-4 pb-2">
               <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/50">
