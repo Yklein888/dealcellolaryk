@@ -23,6 +23,89 @@ import { calculateStats } from './rental/useRentalStats';
 import { createRentalValidation } from './rental/useRentalValidation';
 import type { RentalItemUpdate } from './rental/types';
 
+// ──────────────── US SIMS HELPERS ────────────────────────────────────────
+
+type SimRow = {
+  id: string;
+  sim_company: string;
+  sim_number: string | null;
+  package: string | null;
+  local_number: string | null;
+  israeli_number: string | null;
+  expiry_date: string | null;
+  status: string;
+  notes: string | null;
+  includes_israeli_number: boolean | null;
+  created_at: string;
+  updated_at: string;
+};
+
+function mapSim(row: SimRow): USSim {
+  return {
+    id: row.id,
+    simCompany: row.sim_company,
+    simNumber: row.sim_number ?? undefined,
+    package: row.package as any ?? undefined,
+    localNumber: row.local_number ?? undefined,
+    israeliNumber: row.israeli_number ?? undefined,
+    expiryDate: row.expiry_date ?? undefined,
+    status: row.status as USSimStatus,
+    notes: row.notes ?? undefined,
+    includesIsraeliNumber: row.includes_israeli_number ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function buildStatusChangeMessage(
+  sim: USSim,
+  oldStatus: USSimStatus,
+  newStatus: USSimStatus
+): string {
+  if (newStatus === 'activating') {
+    return `🔄 סים ${sim.simCompany} החל בהפעלה\nממתין למספרים...`;
+  }
+  if (newStatus === 'active') {
+    return `✅ סים ${sim.simCompany} הופעל בהצלחה!\n📱 מספר מקומי: ${sim.localNumber || 'לא מוגדר'}\n🇮🇱 מספר ישראלי: ${sim.israeliNumber || 'לא הוגדר'}\nתוקף: ${sim.expiryDate || 'לא מוגדר'}`;
+  }
+  if (newStatus === 'returned') {
+    return `🔙 סים ${sim.simCompany} הוחזר למלאי`;
+  }
+  return `📱 סים ${sim.simCompany}: ${newStatus}`;
+}
+
+// US SIMs cache helpers
+const US_SIMS_CACHE_KEY = 'dealcellular_us_sims_cache';
+const US_SIMS_CACHE_EXPIRY_KEY = 'dealcellular_us_sims_cache_expiry';
+const US_SIMS_CACHE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
+
+function getCachedUSSims(): USSim[] | null {
+  try {
+    const cached = localStorage.getItem(US_SIMS_CACHE_KEY);
+    const expiry = localStorage.getItem(US_SIMS_CACHE_EXPIRY_KEY);
+
+    if (cached && expiry && Date.now() < parseInt(expiry)) {
+      return JSON.parse(cached);
+    }
+
+    // Clear expired cache
+    localStorage.removeItem(US_SIMS_CACHE_KEY);
+    localStorage.removeItem(US_SIMS_CACHE_EXPIRY_KEY);
+  } catch (e) {
+    console.warn('Failed to read US SIMs cache:', e);
+  }
+  return null;
+}
+
+function setCachedUSSims(sims: USSim[]): void {
+  try {
+    localStorage.setItem(US_SIMS_CACHE_KEY, JSON.stringify(sims));
+    localStorage.setItem(US_SIMS_CACHE_EXPIRY_KEY, (Date.now() + US_SIMS_CACHE_EXPIRY_MS).toString());
+  } catch (e) {
+    console.warn('Failed to cache US SIMs:', e);
+  }
+}
+
 interface RentalContextType {
   customers: Customer[];
   inventory: InventoryItem[];
