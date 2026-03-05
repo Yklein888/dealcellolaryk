@@ -224,28 +224,32 @@ export default function Dashboard() {
             {rentalsWithUSSims.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-6">אין השכרות פעילות עם סימים לארה״ב כרגע</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border/50">
-                      <th className="text-right px-4 py-2 text-muted-foreground font-medium text-xs">לקוח</th>
-                      <th className="text-right px-4 py-2 text-muted-foreground font-medium text-xs">עד תאריך</th>
-                      <th className="text-right px-4 py-2 text-muted-foreground font-medium text-xs">מחיר</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rentalsWithUSSims.slice(0, 5).map(rental => (
-                      <tr key={rental.id} className="border-b border-border/20 hover:bg-muted/10">
-                        <td className="px-4 py-2">{rental.customerName}</td>
-                        <td className="px-4 py-2 text-muted-foreground text-xs">
-                          {format(parseISO(rental.endDate), 'dd/MM/yyyy', { locale: he })}
-                        </td>
-                        <td className="px-4 py-2 font-medium">{rental.currency === 'USD' ? '$' : '₪'}{rental.totalPrice.toFixed(0)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <SortableTable<typeof rentalsWithUSSims[0]>
+                columns={useMemo(() => [
+                  {
+                    key: 'customerName',
+                    label: 'לקוח',
+                    sortable: true,
+                  },
+                  {
+                    key: 'endDate',
+                    label: 'עד תאריך',
+                    sortable: true,
+                    render: (value) => format(parseISO(value as string), 'dd/MM/yyyy', { locale: he }),
+                  },
+                  {
+                    key: 'totalPrice',
+                    label: 'מחיר',
+                    sortable: true,
+                    render: (value, row: any) => `${row.currency === 'USD' ? '$' : '₪'}${(value as number).toFixed(0)}`,
+                  },
+                ] as Column<typeof rentalsWithUSSims[0]>[], [])}
+                data={rentalsWithUSSims.slice(0, 5)}
+                keyExtractor={(rental) => rental.id}
+                defaultSort="endDate"
+                defaultSortDirection="asc"
+                noDataMessage="אין השכרות עם סימים לארה״ב"
+              />
             )}
           </div>
           <div className="stat-shimmer" />
