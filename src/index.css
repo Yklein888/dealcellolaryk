@@ -367,7 +367,16 @@
   }
 
   .animate-scan-line {
-    animation: scan-line 1.5s ease-in-out infinite;
+    animation: scan-line 1.2s ease-in-out infinite;
+  }
+
+  /* Respect prefers-reduced-motion for accessibility and performance */
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 
   /* ─── Mobile utilities ───────────────────────────── */
