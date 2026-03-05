@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRental } from '@/hooks/useRental';
-import { useUSSims } from '@/hooks/useUSSims';
 
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
