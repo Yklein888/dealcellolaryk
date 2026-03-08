@@ -33,7 +33,6 @@ import { QuickStatsRow } from '@/components/dashboard/QuickStatsRow';
 // Lazy load heavy chart components
 const InventoryChart = lazy(() => import('@/components/dashboard/InventoryChart').then(m => ({ default: m.InventoryChart })));
 const RentalsActivityChart = lazy(() => import('@/components/dashboard/RentalsActivityChart').then(m => ({ default: m.RentalsActivityChart })));
-const RevenueChart = lazy(() => import('@/components/dashboard/RevenueChart').then(m => ({ default: m.RevenueChart })));
 const UpcomingReturnsCard = lazy(() => import('@/components/dashboard/UpcomingReturnsCard').then(m => ({ default: m.UpcomingReturnsCard })));
 const RecentRepairsCard = lazy(() => import('@/components/dashboard/RecentRepairsCard').then(m => ({ default: m.RecentRepairsCard })));
 const OverdueAlert = lazy(() => import('@/components/dashboard/OverdueAlert').then(m => ({ default: m.OverdueAlert })));
@@ -165,12 +164,6 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <InventoryChart inventory={inventory} />
           <RentalsActivityChart rentals={rentals} />
-        </div>
-      </Suspense>
-
-      <Suspense fallback={<div className="mb-8"><ChartSkeleton /></div>}>
-        <div className="mb-8">
-          <RevenueChart rentals={rentals} />
         </div>
       </Suspense>
 
