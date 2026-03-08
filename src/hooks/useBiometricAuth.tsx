@@ -41,14 +41,25 @@ export function useBiometricAuth() {
   useEffect(() => {
     // Check WebAuthn support - requires HTTPS
     const checkSupport = async () => {
-      const supported = 
-        typeof window !== 'undefined' &&
-        window.PublicKeyCredential !== undefined &&
-        (window.location.protocol === 'https:' || window.location.hostname === 'localhost');
-      
-      setIsSupported(supported);
+      try {
+        const supported =
+          typeof window !== 'undefined' &&
+          window.PublicKeyCredential !== undefined &&
+          (window.location.protocol === 'https:' || window.location.hostname === 'localhost');
+
+        // Also check if the browser actually supports it
+        if (supported) {
+          const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable?.();
+          setIsSupported(supported && (available || window.location.hostname === 'localhost'));
+        } else {
+          setIsSupported(false);
+        }
+      } catch (error) {
+        console.warn('Error checking biometric support:', error);
+        setIsSupported(false);
+      }
     };
-    
+
     checkSupport();
   }, []);
 
