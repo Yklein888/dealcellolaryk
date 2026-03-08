@@ -13,23 +13,22 @@ import { AppLayout } from "@/components/AppLayout";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 // Lazy-loaded pages for code splitting
-// ALL COMMENTED FOR TESTING
 const Dashboard = lazy(() => import("./pages/Dashboard"));
-const Rentals = lazy(() => import("./pages/Rentals"));
-// const Customers = lazy(() => import("./pages/Customers"));
-// const Inventory = lazy(() => import("./pages/Inventory"));
-// const Repairs = lazy(() => import("./pages/Repairs"));
-// const UserManagement = lazy(() => import("./pages/UserManagement"));
-// const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
-// const PaymentError = lazy(() => import("./pages/PaymentError"));
-// const PaymentHistory = lazy(() => import("./pages/PaymentHistory"));
-// const Invoices = lazy(() => import("./pages/Invoices"));
-// const POS = lazy(() => import("./pages/POS"));
-// const CellStation = lazy(() => import("./pages/CellStation"));
-// const NotFound = lazy(() => import("./pages/NotFound"));
-// const Install = lazy(() => import("./pages/Install"));
-// const USSims = lazy(() => import("./pages/USSims"));
-// const SimActivation = lazy(() => import("./pages/SimActivation"));
+// const Rentals = lazy(() => import("./pages/Rentals")); // DISABLED DUE TO BUILD ERROR - see DEBUGGING_NOTES.md
+const Customers = lazy(() => import("./pages/Customers"));
+const Inventory = lazy(() => import("./pages/Inventory"));
+const Repairs = lazy(() => import("./pages/Repairs"));
+const UserManagement = lazy(() => import("./pages/UserManagement"));
+const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
+const PaymentError = lazy(() => import("./pages/PaymentError"));
+const PaymentHistory = lazy(() => import("./pages/PaymentHistory"));
+const Invoices = lazy(() => import("./pages/Invoices"));
+const POS = lazy(() => import("./pages/POS"));
+const CellStation = lazy(() => import("./pages/CellStation"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const Install = lazy(() => import("./pages/Install"));
+const USSims = lazy(() => import("./pages/USSims"));
+const SimActivation = lazy(() => import("./pages/SimActivation"));
 
 const queryClient = new QueryClient();
 
@@ -51,18 +50,18 @@ const App = () => (
             <BrowserRouter>
               <Routes>
                 {/* Install page - accessible without auth */}
-                {/* <Route path="/install" element={
+                <Route path="/install" element={
                   <Suspense fallback={<PageFallback />}>
                     <Install />
                   </Suspense>
-                } /> */}
+                } />
 
                 {/* Public activator page — no auth required */}
-                {/* <Route path="/activate/:token" element={
+                <Route path="/activate/:token" element={
                   <Suspense fallback={<PageFallback />}>
                     <SimActivation />
                   </Suspense>
-                } /> */}
+                } />
                 
                 {/* Protected routes */}
                 <Route path="/*" element={
@@ -73,20 +72,20 @@ const App = () => (
                         <Suspense fallback={<PageFallback />}>
                           <Routes>
                           <Route path="/" element={<Dashboard />} />
-                          <Route path="/rentals" element={<Rentals />} />
-                          {/* <Route path="/customers" element={<Customers />} /> */}
-                          {/* <Route path="/inventory" element={<Inventory />} /> */}
-                          {/* <Route path="/repairs" element={<Repairs />} /> */}
-                          {/* <Route path="/users" element={<UserManagement />} /> */}
-                          {/* <Route path="/payments" element={<PaymentHistory />} /> */}
-                          {/* <Route path="/invoices" element={<Invoices />} /> */}
-                          {/* <Route path="/pos" element={<POS />} /> */}
-                          {/* <Route path="/cellstation" element={<CellStation />} /> */}
-                          {/* <Route path="/sims" element={<USSims />} /> */}
+                          {/* <Route path="/rentals" element={<Rentals />} /> - DISABLED DUE TO BUILD ERROR */}
+                          <Route path="/customers" element={<Customers />} />
+                          <Route path="/inventory" element={<Inventory />} />
+                          <Route path="/repairs" element={<Repairs />} />
+                          <Route path="/users" element={<UserManagement />} />
+                          <Route path="/payments" element={<PaymentHistory />} />
+                          <Route path="/invoices" element={<Invoices />} />
+                          <Route path="/pos" element={<POS />} />
+                          <Route path="/cellstation" element={<CellStation />} />
+                          <Route path="/sims" element={<USSims />} />
                           
-                          {/* <Route path="/payment-success" element={<PaymentSuccess />} /> */}
-                          {/* <Route path="/payment-error" element={<PaymentError />} /> */}
-                          {/* <Route path="*" element={<NotFound />} /> */}
+                          <Route path="/payment-success" element={<PaymentSuccess />} />
+                          <Route path="/payment-error" element={<PaymentError />} />
+                          <Route path="*" element={<NotFound />} />
                         </Routes>
                       </Suspense>
                     </AppLayout>
