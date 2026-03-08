@@ -28,7 +28,7 @@ const CellStation = lazy(() => import("./pages/CellStation"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Install = lazy(() => import("./pages/Install"));
 const USSims = lazy(() => import("./pages/USSims"));
-const SimActivation = lazy(() => import("./pages/SimActivation"));
+// const SimActivation = lazy(() => import("./pages/SimActivation"));
 
 const queryClient = new QueryClient();
 
