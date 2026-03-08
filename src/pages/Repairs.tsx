@@ -733,8 +733,8 @@ export default function Repairs() {
                     הדפס
                   </Button>
                   {repair.status === 'in_lab' && (
-                    <Button 
-                      variant="success" 
+                    <Button
+                      variant="success"
                       size="sm"
                       onClick={() => handleStatusChange(repair.id, 'ready')}
                     >
@@ -745,8 +745,8 @@ export default function Repairs() {
                   {repair.status === 'ready' && (
                     <>
                       <div className="flex items-center gap-1">
-                        <Button 
-                          variant="default" 
+                        <Button
+                          variant="default"
                           size="sm"
                           onClick={() => notifyCustomer(repair)}
                           disabled={callingRepairId === repair.id}
@@ -754,20 +754,38 @@ export default function Repairs() {
                           <Phone className="h-4 w-4" />
                           {callingRepairId === repair.id ? 'מתקשר...' : 'הודע ללקוח'}
                         </Button>
-                        <CallHistoryBadge 
-                          entityType="repair" 
+                        <CallHistoryBadge
+                          entityType="repair"
                           entityId={repair.id}
                         />
                       </div>
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
                         onClick={() => handleStatusChange(repair.id, 'collected')}
                       >
                         <Package className="h-4 w-4" />
                         נאסף
                       </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleStatusChange(repair.id, 'in_lab')}
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        חזור לעבודה
+                      </Button>
                     </>
+                  )}
+                  {repair.status === 'collected' && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleStatusChange(repair.id, 'ready')}
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      חזור למוכן
+                    </Button>
                   )}
                   <Button 
                     variant="destructive" 
