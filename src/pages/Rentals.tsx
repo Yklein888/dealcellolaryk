@@ -688,7 +688,7 @@ export default function Rentals() {
             }}
             iconColor="primary"
           />
-        ) : (
+        ) : filteredRentals.length === 0 ? (
           <EmptyState
             icon={ShoppingCart}
             title="לא נמצאו השכרות"
