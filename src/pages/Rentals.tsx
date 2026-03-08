@@ -676,25 +676,24 @@ export default function Rentals() {
       </div>
 
       {/* Rentals List */}
-      {filteredRentals.length === 0 ? (
-        rentals.length === 0 ? (
-          <EmptyState
-            icon={ShoppingCart}
-            title="אין השכרות עדיין"
-            description="צור השכרה ראשונה ועקוב אחרי כל הציוד המושכר"
-            action={{
-              label: 'צור השכרה ראשונה',
-              onClick: () => setIsAddDialogOpen(true),
-            }}
-            iconColor="primary"
-          />
-        ) : filteredRentals.length === 0 ? (
-          <EmptyState
-            icon={ShoppingCart}
-            title="לא נמצאו השכרות"
-            description="נסה לשנות את מסנני החיפוש"
-            iconColor="muted"
-          />
+      {rentals.length === 0 ? (
+        <EmptyState
+          icon={ShoppingCart}
+          title="אין השכרות עדיין"
+          description="צור השכרה ראשונה ועקוב אחרי כל הציוד המושכר"
+          action={{
+            label: 'צור השכרה ראשונה',
+            onClick: () => setIsAddDialogOpen(true),
+          }}
+          iconColor="primary"
+        />
+      ) : filteredRentals.length === 0 ? (
+        <EmptyState
+          icon={ShoppingCart}
+          title="לא נמצאו השכרות"
+          description="נסה לשנות את מסנני החיפוש"
+          iconColor="muted"
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredRentals.map((rental, index) => (
