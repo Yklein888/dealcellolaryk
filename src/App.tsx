@@ -23,7 +23,6 @@ const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
 const PaymentError = lazy(() => import("./pages/PaymentError"));
 const PaymentHistory = lazy(() => import("./pages/PaymentHistory"));
 const Invoices = lazy(() => import("./pages/Invoices"));
-const POS = lazy(() => import("./pages/POS"));
 const CellStation = lazy(() => import("./pages/CellStation"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Install = lazy(() => import("./pages/Install"));
@@ -79,7 +78,6 @@ const App = () => (
                           <Route path="/users" element={<UserManagement />} />
                           <Route path="/payments" element={<PaymentHistory />} />
                           <Route path="/invoices" element={<Invoices />} />
-                          <Route path="/pos" element={<POS />} />
                           <Route path="/cellstation" element={<CellStation />} />
                           <Route path="/sims" element={<USSims />} />
                           
