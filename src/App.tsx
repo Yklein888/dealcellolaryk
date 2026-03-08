@@ -14,7 +14,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 // Lazy-loaded pages for code splitting
 const Dashboard = lazy(() => import("./pages/Dashboard"));
-// const Rentals = lazy(() => import("./pages/Rentals")); // DISABLED DUE TO BUILD ERROR - see DEBUGGING_NOTES.md
+const Rentals = lazy(() => import("./pages/Rentals"));
 const Customers = lazy(() => import("./pages/Customers"));
 const Inventory = lazy(() => import("./pages/Inventory"));
 const Repairs = lazy(() => import("./pages/Repairs"));
@@ -72,7 +72,7 @@ const App = () => (
                         <Suspense fallback={<PageFallback />}>
                           <Routes>
                           <Route path="/" element={<Dashboard />} />
-                          {/* <Route path="/rentals" element={<Rentals />} /> - DISABLED DUE TO BUILD ERROR */}
+                          <Route path="/rentals" element={<Rentals />} />
                           <Route path="/customers" element={<Customers />} />
                           <Route path="/inventory" element={<Inventory />} />
                           <Route path="/repairs" element={<Repairs />} />
