@@ -375,13 +375,7 @@ export default function Customers() {
             iconColor="primary"
           />
         ) : (
-          <EmptyState
-            icon={Users}
-            title="לא נמצאו לקוחות"
-            description="נסה לשנות את מילות החיפוש"
-            iconColor="muted"
-          />
-        ) : (
+        )
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {filteredCustomers.map((customer) => (
             <div 
