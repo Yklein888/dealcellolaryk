@@ -117,8 +117,10 @@ export function NewRentalDialog({
 
   // Item handlers
   const handleAddItem = (item: InventoryItem) => {
+    // Toggle: if item already selected, remove it
     if (selectedItems.some(i => i.inventoryItemId === item.id)) {
-      toast({ title: 'הפריט כבר נבחר', variant: 'destructive' });
+      setSelectedItems(selectedItems.filter(i => i.inventoryItemId !== item.id));
+      toast({ title: 'פריט הוסר מהבחירה', variant: 'default' });
       return;
     }
     const validity = isSimValidForPeriod(item);
