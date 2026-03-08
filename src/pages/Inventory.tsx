@@ -492,6 +492,7 @@ export default function Inventory() {
             description="נסה לשנות את מילות החיפוש"
             iconColor="muted"
           />
+        )
       ) : (
         <div className="space-y-3 sm:space-y-4">
           {categoryOrder
