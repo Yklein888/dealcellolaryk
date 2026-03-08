@@ -681,7 +681,8 @@ export default function Repairs() {
             title="לא נמצאו תיקונים"
             description="נסה לשנות את מילות החיפוש"
             iconColor="muted"
-          /)
+          />
+        )
       ) : (
         <div className="space-y-4">
           {filteredRepairs.map((repair, index) => (
