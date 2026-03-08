@@ -1,3 +1,4 @@
+// Clean rebuild attempt
 import { useState } from 'react';
 import { useRental } from '@/hooks/useRental';
 import { PageLoadingSkeleton } from '@/components/PageLoadingSkeleton';
