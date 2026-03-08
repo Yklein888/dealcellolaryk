@@ -23,6 +23,7 @@ const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
 const PaymentError = lazy(() => import("./pages/PaymentError"));
 const PaymentHistory = lazy(() => import("./pages/PaymentHistory"));
 const Invoices = lazy(() => import("./pages/Invoices"));
+const POS = lazy(() => import("./pages/POS"));
 const CellStation = lazy(() => import("./pages/CellStation"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Install = lazy(() => import("./pages/Install"));
