@@ -15,7 +15,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 // Lazy-loaded pages for code splitting
 // ALL COMMENTED FOR TESTING
 const Dashboard = lazy(() => import("./pages/Dashboard"));
-// const Rentals = lazy(() => import("./pages/Rentals"));
+const Rentals = lazy(() => import("./pages/Rentals"));
 // const Customers = lazy(() => import("./pages/Customers"));
 // const Inventory = lazy(() => import("./pages/Inventory"));
 // const Repairs = lazy(() => import("./pages/Repairs"));
