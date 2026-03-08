@@ -1,7 +1,49 @@
-import { memo } from 'react';
+import { memo, useEffect, useState, useRef } from 'react';
 import { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
+
+// Hook for animated counting
+function useCountUp(end: number, duration: number = 1000) {
+  const [count, setCount] = useState(0);
+  const countRef = useRef(0);
+  const startTime = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (end === 0) {
+      setCount(0);
+      return;
+    }
+
+    const animate = (currentTime: number) => {
+      if (startTime.current === null) {
+        startTime.current = currentTime;
+      }
+      const elapsed = currentTime - startTime.current;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      // Easing function for smooth animation
+      const easeOutQuart = 1 - Math.pow(1 - progress, 4);
+      const currentCount = Math.floor(easeOutQuart * end);
+      
+      if (currentCount !== countRef.current) {
+        countRef.current = currentCount;
+        setCount(currentCount);
+      }
+      
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        setCount(end);
+      }
+    };
+
+    startTime.current = null;
+    requestAnimationFrame(animate);
+  }, [end, duration]);
+
+  return count;
+}
 
 interface StatCardProps {
   title: string;
@@ -45,6 +87,12 @@ export const StatCard = memo(function StatCard({ title, value, icon: Icon, trend
   const navigate = useNavigate();
   const isClickable = !!href || !!onClick;
 
+  // Animated counting for numeric values
+  const numericValue = typeof value === 'number' ? value : parseInt(String(value).replace(/[^\d]/g, ''), 10);
+  const isNumeric = !isNaN(numericValue) && typeof value === 'number';
+  const animatedValue = useCountUp(isNumeric ? numericValue : 0, 1200);
+  const displayValue = isNumeric ? animatedValue : value;
+
   const handleClick = () => {
     if (onClick) {
       onClick();
@@ -78,7 +126,7 @@ export const StatCard = memo(function StatCard({ title, value, icon: Icon, trend
             'mt-1 sm:mt-2 text-2xl sm:text-3xl font-bold transition-all duration-300',
             valueVariantStyles[variant]
           )}>
-            {value}
+            {displayValue}
           </p>
           {trend && (
             <p className={cn(
