@@ -12,22 +12,22 @@ import { SessionManager } from "@/components/SessionManager";
 import { AppLayout } from "@/components/AppLayout";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
-// Lazy-loaded pages for code splitting
-const Dashboard = lazy(() => import("./pages/Dashboard"));
-const Rentals = lazy(() => import("./pages/Rentals"));
-const Customers = lazy(() => import("./pages/Customers"));
-const Inventory = lazy(() => import("./pages/Inventory"));
-const Repairs = lazy(() => import("./pages/Repairs"));
-const UserManagement = lazy(() => import("./pages/UserManagement"));
-const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
-const PaymentError = lazy(() => import("./pages/PaymentError"));
-const PaymentHistory = lazy(() => import("./pages/PaymentHistory"));
-const Invoices = lazy(() => import("./pages/Invoices"));
-const POS = lazy(() => import("./pages/POS"));
-const CellStation = lazy(() => import("./pages/CellStation"));
-const NotFound = lazy(() => import("./pages/NotFound"));
-const Install = lazy(() => import("./pages/Install"));
-const USSims = lazy(() => import("./pages/USSims"));
+// Lazy-loaded pages for code splitting - ALL COMMENTED FOR TESTING
+// const Dashboard = lazy(() => import("./pages/Dashboard"));
+// const Rentals = lazy(() => import("./pages/Rentals"));
+// const Customers = lazy(() => import("./pages/Customers"));
+// const Inventory = lazy(() => import("./pages/Inventory"));
+// const Repairs = lazy(() => import("./pages/Repairs"));
+// const UserManagement = lazy(() => import("./pages/UserManagement"));
+// const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
+// const PaymentError = lazy(() => import("./pages/PaymentError"));
+// const PaymentHistory = lazy(() => import("./pages/PaymentHistory"));
+// const Invoices = lazy(() => import("./pages/Invoices"));
+// const POS = lazy(() => import("./pages/POS"));
+// const CellStation = lazy(() => import("./pages/CellStation"));
+// const NotFound = lazy(() => import("./pages/NotFound"));
+// const Install = lazy(() => import("./pages/Install"));
+// const USSims = lazy(() => import("./pages/USSims"));
 // const SimActivation = lazy(() => import("./pages/SimActivation"));
 
 const queryClient = new QueryClient();
