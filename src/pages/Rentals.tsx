@@ -419,7 +419,7 @@ export default function Rentals() {
         israeliNumber: s.includesIsraeliNumber ? s.israeliNumber : undefined,
         expiryDate: s.expiryDate,
         simNumber: s.simNumber,
-        status: 'available' as const,
+        status: 'available',
         notes: s.notes,
       })),
     [usSims]
