@@ -57,11 +57,11 @@ const App = () => (
                 } />
 
                 {/* Public activator page — no auth required */}
-                <Route path="/activate/:token" element={
+                {/* <Route path="/activate/:token" element={
                   <Suspense fallback={<PageFallback />}>
                     <SimActivation />
                   </Suspense>
-                } />
+                } /> */}
                 
                 {/* Protected routes */}
                 <Route path="/*" element={
