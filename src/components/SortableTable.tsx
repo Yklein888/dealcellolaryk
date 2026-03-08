@@ -156,9 +156,7 @@ export const SortableTable = memo(function SortableTable<T>({
             <tr
               key={keyExtractor(row)}
               className={cn(
-                'border-b border-border/20 transition-all duration-200',
-                'hover:bg-primary/5 hover:shadow-sm hover:border-r-2 hover:border-r-primary',
-                index % 2 === 0 ? 'bg-transparent' : 'bg-muted/30',
+                'border-b border-border/20 hover:bg-muted/20 transition-colors',
                 rowClassName
               )}
             >

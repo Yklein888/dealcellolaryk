@@ -185,18 +185,8 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
       {/* User & Settings */}
       <div className="absolute bottom-0 right-0 left-0 p-4 border-t border-white/10">
         <div className="rounded-xl glass-subtle p-3 mb-3">
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white font-bold text-lg shadow-lg">
-                {user?.email?.charAt(0).toUpperCase() || 'U'}
-              </div>
-              <div className="absolute -bottom-0.5 -left-0.5 h-3 w-3 rounded-full bg-success border-2 border-background" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-muted-foreground">מחובר כ:</p>
-              <p className="text-sm font-medium text-foreground truncate">{user?.email}</p>
-            </div>
-          </div>
+          <p className="text-xs text-muted-foreground">מחובר כ:</p>
+          <p className="text-sm font-medium text-foreground truncate">{user?.email}</p>
         </div>
         <div className="flex gap-2">
           <Button

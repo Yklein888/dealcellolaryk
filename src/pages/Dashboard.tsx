@@ -29,7 +29,7 @@ import { he } from 'date-fns/locale';
 // Dashboard components
 import { DashboardStatsGrid } from '@/components/dashboard/DashboardStatsGrid';
 import { QuickStatsRow } from '@/components/dashboard/QuickStatsRow';
-import { WelcomeCard } from '@/components/dashboard/WelcomeCard';
+
 
 // Lazy load heavy chart components
 const InventoryChart = lazy(() => import('@/components/dashboard/InventoryChart').then(m => ({ default: m.InventoryChart })));
@@ -151,12 +151,6 @@ export default function Dashboard() {
           </Button>
         </div>
       </PageHeader>
-
-      <WelcomeCard 
-        overdueCount={overdueRentals.length}
-        readyRepairsCount={readyRepairs.length}
-        activeRentalsCount={activeRentals.length}
-      />
 
       <DashboardStatsGrid stats={stats} inventory={inventory} />
       <QuickStatsRow
