@@ -282,13 +282,11 @@ export default function Dashboard() {
         <NotificationSettings />
       </div>
 
-      <Suspense fallback={<div className="grid grid-cols-1 lg:grid-cols-2 gap-6"><ChartSkeleton /><ChartSkeleton /><ChartSkeleton /></div>}>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <UpcomingReturnsCard upcomingReturns={upcomingReturns} />
-          <RecentRepairsCard pendingRepairs={pendingRepairs} />
-          <OverdueAlert overdueRentals={overdueRentals} />
-        </div>
-      </Suspense>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <UpcomingReturnsCard upcomingReturns={upcomingReturns} />
+        <RecentRepairsCard pendingRepairs={pendingRepairs} />
+        <OverdueAlert overdueRentals={overdueRentals} />
+      </div>
 
       {/* Modals */}
       <GlobalSearch 
