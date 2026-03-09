@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, lazy, Suspense } from 'react';
+import { useState, useMemo, useEffect, useCallback, lazy, Suspense, Component, ReactNode } from 'react';
 import { useRental } from '@/hooks/useRental';
 
 import { PageHeader } from '@/components/PageHeader';
