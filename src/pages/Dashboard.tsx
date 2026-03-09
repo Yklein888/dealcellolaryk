@@ -140,6 +140,30 @@ export default function Dashboard() {
     };
   }, [rentals, repairs, usSims]);
 
+  // Must be defined at top level — NEVER inside conditional JSX (Rules of Hooks)
+  const usSimsTableColumns = useMemo(() => [
+    {
+      key: 'customerName' as const,
+      label: 'לקוח',
+      sortable: true,
+    },
+    {
+      key: 'endDate' as const,
+      label: 'עד תאריך',
+      sortable: true,
+      render: (value: unknown) => format(parseISO(value as string), 'dd/MM/yyyy', { locale: he }),
+    },
+    {
+      key: 'totalPrice' as const,
+      label: 'מחיר',
+      sortable: true,
+      render: (value: unknown, row: unknown) => {
+        const r = row as { currency?: string };
+        return `${r.currency === 'USD' ? '$' : '₪'}${(value as number).toFixed(0)}`;
+      },
+    },
+  ], []);
+
   if (loading) {
     return <DashboardSkeleton />;
   }
