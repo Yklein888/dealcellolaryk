@@ -180,12 +180,14 @@ export default function Dashboard() {
         isSubscribed={isSubscribed}
       />
 
-      <Suspense fallback={<div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8"><ChartSkeleton /><ChartSkeleton /></div>}>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <InventoryChart inventory={inventory} />
-          <RentalsActivityChart rentals={rentals} />
-        </div>
-      </Suspense>
+      <SectionErrorBoundary>
+        <Suspense fallback={<div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8"><ChartSkeleton /><ChartSkeleton /></div>}>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <InventoryChart inventory={inventory} />
+            <RentalsActivityChart rentals={rentals} />
+          </div>
+        </Suspense>
+      </SectionErrorBoundary>
 
       {/* US SIMs Activations Section */}
       <div className="mb-8">
