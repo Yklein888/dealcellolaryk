@@ -25,9 +25,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { 
-  Plus, 
-  Search, 
+import {
+  Plus,
+  Search,
   Wrench,
   CheckCircle,
   Package,
@@ -35,7 +35,8 @@ import {
   Download,
   Trash2,
   Shield,
-  Phone
+  Phone,
+  RotateCcw
 } from 'lucide-react';
 import { Repair, repairStatusLabels } from '@/types/rental';
 import { useToast } from '@/hooks/use-toast';
