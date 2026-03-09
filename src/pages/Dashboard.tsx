@@ -3,7 +3,7 @@ import { useRental } from '@/hooks/useRental';
 
 import { PageHeader } from '@/components/PageHeader';
 import { SortableTable, Column } from '@/components/SortableTable';
-import { EmptyState, LoadingState } from '@/components/EmptyState';
+import { EmptyState } from '@/components/EmptyState';
 import { Button } from '@/components/ui/button';
 import { GlobalSearch } from '@/components/GlobalSearch';
 import { QuickActions } from '@/components/QuickActions';
