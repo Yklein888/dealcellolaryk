@@ -270,25 +270,7 @@ export default function Dashboard() {
               />
             ) : (
               <SortableTable<typeof rentalsWithUSSims[0]>
-                columns={useMemo(() => [
-                  {
-                    key: 'customerName',
-                    label: 'לקוח',
-                    sortable: true,
-                  },
-                  {
-                    key: 'endDate',
-                    label: 'עד תאריך',
-                    sortable: true,
-                    render: (value) => format(parseISO(value as string), 'dd/MM/yyyy', { locale: he }),
-                  },
-                  {
-                    key: 'totalPrice',
-                    label: 'מחיר',
-                    sortable: true,
-                    render: (value, row: any) => `${row.currency === 'USD' ? '$' : '₪'}${(value as number).toFixed(0)}`,
-                  },
-                ] as Column<typeof rentalsWithUSSims[0]>[], [])}
+                columns={usSimsTableColumns as Column<typeof rentalsWithUSSims[0]>[]}
                 data={rentalsWithUSSims.slice(0, 5)}
                 keyExtractor={(rental) => rental.id}
                 defaultSort="endDate"
