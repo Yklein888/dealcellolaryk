@@ -26,18 +26,18 @@ import {
 import { format, parseISO, isBefore, differenceInDays } from 'date-fns';
 import { he } from 'date-fns/locale';
 
-// Dashboard components
+// Dashboard components — direct imports (no lazy, no chunk failure risk)
 import { DashboardStatsGrid } from '@/components/dashboard/DashboardStatsGrid';
 import { QuickStatsRow } from '@/components/dashboard/QuickStatsRow';
+import { UpcomingReturnsCard } from '@/components/dashboard/UpcomingReturnsCard';
+import { RecentRepairsCard } from '@/components/dashboard/RecentRepairsCard';
+import { OverdueAlert } from '@/components/dashboard/OverdueAlert';
 
-// Lazy load heavy chart components
+// Lazy load ONLY the heavy recharts components
 const InventoryChart = lazy(() => import('@/components/dashboard/InventoryChart').then(m => ({ default: m.InventoryChart })));
 const RentalsActivityChart = lazy(() => import('@/components/dashboard/RentalsActivityChart').then(m => ({ default: m.RentalsActivityChart })));
-const UpcomingReturnsCard = lazy(() => import('@/components/dashboard/UpcomingReturnsCard').then(m => ({ default: m.UpcomingReturnsCard })));
-const RecentRepairsCard = lazy(() => import('@/components/dashboard/RecentRepairsCard').then(m => ({ default: m.RecentRepairsCard })));
-const OverdueAlert = lazy(() => import('@/components/dashboard/OverdueAlert').then(m => ({ default: m.OverdueAlert })));
 
-// Fallback component for chart loading
+// Fallback skeleton while charts load
 const ChartSkeleton = () => (
   <div className="rounded-2xl p-6 bg-muted/30 animate-pulse min-h-80">
     <div className="h-4 bg-muted rounded w-1/3 mb-4"></div>
@@ -46,6 +46,26 @@ const ChartSkeleton = () => (
     </div>
   </div>
 );
+
+// Section-level error boundary: shows a soft fallback instead of crashing the page
+interface SectionErrorState { hasError: boolean }
+class SectionErrorBoundary extends Component<{ children: ReactNode; fallback?: ReactNode }, SectionErrorState> {
+  constructor(props: { children: ReactNode; fallback?: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError(): SectionErrorState { return { hasError: true }; }
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback ?? (
+        <div className="rounded-2xl p-6 bg-muted/30 text-center text-sm text-muted-foreground">
+          לא ניתן לטעון סקציה זו. נסה לרענן את הדף.
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export default function Dashboard() {
   const { stats, rentals, repairs, inventory, getUpcomingReturns, loading, usSims, usSimsLoading } = useRental();
