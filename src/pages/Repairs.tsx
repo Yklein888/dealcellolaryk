@@ -40,7 +40,7 @@ import {
 } from 'lucide-react';
 import { Repair, repairStatusLabels } from '@/types/rental';
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO, isToday } from 'date-fns';
+import { format, parseISO, isToday, isThisWeek, isThisMonth } from 'date-fns';
 import { he } from 'date-fns/locale';
 
 // deviceTypes removed - using deviceModel input only
@@ -51,6 +51,8 @@ export default function Repairs() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [timeFilter, setTimeFilter] = useState<string>('all');
+  const [warrantyFilter, setWarrantyFilter] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [callingRepairId, setCallingRepairId] = useState<string | null>(null);
 
@@ -149,13 +151,26 @@ export default function Repairs() {
   }, [isAddDialogOpen, nextRepairNumber]);
 
   const filteredRepairs = repairs.filter(repair => {
-    const matchesSearch = 
+    const matchesSearch =
       repair.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       repair.customerPhone.includes(searchTerm) ||
       repair.deviceType.toLowerCase().includes(searchTerm.toLowerCase()) ||
       repair.repairNumber.includes(searchTerm);
     const matchesStatus = filterStatus === 'all' || repair.status === filterStatus;
-    return matchesSearch && matchesStatus;
+
+    // Time filter - use most relevant date per repair
+    let matchesTime = true;
+    if (timeFilter !== 'all') {
+      const relevantDate = repair.completedDate || repair.collectedDate || repair.receivedDate;
+      const date = parseISO(relevantDate);
+      if (timeFilter === 'today') matchesTime = isToday(date);
+      else if (timeFilter === 'week') matchesTime = isThisWeek(date, { weekStartsOn: 0 });
+      else if (timeFilter === 'month') matchesTime = isThisMonth(date);
+    }
+
+    const matchesWarranty = !warrantyFilter || repair.isWarranty;
+
+    return matchesSearch && matchesStatus && matchesTime && matchesWarranty;
   });
 
   // Get repairs marked as ready today
@@ -638,7 +653,62 @@ export default function Repairs() {
         ))}
       </div>
 
-      {/* Filters */}
+      {/* Time & Special Filters */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' as const }}>
+        {([
+          { value: 'all',     label: 'הכל',      icon: '📋' },
+          { value: 'today',   label: 'היום',      icon: '📅' },
+          { value: 'week',    label: 'השבוע',     icon: '📆' },
+          { value: 'month',   label: 'החודש',     icon: '🗓️' },
+        ] as const).map(({ value, label, icon }) => {
+          const isActive = timeFilter === value;
+          return (
+            <button
+              key={value}
+              onClick={() => setTimeFilter(timeFilter === value && value !== 'all' ? 'all' : value)}
+              style={{
+                padding: '6px 14px',
+                borderRadius: 20,
+                border: `1.5px solid ${isActive ? '#0D9488' : '#E5E7EB'}`,
+                background: isActive ? '#F0FDFA' : '#FFFFFF',
+                color: isActive ? '#0D9488' : '#6B7280',
+                fontWeight: isActive ? 700 : 500,
+                fontSize: 13,
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+              }}
+            >
+              <span>{icon}</span>
+              <span>{label}</span>
+            </button>
+          );
+        })}
+        <button
+          onClick={() => setWarrantyFilter(!warrantyFilter)}
+          style={{
+            padding: '6px 14px',
+            borderRadius: 20,
+            border: `1.5px solid ${warrantyFilter ? '#22C55E' : '#E5E7EB'}`,
+            background: warrantyFilter ? '#F0FDF4' : '#FFFFFF',
+            color: warrantyFilter ? '#15803D' : '#6B7280',
+            fontWeight: warrantyFilter ? 700 : 500,
+            fontSize: 13,
+            cursor: 'pointer',
+            transition: 'all 0.15s',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+          }}
+        >
+          <Shield style={{ width: 14, height: 14 }} />
+          <span>באחריות</span>
+        </button>
+      </div>
+
+      {/* Search & Status Filter */}
       <div style={{ background: '#FFFFFF', borderRadius: 14, padding: '12px 16px', marginBottom: 24, border: '1px solid #F3F4F6', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', display: 'flex', gap: 12, flexWrap: 'wrap' as const }}>
         <div className="relative flex-1" style={{ minWidth: 200 }}>
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
