@@ -8,8 +8,9 @@ import { useUSSimNotificationSync } from '@/hooks/useUSSimNotificationSync';
 import { useKeyboardShortcuts, KeyboardShortcut } from '@/hooks/useKeyboardShortcuts';
 import { KeyboardShortcutsDialog } from './KeyboardShortcutsDialog';
 import { GlobalSearch } from './GlobalSearch';
-import { Smartphone, Search } from 'lucide-react';
+import { Smartphone, Search, RotateCw } from 'lucide-react';
 import { PWAInstallPrompt } from './PWAInstallPrompt';
+import { BiometricRegistrationBanner } from './BiometricRegistrationBanner';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -36,6 +37,12 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(() => {
+    setIsRefreshing(true);
+    setTimeout(() => window.location.reload(), 300);
+  }, []);
 
   // Sidebar collapse state, persisted to localStorage
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
@@ -91,7 +98,27 @@ export function AppLayout({ children }: AppLayoutProps) {
           }}
         >
           <div className="flex items-center justify-between">
-            <ConnectionStatusIndicator />
+            <div className="flex items-center gap-2">
+              <ConnectionStatusIndicator />
+              <button
+                onClick={handleRefresh}
+                aria-label="רענן דף"
+                style={{
+                  width: 34, height: 34, borderRadius: 10,
+                  background: '#F3F4F6', border: '1px solid #E5E7EB',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', transition: 'background 0.15s',
+                }}
+              >
+                <RotateCw
+                  style={{
+                    width: 16, height: 16, color: '#6B7280',
+                    transition: 'transform 0.3s ease',
+                    transform: isRefreshing ? 'rotate(360deg)' : 'rotate(0deg)',
+                  }}
+                />
+              </button>
+            </div>
             <div className="flex items-center gap-2">
               <div
                 className="flex h-8 w-8 items-center justify-center rounded-xl"
@@ -152,6 +179,26 @@ export function AppLayout({ children }: AppLayoutProps) {
                 <Search className="h-3.5 w-3.5" />
                 <span className="text-xs hidden xl:inline">חיפוש... (Ctrl+K)</span>
               </button>
+              <button
+                onClick={handleRefresh}
+                aria-label="רענן דף"
+                title="רענן דף (F5)"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all duration-150"
+                style={{
+                  color: 'hsl(var(--muted-foreground))',
+                  background: 'hsl(var(--muted))',
+                  border: '1px solid hsl(var(--border))',
+                }}
+              >
+                <RotateCw
+                  className="h-3.5 w-3.5"
+                  style={{
+                    transition: 'transform 0.4s ease',
+                    transform: isRefreshing ? 'rotate(360deg)' : 'rotate(0deg)',
+                  }}
+                />
+                <span className="text-xs">רענון</span>
+              </button>
             </div>
 
             {/* Right side (RTL: page label on right) */}
@@ -175,6 +222,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
         <MobileBottomNav />
         <PWAInstallPrompt />
+        <BiometricRegistrationBanner />
 
         <KeyboardShortcutsDialog
           open={isHelpOpen}

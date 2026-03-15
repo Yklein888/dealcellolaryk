@@ -678,20 +678,45 @@ export default function Rentals() {
             <SelectItem value="returned">הוחזר</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={filterCategory} onValueChange={setFilterCategory}>
-          <SelectTrigger style={{ width: 180, height: 40, borderRadius: 10, fontSize: 14, border: '1px solid #E5E7EB', background: '#F9FAFB' }}>
-            <SelectValue placeholder="כל הקטגוריות" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">כל הקטגוריות</SelectItem>
-            <SelectItem value="sim_american">🇺🇸 סים אמריקאי</SelectItem>
-            <SelectItem value="sim_european">🇪🇺 סים אירופאי</SelectItem>
-            <SelectItem value="device_simple">📱 מכשיר פשוט</SelectItem>
-            <SelectItem value="device_smartphone">📲 סמארטפון</SelectItem>
-            <SelectItem value="modem">📡 מודם</SelectItem>
-            <SelectItem value="netstick">📶 נטסטיק</SelectItem>
-          </SelectContent>
-        </Select>
+        {/* Category chips */}
+        <div style={{ width: '100%', display: 'flex', gap: 8, flexWrap: 'wrap', paddingTop: 4, borderTop: '1px solid #F3F4F6' }}>
+          {[
+            { value: 'all',              label: 'הכל',          emoji: '🔀' },
+            { value: 'sim_american',     label: 'SIM אמריקאי',  emoji: '🇺🇸' },
+            { value: 'sim_european',     label: 'SIM אירופאי',  emoji: '🇪🇺' },
+            { value: 'device_simple',    label: 'מכשיר פשוט',   emoji: '📱' },
+            { value: 'device_smartphone',label: 'סמארטפון',     emoji: '📲' },
+            { value: 'modem',            label: 'מודם',          emoji: '📡' },
+            { value: 'netstick',         label: 'נטסטיק',        emoji: '📶' },
+          ].map(({ value, label, emoji }) => {
+            const isActive = filterCategory === value;
+            return (
+              <button
+                key={value}
+                onClick={() => setFilterCategory(value)}
+                style={{
+                  height: 32,
+                  paddingInline: 12,
+                  borderRadius: 20,
+                  fontSize: 13,
+                  fontWeight: isActive ? 700 : 500,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  transition: 'all 0.15s',
+                  border: isActive ? '1.5px solid #0D9488' : '1.5px solid #E5E7EB',
+                  background: isActive ? '#F0FDFA' : '#F9FAFB',
+                  color: isActive ? '#0F766E' : '#6B7280',
+                  boxShadow: isActive ? '0 2px 8px rgba(13,148,136,0.18)' : 'none',
+                }}
+              >
+                <span style={{ fontSize: 15 }}>{emoji}</span>
+                {label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Rentals List */}
