@@ -8,7 +8,7 @@ import {
   MoreHorizontal,
   Store,
   Signal,
-  Globe
+  Globe,
 } from 'lucide-react';
 import { useState } from 'react';
 import {
@@ -65,14 +65,22 @@ export function MobileBottomNav() {
 
   const isActive = (path: string) => location.pathname === path;
 
-  // Filter nav items by permission (admins see all)
-  const visibleMainItems = mainNavItems.filter(item => isAdmin || hasPermission(item.permission));
-  const visibleMoreItems = moreNavItems.filter(item => isAdmin || hasPermission(item.permission));
-  const isMoreActive = [...moreNavItems, ...adminNavItems].some(item => isActive(item.path));
+  const visibleMainItems = mainNavItems.filter((item) => isAdmin || hasPermission(item.permission));
+  const visibleMoreItems = moreNavItems.filter((item) => isAdmin || hasPermission(item.permission));
+  const isMoreActive = [...moreNavItems, ...adminNavItems].some((item) => isActive(item.path));
 
   return (
-    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 glass-strong border-t border-white/20 safe-area-bottom">
-      <div className="flex items-center justify-around h-16 px-1">
+    <nav
+      className="lg:hidden fixed bottom-0 left-0 right-0 z-50 safe-area-bottom"
+      style={{
+        background: 'hsl(var(--card) / 0.97)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        borderTop: '1px solid hsl(var(--border))',
+      }}
+    >
+      <div className="flex items-center justify-around h-16 px-2">
+        {/* Main nav items */}
         {visibleMainItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.path);
@@ -81,18 +89,36 @@ export function MobileBottomNav() {
             <Link
               key={item.path}
               to={item.path}
-              className={cn(
-                'flex flex-col items-center justify-center flex-1 py-2 mx-0.5 rounded-xl transition-all duration-200',
-                active
-                  ? 'text-white bg-gradient-to-b from-primary to-accent shadow-md scale-[1.04]'
-                  : 'text-muted-foreground hover:text-foreground active:bg-muted/50'
-              )}
+              className="flex flex-col items-center justify-center flex-1 py-2 px-1 rounded-xl transition-all duration-150 relative"
             >
-              <Icon className={cn(
-                'h-5 w-5 mb-1 transition-all duration-200',
-                active ? 'scale-110' : ''
-              )} />
-              <span className={cn('text-[10px] font-semibold leading-tight', active && 'text-white')}>{item.label}</span>
+              <div
+                className={cn(
+                  'flex items-center justify-center rounded-xl transition-all duration-150',
+                  active ? 'w-10 h-7' : 'w-10 h-7'
+                )}
+                style={
+                  active
+                    ? {
+                        background: 'var(--brand-alpha-20)',
+                      }
+                    : {}
+                }
+              >
+                <Icon
+                  className={cn(
+                    'h-5 w-5 transition-colors duration-150',
+                    active ? 'text-primary' : 'text-muted-foreground'
+                  )}
+                />
+              </div>
+              <span
+                className={cn(
+                  'text-[10px] font-semibold leading-tight mt-0.5 transition-colors duration-150',
+                  active ? 'text-primary' : 'text-muted-foreground'
+                )}
+              >
+                {item.label}
+              </span>
             </Link>
           );
         })}
@@ -100,93 +126,112 @@ export function MobileBottomNav() {
         {/* Settings Button */}
         <button
           onClick={() => setIsSettingsOpen(true)}
-          className={cn(
-            'flex flex-col items-center justify-center flex-1 py-2 mx-0.5 rounded-xl transition-all duration-200',
-            'text-muted-foreground hover:text-foreground active:bg-muted/50'
-          )}
+          className="flex flex-col items-center justify-center flex-1 py-2 px-1 rounded-xl transition-all duration-150"
         >
-          <Settings className="h-5 w-5 mb-1" />
-          <span className="text-[10px] font-semibold leading-tight">הגדרות</span>
+          <div className="flex items-center justify-center w-10 h-7">
+            <Settings className="h-5 w-5 text-muted-foreground" />
+          </div>
+          <span className="text-[10px] font-semibold leading-tight mt-0.5 text-muted-foreground">
+            הגדרות
+          </span>
         </button>
 
         {/* More Menu */}
         <Sheet open={isMoreOpen} onOpenChange={setIsMoreOpen}>
           <SheetTrigger asChild>
-            <button
-              className={cn(
-                'flex flex-col items-center justify-center flex-1 py-2 mx-0.5 rounded-xl transition-all duration-200',
-                isMoreActive
-                  ? 'text-white bg-gradient-to-b from-primary to-accent shadow-md scale-[1.04]'
-                  : 'text-muted-foreground hover:text-foreground active:bg-muted/50'
-              )}
-            >
-              <MoreHorizontal className={cn(
-                'h-5 w-5 mb-1 transition-all duration-200',
-                isMoreActive ? 'scale-110' : ''
-              )} />
-              <span className={cn('text-[10px] font-semibold leading-tight', isMoreActive && 'text-white')}>עוד</span>
+            <button className="flex flex-col items-center justify-center flex-1 py-2 px-1 rounded-xl transition-all duration-150">
+              <div
+                className="flex items-center justify-center w-10 h-7 rounded-xl transition-all duration-150"
+                style={
+                  isMoreActive
+                    ? { background: 'var(--brand-alpha-20)' }
+                    : {}
+                }
+              >
+                <MoreHorizontal
+                  className={cn(
+                    'h-5 w-5 transition-colors duration-150',
+                    isMoreActive ? 'text-primary' : 'text-muted-foreground'
+                  )}
+                />
+              </div>
+              <span
+                className={cn(
+                  'text-[10px] font-semibold leading-tight mt-0.5 transition-colors duration-150',
+                  isMoreActive ? 'text-primary' : 'text-muted-foreground'
+                )}
+              >
+                עוד
+              </span>
             </button>
           </SheetTrigger>
-          <SheetContent side="bottom" className="h-auto max-h-[70vh] rounded-t-3xl">
+
+          <SheetContent side="bottom" className="h-auto max-h-[70vh] rounded-t-2xl">
             <SheetHeader className="pb-4">
-              <SheetTitle className="text-right">תפריט נוסף</SheetTitle>
+              <SheetTitle className="text-right text-base font-semibold">תפריט נוסף</SheetTitle>
             </SheetHeader>
-            
-            <div className="space-y-2 pb-4">
+
+            <div className="space-y-1 pb-4">
               {visibleMoreItems.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item.path);
-                
+
                 return (
                   <Link
                     key={item.path}
                     to={item.path}
                     onClick={() => setIsMoreOpen(false)}
                     className={cn(
-                      'flex items-center gap-4 p-4 rounded-2xl transition-all duration-200',
-                      active 
-                        ? 'bg-primary/10 text-primary' 
-                        : 'hover:bg-muted active:bg-muted/70'
+                      'flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-150',
+                      active
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-foreground hover:bg-muted active:bg-muted/70'
                     )}
                   >
-                    <div className={cn(
-                      'flex items-center justify-center w-12 h-12 rounded-xl',
-                      active ? 'bg-primary text-white' : 'bg-muted'
-                    )}>
+                    <div
+                      className={cn(
+                        'flex items-center justify-center w-10 h-10 rounded-xl flex-shrink-0',
+                        active ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
+                      )}
+                    >
                       <Icon className="h-5 w-5" />
                     </div>
-                    <span className="font-medium text-base">{item.label}</span>
+                    <span className="font-medium text-sm">{item.label}</span>
                   </Link>
                 );
               })}
 
               {isAdmin && (
                 <>
-                  <div className="h-px bg-border my-4" />
-                  <p className="text-xs text-muted-foreground px-4 mb-2">ניהול מערכת</p>
+                  <div className="h-px bg-border my-3" />
+                  <p className="text-xs font-semibold text-muted-foreground/60 px-4 mb-1 uppercase tracking-wider">
+                    ניהול מערכת
+                  </p>
                   {adminNavItems.map((item) => {
                     const Icon = item.icon;
                     const active = isActive(item.path);
-                    
+
                     return (
                       <Link
                         key={item.path}
                         to={item.path}
                         onClick={() => setIsMoreOpen(false)}
                         className={cn(
-                          'flex items-center gap-4 p-4 rounded-2xl transition-all duration-200',
-                          active 
-                            ? 'bg-primary/10 text-primary' 
-                            : 'hover:bg-muted active:bg-muted/70'
+                          'flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-150',
+                          active
+                            ? 'bg-primary/10 text-primary'
+                            : 'text-foreground hover:bg-muted active:bg-muted/70'
                         )}
                       >
-                        <div className={cn(
-                          'flex items-center justify-center w-12 h-12 rounded-xl',
-                          active ? 'bg-primary text-white' : 'bg-muted'
-                        )}>
+                        <div
+                          className={cn(
+                            'flex items-center justify-center w-10 h-10 rounded-xl flex-shrink-0',
+                            active ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
+                          )}
+                        >
                           <Icon className="h-5 w-5" />
                         </div>
-                        <span className="font-medium text-base">{item.label}</span>
+                        <span className="font-medium text-sm">{item.label}</span>
                       </Link>
                     );
                   })}
@@ -194,18 +239,18 @@ export function MobileBottomNav() {
               )}
             </div>
 
-            {/* User Section */}
+            {/* User section */}
             <div className="border-t border-border pt-4 pb-2">
-              <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/50">
+              <div className="flex items-center justify-between px-4 py-3 rounded-xl bg-muted/60">
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-muted-foreground">מחובר כ:</p>
-                  <p className="text-sm font-medium truncate">{user?.email}</p>
+                  <p className="text-sm font-medium truncate text-foreground">{user?.email}</p>
                 </div>
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={signOut}
-                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10 flex-shrink-0"
                 >
                   <LogOut className="h-5 w-5" />
                 </Button>

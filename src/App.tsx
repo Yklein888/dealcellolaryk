@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react';
+import { ThemeProvider } from 'next-themes';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -39,6 +40,7 @@ const PageFallback = () => (
 );
 
 const App = () => (
+  <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <AuthProvider>
@@ -97,6 +99,7 @@ const App = () => (
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
+  </ThemeProvider>
 );
 
 export default App;
