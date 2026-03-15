@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { LucideIcon, TrendingUp, TrendingDown } from 'lucide-react';
+import { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 
@@ -16,39 +16,32 @@ interface StatCardProps {
   onClick?: () => void;
 }
 
-const variantBorderStyles: Record<string, string> = {
-  default:     '',
-  primary:     'border-primary/20',
-  warning:     'border-warning/20',
-  success:     'border-success/20',
-  destructive: 'border-destructive/20',
+const variantStyles = {
+  default:     'border-white/30',
+  primary:     'border-primary/30',
+  warning:     'border-warning/30',
+  success:     'border-success/30',
+  destructive: 'border-destructive/30',
 };
 
-const iconContainerStyles: Record<string, string> = {
-  default:     'bg-muted text-muted-foreground',
-  primary:     'bg-primary/10 text-primary',
-  warning:     'bg-warning/10 text-warning',
-  success:     'bg-success/10 text-success',
-  destructive: 'bg-destructive/10 text-destructive',
+const iconVariantStyles = {
+  default:     'bg-muted/50 text-muted-foreground',
+  primary:     'bg-gradient-to-br from-primary/30 to-accent/20 text-primary',
+  warning:     'bg-gradient-to-br from-warning/30 to-orange-400/20 text-warning',
+  success:     'bg-gradient-to-br from-success/30 to-green-400/20 text-success',
+  destructive: 'bg-gradient-to-br from-destructive/30 to-red-400/20 text-destructive',
 };
 
-const valueColorStyles: Record<string, string> = {
+// Value number glow + colour per variant
+const valueVariantStyles = {
   default:     'text-foreground',
-  primary:     'value-glow-primary',
-  warning:     'value-glow-warning',
-  success:     'value-glow-success',
-  destructive: 'value-glow-destructive',
+  primary:     'gradient-text value-glow-primary',
+  warning:     'text-warning value-glow-warning',
+  success:     'text-success value-glow-success',
+  destructive: 'text-destructive value-glow-destructive',
 };
 
-export const StatCard = memo(function StatCard({
-  title,
-  value,
-  icon: Icon,
-  trend,
-  variant = 'default',
-  href,
-  onClick,
-}: StatCardProps) {
+export const StatCard = memo(function StatCard({ title, value, icon: Icon, trend, variant = 'default', href, onClick }: StatCardProps) {
   const navigate = useNavigate();
   const isClickable = !!href || !!onClick;
 
@@ -63,66 +56,44 @@ export const StatCard = memo(function StatCard({
   return (
     <div
       className={cn(
-        'stat-card animate-fade-in group',
-        variantBorderStyles[variant],
+        'stat-card animate-fade-in card-glow group',
+        variantStyles[variant],
         isClickable && 'cursor-pointer active:scale-[0.98]'
       )}
       onClick={isClickable ? handleClick : undefined}
       role={isClickable ? 'button' : undefined}
       tabIndex={isClickable ? 0 : undefined}
-      onKeyDown={
-        isClickable
-          ? (e) => {
-              if (e.key === 'Enter' || e.key === ' ') handleClick();
-            }
-          : undefined
-      }
+      onKeyDown={isClickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') handleClick(); } : undefined}
     >
+      {/* Shimmer sweep — animated by CSS on :hover */}
+      <div className="stat-shimmer" aria-hidden="true" />
+
       {/* Bottom accent bar — scales in on hover */}
       <div className="stat-bar" aria-hidden="true" />
 
-      <div className="flex items-center justify-between gap-3 relative z-10">
-        {/* Left side: icon */}
-        <div
-          className={cn(
-            'flex h-11 w-11 items-center justify-center rounded-xl flex-shrink-0 transition-transform duration-200 group-hover:scale-105',
-            iconContainerStyles[variant]
-          )}
-        >
-          <Icon className="h-5 w-5" />
-        </div>
-
-        {/* Right side: text */}
-        <div className="flex-1 min-w-0 text-right">
-          <p className="text-xs sm:text-sm font-medium text-muted-foreground truncate leading-snug">
-            {title}
-          </p>
-          <p
-            className={cn(
-              'mt-0.5 text-2xl sm:text-3xl font-bold leading-tight tracking-tight transition-colors duration-200',
-              valueColorStyles[variant]
-            )}
-          >
+      <div className="flex items-start justify-between gap-2 relative z-10">
+        <div className="flex-1 min-w-0">
+          <p className="text-xs sm:text-sm font-medium text-muted-foreground truncate">{title}</p>
+          <p className={cn(
+            'mt-1 sm:mt-2 text-2xl sm:text-3xl font-bold transition-all duration-300',
+            valueVariantStyles[variant]
+          )}>
             {value}
           </p>
           {trend && (
-            <div
-              className={cn(
-                'inline-flex items-center gap-1 mt-1 text-xs font-semibold',
-                trend.isPositive ? 'text-success' : 'text-destructive'
-              )}
-            >
-              {trend.isPositive ? (
-                <TrendingUp className="h-3 w-3" />
-              ) : (
-                <TrendingDown className="h-3 w-3" />
-              )}
-              <span>
-                {trend.isPositive ? '+' : ''}
-                {trend.value}%
-              </span>
-            </div>
+            <p className={cn(
+              'mt-1 text-xs sm:text-sm font-medium',
+              trend.isPositive ? 'text-success' : 'text-destructive'
+            )}>
+              {trend.isPositive ? '+' : ''}{trend.value}%
+            </p>
           )}
+        </div>
+        <div className={cn(
+          'flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl sm:rounded-2xl transition-transform duration-300 group-hover:scale-110 shrink-0',
+          iconVariantStyles[variant]
+        )}>
+          <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
         </div>
       </div>
     </div>
