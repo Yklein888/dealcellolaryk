@@ -7,7 +7,6 @@ import { useRental } from '@/hooks/useRental';
 import { useAuth } from '@/hooks/useAuth';
 import { useRole } from '@/hooks/useRole';
 import { usePermissions, PermissionKey } from '@/hooks/usePermissions';
-import { Button } from '@/components/ui/button';
 import {
   Tooltip,
   TooltipContent,
@@ -90,41 +89,40 @@ function NavLink({ to, label, icon: Icon, isActive, isCollapsed, badge, onClick 
         isCollapsed
           ? 'justify-center w-10 h-10 mx-auto'
           : 'gap-3 px-3 py-2 w-full',
-        isActive
-          ? 'text-primary'
-          : 'text-muted-foreground hover:text-foreground'
       )}
       style={
         isActive
-          ? { background: 'var(--brand-alpha-10)' }
-          : {}
+          ? {
+              background: 'rgba(59,130,246,0.18)',
+              borderLeft: isCollapsed ? 'none' : '3px solid #3B82F6',
+              color: '#93C5FD',
+            }
+          : { color: 'hsl(210 35% 62%)' }
       }
     >
-      {/* Active left-side indicator bar */}
-      {isActive && !isCollapsed && (
-        <span
-          className="absolute right-0 top-1 bottom-1 w-0.5 rounded-full"
-          style={{ background: 'hsl(var(--primary))' }}
-        />
-      )}
-
       {/* Icon */}
       <div
         className={cn(
           'flex items-center justify-center rounded-md flex-shrink-0 transition-all duration-150',
           isCollapsed ? 'h-9 w-9' : 'h-7 w-7',
-          isActive
-            ? 'text-primary'
-            : 'text-muted-foreground group-hover:text-foreground'
         )}
-        style={isActive ? { background: 'var(--brand-alpha-20)' } : {}}
+        style={
+          isActive
+            ? { background: 'rgba(59,130,246,0.22)', color: '#93C5FD' }
+            : { color: 'hsl(210 35% 58%)' }
+        }
       >
         <Icon className="h-[18px] w-[18px]" />
       </div>
 
       {/* Label */}
       {!isCollapsed && (
-        <span className="text-sm font-medium flex-1 text-right truncate">{label}</span>
+        <span
+          className="text-sm font-medium flex-1 text-right truncate"
+          style={isActive ? { color: '#93C5FD' } : { color: 'hsl(210 35% 72%)' }}
+        >
+          {label}
+        </span>
       )}
 
       {/* Badge — expanded */}
@@ -133,10 +131,10 @@ function NavLink({ to, label, icon: Icon, isActive, isCollapsed, badge, onClick 
           className="text-[11px] font-bold tabular-nums px-1.5 py-0.5 rounded-full min-w-[20px] text-center"
           style={
             badge.variant === 'red'
-              ? { background: 'hsl(var(--destructive) / 0.10)', color: 'hsl(var(--destructive))', border: '1px solid hsl(var(--destructive) / 0.20)' }
+              ? { background: 'rgba(220,38,38,0.20)', color: '#FCA5A5', border: '1px solid rgba(220,38,38,0.30)' }
               : badge.variant === 'green'
-              ? { background: 'hsl(var(--success) / 0.10)', color: 'hsl(var(--success))', border: '1px solid hsl(var(--success) / 0.20)' }
-              : { background: 'var(--brand-alpha-10)', color: 'hsl(var(--primary))', border: '1px solid var(--brand-border)' }
+              ? { background: 'rgba(34,197,94,0.20)', color: '#86EFAC', border: '1px solid rgba(34,197,94,0.30)' }
+              : { background: 'rgba(59,130,246,0.20)', color: '#93C5FD', border: '1px solid rgba(59,130,246,0.30)' }
           }
         >
           {badge.count}
@@ -146,8 +144,8 @@ function NavLink({ to, label, icon: Icon, isActive, isCollapsed, badge, onClick 
       {/* Badge dot — collapsed */}
       {isCollapsed && badge && badge.count > 0 && (
         <span
-          className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full ring-2 ring-card"
-          style={{ background: badge.variant === 'red' ? 'hsl(var(--destructive))' : 'hsl(var(--success))' }}
+          className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full"
+          style={{ background: badge.variant === 'red' ? '#EF4444' : '#22C55E' }}
         />
       )}
     </Link>
@@ -169,10 +167,13 @@ function NavLink({ to, label, icon: Icon, isActive, isCollapsed, badge, onClick 
 
 function SectionLabel({ label, isCollapsed }: { label: string; isCollapsed: boolean }) {
   if (isCollapsed) {
-    return <div className="my-2 h-px bg-border mx-2" />;
+    return <div className="my-2 h-px mx-2" style={{ background: 'hsl(var(--sidebar-border))' }} />;
   }
   return (
-    <p className="px-3 pt-5 pb-1.5 text-[10px] font-bold uppercase tracking-[0.10em] text-muted-foreground/50 select-none">
+    <p
+      className="px-3 pt-5 pb-1.5 text-[10px] font-bold uppercase tracking-[0.12em] select-none"
+      style={{ color: 'hsl(210 30% 42%)' }}
+    >
       {label}
     </p>
   );
@@ -239,15 +240,15 @@ export function AppSidebar({ onNavigate, isCollapsed = false, onToggleCollapse }
 
         {!isCollapsed && (
           <div className="flex-1 min-w-0">
-            <h1 className="text-[15px] font-bold text-foreground tracking-tight truncate">
+            <h1 className="text-[15px] font-bold tracking-tight truncate" style={{ color: '#F1F5F9' }}>
               DealCell
             </h1>
             <div className="flex items-center gap-1.5 mt-0.5">
               <span
                 className="block h-1.5 w-1.5 rounded-full"
-                style={{ background: 'hsl(var(--success))' }}
+                style={{ background: '#22C55E' }}
               />
-              <span className="text-[10px] font-semibold tracking-wider" style={{ color: 'hsl(var(--success))' }}>
+              <span className="text-[10px] font-semibold tracking-wider" style={{ color: '#4ADE80' }}>
                 LIVE
               </span>
             </div>
@@ -258,7 +259,8 @@ export function AppSidebar({ onNavigate, isCollapsed = false, onToggleCollapse }
         {!isCollapsed && (
           <button
             onClick={onToggleCollapse}
-            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-all duration-150 flex-shrink-0"
+            className="flex h-7 w-7 items-center justify-center rounded-md transition-all duration-150 flex-shrink-0"
+            style={{ color: 'hsl(210 30% 48%)', background: 'transparent' }}
             aria-label="כווץ תפריט"
           >
             <ChevronRight className="h-4 w-4" />
@@ -279,7 +281,8 @@ export function AppSidebar({ onNavigate, isCollapsed = false, onToggleCollapse }
             <TooltipTrigger asChild>
               <button
                 onClick={onToggleCollapse}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-all duration-150 mb-2"
+                className="flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-150 mb-2"
+                style={{ color: 'hsl(210 30% 48%)' }}
                 aria-label="הרחב תפריט"
               >
                 <ChevronRight className="h-4 w-4 rotate-180" />
@@ -357,21 +360,21 @@ export function AppSidebar({ onNavigate, isCollapsed = false, onToggleCollapse }
           <div
             className="flex items-center gap-2.5 rounded-lg px-3 py-2 mb-2"
             style={{
-              background: 'hsl(var(--muted))',
-              border: '1px solid hsl(var(--border))',
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.08)',
             }}
           >
             <div
               className="flex h-7 w-7 items-center justify-center rounded-full flex-shrink-0 text-[11px] font-bold text-white"
-              style={{ background: 'var(--gradient-primary)' }}
+              style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)' }}
             >
               {userInitials}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold truncate text-foreground">
+              <p className="text-xs font-semibold truncate" style={{ color: '#E2E8F0' }}>
                 {user?.email ?? 'admin'}
               </p>
-              <p className="text-[10px] text-muted-foreground">Administrator</p>
+              <p className="text-[10px]" style={{ color: 'hsl(210 30% 48%)' }}>Administrator</p>
             </div>
           </div>
         )}
@@ -382,7 +385,7 @@ export function AppSidebar({ onNavigate, isCollapsed = false, onToggleCollapse }
             <TooltipTrigger asChild>
               <div
                 className="flex h-9 w-9 items-center justify-center rounded-full text-[11px] font-bold text-white cursor-default"
-                style={{ background: 'var(--gradient-primary)' }}
+                style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)' }}
               >
                 {userInitials}
               </div>
@@ -396,25 +399,24 @@ export function AppSidebar({ onNavigate, isCollapsed = false, onToggleCollapse }
         {/* Action row — expanded */}
         {!isCollapsed ? (
           <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              className="flex-1 justify-start gap-2 text-xs h-8 rounded-lg text-muted-foreground hover:text-foreground px-2"
+            <button
+              className="flex flex-1 items-center justify-start gap-2 text-xs h-8 rounded-lg px-2 transition-all duration-150"
+              style={{ color: 'hsl(210 30% 52%)' }}
               onClick={() => setIsSettingsOpen(true)}
             >
               <Settings className="h-3.5 w-3.5 flex-shrink-0" />
               הגדרות
-            </Button>
+            </button>
 
             <Tooltip delayDuration={0}>
               <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground flex-shrink-0"
+                <button
+                  className="flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-150"
+                  style={{ color: 'hsl(210 30% 52%)' }}
                   onClick={toggleTheme}
                 >
                   {theme === 'dark' ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
-                </Button>
+                </button>
               </TooltipTrigger>
               <TooltipContent side="top">
                 <span className="text-xs">{theme === 'dark' ? 'מצב בהיר' : 'מצב כהה'}</span>
@@ -423,14 +425,13 @@ export function AppSidebar({ onNavigate, isCollapsed = false, onToggleCollapse }
 
             <Tooltip delayDuration={0}>
               <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 rounded-lg text-muted-foreground hover:text-destructive flex-shrink-0"
+                <button
+                  className="flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-150"
+                  style={{ color: 'hsl(210 30% 52%)' }}
                   onClick={signOut}
                 >
                   <LogOut className="h-3.5 w-3.5" />
-                </Button>
+                </button>
               </TooltipTrigger>
               <TooltipContent side="top">
                 <span className="text-xs">התנתק</span>
@@ -442,27 +443,39 @@ export function AppSidebar({ onNavigate, isCollapsed = false, onToggleCollapse }
           <>
             <Tooltip delayDuration={0}>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg text-muted-foreground hover:text-foreground" onClick={() => setIsSettingsOpen(true)}>
+                <button
+                  className="flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-150"
+                  style={{ color: 'hsl(210 30% 52%)' }}
+                  onClick={() => setIsSettingsOpen(true)}
+                >
                   <Settings className="h-4 w-4" />
-                </Button>
+                </button>
               </TooltipTrigger>
               <TooltipContent side="left" sideOffset={8}><span className="text-xs">הגדרות</span></TooltipContent>
             </Tooltip>
 
             <Tooltip delayDuration={0}>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg text-muted-foreground hover:text-foreground" onClick={toggleTheme}>
+                <button
+                  className="flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-150"
+                  style={{ color: 'hsl(210 30% 52%)' }}
+                  onClick={toggleTheme}
+                >
                   {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                </Button>
+                </button>
               </TooltipTrigger>
               <TooltipContent side="left" sideOffset={8}><span className="text-xs">{theme === 'dark' ? 'מצב בהיר' : 'מצב כהה'}</span></TooltipContent>
             </Tooltip>
 
             <Tooltip delayDuration={0}>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg text-muted-foreground hover:text-destructive" onClick={signOut}>
+                <button
+                  className="flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-150"
+                  style={{ color: 'hsl(210 30% 52%)' }}
+                  onClick={signOut}
+                >
                   <LogOut className="h-4 w-4" />
-                </Button>
+                </button>
               </TooltipTrigger>
               <TooltipContent side="left" sideOffset={8}><span className="text-xs">התנתק</span></TooltipContent>
             </Tooltip>

@@ -26,18 +26,18 @@ export const PageHeader = memo(function PageHeader({
   return (
     <div
       className={cn(
-        'flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 sm:mb-8 pb-5 border-b border-border',
+        'flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6',
         className
       )}
     >
       <div className="min-w-0">
         {/* Breadcrumbs */}
         {breadcrumbs && breadcrumbs.length > 0 && (
-          <nav className="flex items-center gap-1 mb-2" aria-label="Breadcrumb">
+          <nav className="flex items-center gap-1 mb-1.5" aria-label="Breadcrumb">
             {breadcrumbs.map((crumb, index) => (
               <span key={index} className="flex items-center gap-1">
                 {index > 0 && (
-                  <ChevronLeft className="h-3.5 w-3.5 text-muted-foreground/50 flex-shrink-0" />
+                  <ChevronLeft className="h-3 w-3 text-muted-foreground/40 flex-shrink-0" />
                 )}
                 {crumb.href ? (
                   <Link
@@ -47,7 +47,7 @@ export const PageHeader = memo(function PageHeader({
                     {crumb.label}
                   </Link>
                 ) : (
-                  <span className="text-xs font-medium text-muted-foreground/60">
+                  <span className="text-xs font-medium text-muted-foreground/50">
                     {crumb.label}
                   </span>
                 )}
@@ -57,13 +57,13 @@ export const PageHeader = memo(function PageHeader({
         )}
 
         {/* Title */}
-        <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight leading-tight">
+        <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight leading-tight">
           {title}
         </h1>
 
         {/* Description */}
         {description && (
-          <p className="mt-1.5 text-sm sm:text-base text-muted-foreground leading-relaxed">
+          <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
             {description}
           </p>
         )}
