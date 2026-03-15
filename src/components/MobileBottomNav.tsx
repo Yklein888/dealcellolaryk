@@ -71,7 +71,7 @@ export function MobileBottomNav() {
   const isMoreActive = [...moreNavItems, ...adminNavItems].some(item => isActive(item.path));
 
   return (
-    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 glass-strong border-t border-white/20 safe-area-bottom">
+    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 safe-area-bottom" style={{ background: '#FFFFFF', borderTop: '1px solid #E5E7EB', boxShadow: '0 -4px 20px rgba(0,0,0,0.08)' }}>
       <div className="flex items-center justify-around h-16 px-1">
         {visibleMainItems.map((item) => {
           const Icon = item.icon;

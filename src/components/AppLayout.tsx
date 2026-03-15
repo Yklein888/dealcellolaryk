@@ -85,10 +85,9 @@ export function AppLayout({ children }: AppLayoutProps) {
         <header
           className="lg:hidden fixed top-0 right-0 left-0 z-50 px-4 py-3 safe-area-top"
           style={{
-            background: 'hsl(var(--card) / 0.97)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            borderBottom: '1px solid hsl(var(--border))',
+            background: '#FFFFFF',
+            borderBottom: '1px solid #E5E7EB',
+            boxShadow: '0 1px 8px rgba(0,0,0,0.06)',
           }}
         >
           <div className="flex items-center justify-between">

@@ -262,22 +262,58 @@ export default function Auth() {
 
           {/* Biometric */}
           {isLogin && isBiometricSupported && (
-            <div style={{ marginTop: 20 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+            <div style={{ marginTop: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
                 <div style={{ flex: 1, height: 1, background: '#E5E7EB' }} />
-                <span style={{ fontSize: 12, color: '#9CA3AF', whiteSpace: 'nowrap' }}>או התחבר עם</span>
+                <span style={{ fontSize: 12, color: '#9CA3AF', whiteSpace: 'nowrap' }}>או</span>
                 <div style={{ flex: 1, height: 1, background: '#E5E7EB' }} />
               </div>
-              <Button
+              <button
                 type="button"
-                variant="outline"
-                style={{ width: '100%', height: 44, borderRadius: 10, fontSize: 14, gap: 8 }}
                 onClick={handleBiometricLogin}
                 disabled={biometricLoading}
+                style={{
+                  width: '100%',
+                  height: 56,
+                  borderRadius: 14,
+                  border: '2px solid #E0E7FF',
+                  background: 'linear-gradient(135deg, #F5F3FF 0%, #EEF2FF 100%)',
+                  cursor: biometricLoading ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 12,
+                  transition: 'all 0.2s',
+                  boxShadow: '0 2px 8px rgba(99,102,241,0.12)',
+                  opacity: biometricLoading ? 0.7 : 1,
+                }}
+                onMouseEnter={(e) => {
+                  if (!biometricLoading) {
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = '#818CF8';
+                    (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 16px rgba(99,102,241,0.25)';
+                    (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = '#E0E7FF';
+                  (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 2px 8px rgba(99,102,241,0.12)';
+                  (e.currentTarget as HTMLButtonElement).style.transform = '';
+                }}
               >
-                {biometricLoading ? <Loader2 style={{ width: 18, height: 18 }} className="animate-spin" /> : <Fingerprint style={{ width: 18, height: 18 }} />}
-                טביעת אצבע / Face ID
-              </Button>
+                {biometricLoading ? (
+                  <Loader2 style={{ width: 24, height: 24, color: '#6366F1', animation: 'spin 1s linear infinite' }} />
+                ) : (
+                  <div style={{ width: 40, height: 40, borderRadius: 12, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 4px 10px rgba(99,102,241,0.35)' }}>
+                    <Fingerprint style={{ width: 22, height: 22, color: 'white' }} />
+                  </div>
+                )}
+                <div style={{ textAlign: 'right' }}>
+                  <p style={{ fontSize: 15, fontWeight: 700, color: '#4F46E5', margin: 0, lineHeight: 1.2 }}>
+                    {biometricLoading ? 'מאמת...' : 'כניסה מהירה'}
+                  </p>
+                  <p style={{ fontSize: 11, color: '#818CF8', margin: 0, marginTop: 2 }}>טביעת אצבע / Face ID</p>
+                </div>
+              </button>
             </div>
           )}
 
