@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useBiometricAuth } from '@/hooks/useBiometricAuth';
-import { Loader2, Smartphone, Wifi, Wrench, Signal, ShoppingCart, Fingerprint, UserPlus } from 'lucide-react';
+import { Loader2, Smartphone, Wifi, Wrench, Signal, ShoppingCart, Fingerprint, UserPlus, ChevronDown } from 'lucide-react';
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
@@ -16,7 +16,22 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const { signIn, signUp } = useAuth();
   const { toast } = useToast();
-  const { isSupported: isBiometricSupported, isLoading: biometricLoading, authenticateWithBiometric } = useBiometricAuth();
+  const { isSupported: isBiometricSupported, isLoading: biometricLoading, authenticateWithBiometric, checkAnyCredentials } = useBiometricAuth();
+  const [hasCredentials, setHasCredentials] = useState<boolean | null>(null);
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
+
+  // On mount: check if any credentials exist and auto-trigger on mobile
+  useEffect(() => {
+    if (!isBiometricSupported) return;
+    checkAnyCredentials().then((has) => {
+      setHasCredentials(has);
+      // Auto-trigger biometric on mobile if credentials exist
+      if (has && isMobile && isLogin) {
+        setTimeout(() => handleBiometricLogin(), 1800);
+      }
+    });
+  }, [isBiometricSupported, isLogin]);
 
   const handleBiometricLogin = async () => {
     const userId = await authenticateWithBiometric();
@@ -157,7 +172,7 @@ export default function Auth() {
         overflowY: 'auto',
       }}>
         {/* Mobile logo */}
-        <div className="lg:hidden" style={{ textAlign: 'center', marginBottom: 32 }}>
+        <div className="lg:hidden" style={{ textAlign: 'center', marginBottom: hasCredentials && isLogin && !showPasswordForm ? 24 : 32 }}>
           <div style={{
             width: 60, height: 60, borderRadius: 16,
             background: 'linear-gradient(135deg,#0D9488,#06B6D4)',
@@ -170,7 +185,72 @@ export default function Auth() {
           <h2 style={{ fontSize: 22, fontWeight: 700, color: '#111827', margin: 0 }}>DealCell</h2>
         </div>
 
-        <div style={{ maxWidth: 360, width: '100%', margin: '0 auto' }}>
+        {/* ── Mobile Biometric Primary Screen ── */}
+        {isLogin && hasCredentials && !showPasswordForm && (
+          <div className="lg:hidden" dir="rtl" style={{ maxWidth: 360, width: '100%', margin: '0 auto', textAlign: 'center' }}>
+            <style>{`
+              @keyframes fingerprintPulse {
+                0%, 100% { box-shadow: 0 0 0 0 rgba(13,148,136,0.4), 0 8px 32px rgba(13,148,136,0.35); }
+                50% { box-shadow: 0 0 0 18px rgba(13,148,136,0), 0 8px 32px rgba(13,148,136,0.35); }
+              }
+              @keyframes fingerprintPulse2 {
+                0%, 100% { box-shadow: 0 0 0 0 rgba(6,182,212,0.3); }
+                50% { box-shadow: 0 0 0 28px rgba(6,182,212,0); }
+              }
+            `}</style>
+
+            <p style={{ fontSize: 15, color: '#6B7280', marginBottom: 32 }}>
+              השתמש בטביעת האצבע שלך לכניסה מהירה
+            </p>
+
+            {/* Big pulsing fingerprint button */}
+            <button
+              onClick={handleBiometricLogin}
+              disabled={biometricLoading}
+              style={{
+                width: 120, height: 120, borderRadius: '50%',
+                background: biometricLoading
+                  ? 'linear-gradient(135deg,#5EEAD4,#22D3EE)'
+                  : 'linear-gradient(135deg,#0D9488,#06B6D4)',
+                border: 'none', cursor: biometricLoading ? 'wait' : 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                margin: '0 auto 32px',
+                animation: biometricLoading ? 'none' : 'fingerprintPulse 2s ease-in-out infinite',
+                transition: 'all 0.2s',
+              }}
+            >
+              {biometricLoading ? (
+                <Loader2 style={{ width: 48, height: 48, color: 'white', animation: 'spin 1s linear infinite' }} />
+              ) : (
+                <Fingerprint style={{ width: 52, height: 52, color: 'white' }} />
+              )}
+            </button>
+
+            <p style={{ fontSize: 17, fontWeight: 700, color: '#0F766E', marginBottom: 4 }}>
+              {biometricLoading ? 'מאמת...' : 'לחץ לכניסה'}
+            </p>
+            <p style={{ fontSize: 13, color: '#9CA3AF', marginBottom: 40 }}>
+              טביעת אצבע / Face ID
+            </p>
+
+            {/* Switch to password */}
+            <button
+              onClick={() => setShowPasswordForm(true)}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: '#6B7280', fontSize: 14, display: 'flex',
+                alignItems: 'center', gap: 6, margin: '0 auto',
+              }}
+            >
+              <ChevronDown style={{ width: 16, height: 16 }} />
+              כניסה עם סיסמה
+            </button>
+          </div>
+        )}
+
+        <div style={{ maxWidth: 360, width: '100%', margin: '0 auto' }}
+          className={isLogin && hasCredentials && !showPasswordForm ? 'hidden lg:block' : ''}
+        >
           <h2 style={{ fontSize: 26, fontWeight: 700, color: '#111827', margin: '0 0 6px' }}>
             {isLogin ? 'ברוך הבא 👋' : 'יצירת חשבון'}
           </h2>
@@ -260,9 +340,9 @@ export default function Auth() {
             </button>
           </form>
 
-          {/* Biometric */}
-          {isLogin && isBiometricSupported && (
-            <div style={{ marginTop: 16 }}>
+          {/* Biometric — Desktop only (mobile has full-screen above) */}
+          {isLogin && isBiometricSupported && hasCredentials && (
+            <div className="hidden lg:block" style={{ marginTop: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
                 <div style={{ flex: 1, height: 1, background: '#E5E7EB' }} />
                 <span style={{ fontSize: 12, color: '#9CA3AF', whiteSpace: 'nowrap' }}>או</span>
@@ -273,16 +353,11 @@ export default function Auth() {
                 onClick={handleBiometricLogin}
                 disabled={biometricLoading}
                 style={{
-                  width: '100%',
-                  height: 56,
-                  borderRadius: 14,
+                  width: '100%', height: 56, borderRadius: 14,
                   border: '2px solid #CCFBF1',
                   background: 'linear-gradient(135deg, #F0FDFA 0%, #F0FDFA 100%)',
                   cursor: biometricLoading ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 12,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
                   transition: 'all 0.2s',
                   boxShadow: '0 2px 8px rgba(13,148,136,0.12)',
                   opacity: biometricLoading ? 0.7 : 1,

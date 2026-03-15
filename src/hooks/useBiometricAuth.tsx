@@ -63,6 +63,19 @@ export function useBiometricAuth() {
     checkSupport();
   }, []);
 
+  // Check if ANY credentials exist in the system (for login page)
+  const checkAnyCredentials = useCallback(async (): Promise<boolean> => {
+    try {
+      const { data } = await supabase
+        .from('user_webauthn_credentials')
+        .select('id')
+        .limit(1);
+      return !!(data && data.length > 0);
+    } catch {
+      return false;
+    }
+  }, []);
+
   // Check if user has registered biometric
   const checkRegistration = useCallback(async (userId: string) => {
     try {
@@ -292,6 +305,7 @@ export function useBiometricAuth() {
     isRegistered,
     isLoading,
     checkRegistration,
+    checkAnyCredentials,
     registerBiometric,
     authenticateWithBiometric,
     removeBiometric,

@@ -100,24 +100,6 @@ export function AppLayout({ children }: AppLayoutProps) {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <ConnectionStatusIndicator />
-              <button
-                onClick={handleRefresh}
-                aria-label="רענן דף"
-                style={{
-                  width: 34, height: 34, borderRadius: 10,
-                  background: '#F3F4F6', border: '1px solid #E5E7EB',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', transition: 'background 0.15s',
-                }}
-              >
-                <RotateCw
-                  style={{
-                    width: 16, height: 16, color: '#6B7280',
-                    transition: 'transform 0.3s ease',
-                    transform: isRefreshing ? 'rotate(360deg)' : 'rotate(0deg)',
-                  }}
-                />
-              </button>
             </div>
             <div className="flex items-center gap-2">
               <div
