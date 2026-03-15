@@ -16,28 +16,28 @@ interface StatCardProps {
   onClick?: () => void;
 }
 
-const iconBg: Record<string, string> = {
-  default:     'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
-  primary:     'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400',
-  warning:     'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400',
-  success:     'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400',
-  destructive: 'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400',
+const variantBorderStyles: Record<string, string> = {
+  default:     '',
+  primary:     'border-primary/20',
+  warning:     'border-warning/20',
+  success:     'border-success/20',
+  destructive: 'border-destructive/20',
 };
 
-const valueColor: Record<string, string> = {
+const iconContainerStyles: Record<string, string> = {
+  default:     'bg-muted text-muted-foreground',
+  primary:     'bg-primary/10 text-primary',
+  warning:     'bg-warning/10 text-warning',
+  success:     'bg-success/10 text-success',
+  destructive: 'bg-destructive/10 text-destructive',
+};
+
+const valueColorStyles: Record<string, string> = {
   default:     'text-foreground',
-  primary:     'text-blue-600 dark:text-blue-400',
-  warning:     'text-amber-600 dark:text-amber-400',
-  success:     'text-emerald-600 dark:text-emerald-400',
-  destructive: 'text-red-600 dark:text-red-400',
-};
-
-const accentBar: Record<string, string> = {
-  default:     'from-slate-300 to-slate-400',
-  primary:     'from-blue-500 to-indigo-500',
-  warning:     'from-amber-400 to-orange-500',
-  success:     'from-emerald-400 to-green-500',
-  destructive: 'from-red-500 to-rose-500',
+  primary:     'value-glow-primary',
+  warning:     'value-glow-warning',
+  success:     'value-glow-success',
+  destructive: 'value-glow-destructive',
 };
 
 export const StatCard = memo(function StatCard({
@@ -53,54 +53,54 @@ export const StatCard = memo(function StatCard({
   const isClickable = !!href || !!onClick;
 
   const handleClick = () => {
-    if (onClick) onClick();
-    else if (href) navigate(href);
+    if (onClick) {
+      onClick();
+    } else if (href) {
+      navigate(href);
+    }
   };
 
   return (
     <div
       className={cn(
         'stat-card animate-fade-in group',
-        isClickable && 'cursor-pointer'
+        variantBorderStyles[variant],
+        isClickable && 'cursor-pointer active:scale-[0.98]'
       )}
       onClick={isClickable ? handleClick : undefined}
       role={isClickable ? 'button' : undefined}
       tabIndex={isClickable ? 0 : undefined}
       onKeyDown={
         isClickable
-          ? (e) => { if (e.key === 'Enter' || e.key === ' ') handleClick(); }
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') handleClick();
+            }
           : undefined
       }
     >
-      {/* Bottom accent bar */}
-      <div
-        className={cn(
-          'stat-bar bg-gradient-to-r',
-          accentBar[variant]
-        )}
-        aria-hidden="true"
-      />
+      {/* Bottom accent bar — scales in on hover */}
+      <div className="stat-bar" aria-hidden="true" />
 
-      <div className="flex items-start justify-between gap-3 relative z-10">
-        {/* Icon */}
+      <div className="flex items-center justify-between gap-3 relative z-10">
+        {/* Left side: icon */}
         <div
           className={cn(
-            'flex h-10 w-10 items-center justify-center rounded-xl flex-shrink-0 transition-transform duration-200 group-hover:scale-105',
-            iconBg[variant]
+            'flex h-11 w-11 items-center justify-center rounded-xl flex-shrink-0 transition-transform duration-200 group-hover:scale-105',
+            iconContainerStyles[variant]
           )}
         >
           <Icon className="h-5 w-5" />
         </div>
 
-        {/* Text */}
+        {/* Right side: text */}
         <div className="flex-1 min-w-0 text-right">
-          <p className="text-xs font-medium text-muted-foreground truncate leading-snug mb-1">
+          <p className="text-xs sm:text-sm font-medium text-muted-foreground truncate leading-snug">
             {title}
           </p>
           <p
             className={cn(
-              'text-2xl sm:text-3xl font-bold leading-tight tracking-tight',
-              valueColor[variant]
+              'mt-0.5 text-2xl sm:text-3xl font-bold leading-tight tracking-tight transition-colors duration-200',
+              valueColorStyles[variant]
             )}
           >
             {value}
@@ -108,8 +108,8 @@ export const StatCard = memo(function StatCard({
           {trend && (
             <div
               className={cn(
-                'inline-flex items-center gap-1 mt-1.5 text-xs font-semibold',
-                trend.isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
+                'inline-flex items-center gap-1 mt-1 text-xs font-semibold',
+                trend.isPositive ? 'text-success' : 'text-destructive'
               )}
             >
               {trend.isPositive ? (
@@ -117,7 +117,10 @@ export const StatCard = memo(function StatCard({
               ) : (
                 <TrendingDown className="h-3 w-3" />
               )}
-              <span>{trend.isPositive ? '+' : ''}{trend.value}%</span>
+              <span>
+                {trend.isPositive ? '+' : ''}
+                {trend.value}%
+              </span>
             </div>
           )}
         </div>

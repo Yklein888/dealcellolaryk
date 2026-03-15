@@ -38,7 +38,6 @@ import {
   Moon,
   PanelLeftClose,
   PanelLeftOpen,
-  ChevronRight,
 } from 'lucide-react';
 import { BiometricSettings } from '@/components/settings/BiometricSettings';
 import { NotificationSettings } from '@/components/NotificationSettings';
@@ -86,68 +85,77 @@ function NavLink({ to, label, icon: Icon, isActive, isCollapsed, badge, onClick 
       to={to}
       onClick={onClick}
       className={cn(
-        'relative flex items-center rounded-lg transition-all duration-150 group',
-        isCollapsed
-          ? 'justify-center w-10 h-10 mx-auto'
-          : 'gap-3 px-3 py-2 w-full',
+        'flex items-center gap-3 rounded-lg transition-all duration-150 group relative',
+        isCollapsed ? 'justify-center px-0 py-2.5 w-full' : 'px-3 py-2',
         isActive
           ? 'text-primary'
-          : 'text-muted-foreground hover:text-foreground'
+          : 'text-muted-foreground hover:text-foreground hover:bg-muted'
       )}
       style={
         isActive
-          ? { background: 'var(--brand-alpha-10)' }
-          : {}
+          ? {
+              background: 'var(--brand-alpha-10)',
+              border: '1px solid var(--brand-border)',
+            }
+          : {
+              border: '1px solid transparent',
+            }
       }
     >
-      {/* Active left-side indicator bar */}
-      {isActive && !isCollapsed && (
-        <span
-          className="absolute right-0 top-1 bottom-1 w-0.5 rounded-full"
-          style={{ background: 'hsl(var(--primary))' }}
-        />
-      )}
-
       {/* Icon */}
       <div
         className={cn(
-          'flex items-center justify-center rounded-md flex-shrink-0 transition-all duration-150',
-          isCollapsed ? 'h-9 w-9' : 'h-7 w-7',
-          isActive
-            ? 'text-primary'
-            : 'text-muted-foreground group-hover:text-foreground'
+          'flex items-center justify-center rounded-lg flex-shrink-0 transition-all duration-150',
+          isCollapsed ? 'h-8 w-8' : 'h-7 w-7',
+          isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
         )}
         style={isActive ? { background: 'var(--brand-alpha-20)' } : {}}
       >
-        <Icon className="h-[18px] w-[18px]" />
+        <Icon className="h-4 w-4" />
       </div>
 
-      {/* Label */}
+      {/* Label — hidden when collapsed */}
       {!isCollapsed && (
         <span className="text-sm font-medium flex-1 text-right truncate">{label}</span>
       )}
 
-      {/* Badge — expanded */}
+      {/* Badge */}
       {!isCollapsed && badge && badge.count > 0 && (
         <span
-          className="text-[11px] font-bold tabular-nums px-1.5 py-0.5 rounded-full min-w-[20px] text-center"
+          className="text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center"
           style={
             badge.variant === 'red'
-              ? { background: 'hsl(var(--destructive) / 0.10)', color: 'hsl(var(--destructive))', border: '1px solid hsl(var(--destructive) / 0.20)' }
+              ? {
+                  background: 'hsl(var(--destructive) / 0.12)',
+                  color: 'hsl(var(--destructive))',
+                  border: '1px solid hsl(var(--destructive) / 0.25)',
+                }
               : badge.variant === 'green'
-              ? { background: 'hsl(var(--success) / 0.10)', color: 'hsl(var(--success))', border: '1px solid hsl(var(--success) / 0.20)' }
-              : { background: 'var(--brand-alpha-10)', color: 'hsl(var(--primary))', border: '1px solid var(--brand-border)' }
+              ? {
+                  background: 'hsl(var(--success) / 0.12)',
+                  color: 'hsl(var(--success))',
+                  border: '1px solid hsl(var(--success) / 0.25)',
+                }
+              : {
+                  background: 'var(--brand-alpha-10)',
+                  color: 'hsl(var(--primary))',
+                  border: '1px solid var(--brand-border)',
+                }
           }
         >
           {badge.count}
         </span>
       )}
 
-      {/* Badge dot — collapsed */}
+      {/* Collapsed badge dot */}
       {isCollapsed && badge && badge.count > 0 && (
         <span
-          className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full ring-2 ring-card"
-          style={{ background: badge.variant === 'red' ? 'hsl(var(--destructive))' : 'hsl(var(--success))' }}
+          className="absolute top-1 right-1 h-2 w-2 rounded-full"
+          style={
+            badge.variant === 'red'
+              ? { background: 'hsl(var(--destructive))' }
+              : { background: 'hsl(var(--success))' }
+          }
         />
       )}
     </Link>
@@ -169,10 +177,13 @@ function NavLink({ to, label, icon: Icon, isActive, isCollapsed, badge, onClick 
 
 function SectionLabel({ label, isCollapsed }: { label: string; isCollapsed: boolean }) {
   if (isCollapsed) {
-    return <div className="my-2 h-px bg-border mx-2" />;
+    return <div className="my-1 border-t border-border/50" />;
   }
   return (
-    <p className="px-3 pt-5 pb-1.5 text-[10px] font-bold uppercase tracking-[0.10em] text-muted-foreground/50 select-none">
+    <p
+      className="px-3 pt-4 pb-1 text-[10px] font-semibold uppercase tracking-widest"
+      style={{ color: 'hsl(var(--muted-foreground) / 0.5)' }}
+    >
       {label}
     </p>
   );
@@ -203,9 +214,9 @@ export function AppSidebar({ onNavigate, isCollapsed = false, onToggleCollapse }
   const mainItems = visibleNavItems.slice(0, 6);
   const financeItems = visibleNavItems.slice(6);
 
-  const toggleTheme = () => setTheme(theme === 'dark' ? 'light' : 'dark');
-
-  const userInitials = user?.email?.slice(0, 2).toUpperCase() ?? 'YK';
+  const toggleTheme = () => {
+    setTheme(theme === 'dark' ? 'light' : 'dark');
+  };
 
   return (
     <aside
@@ -221,76 +232,56 @@ export function AppSidebar({ onNavigate, isCollapsed = false, onToggleCollapse }
       {/* ── Logo ── */}
       <div
         className={cn(
-          'flex items-center gap-3 h-[60px] flex-shrink-0 px-4',
-          isCollapsed && 'justify-center px-3'
+          'flex items-center gap-3 flex-shrink-0',
+          isCollapsed ? 'justify-center p-3 py-4' : 'p-4'
         )}
         style={{ borderBottom: '1px solid hsl(var(--sidebar-border))' }}
       >
         {/* Brand icon */}
         <div
-          className="flex h-8 w-8 items-center justify-center rounded-lg flex-shrink-0"
+          className="flex h-9 w-9 items-center justify-center rounded-xl flex-shrink-0"
           style={{
-            background: 'var(--gradient-primary)',
+            background: 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)))',
             boxShadow: 'var(--shadow-brand)',
           }}
         >
-          <Smartphone style={{ width: 16, height: 16, color: 'white' }} />
+          <Smartphone className="h-4.5 w-4.5 text-white" style={{ width: 18, height: 18 }} />
         </div>
 
+        {/* Name + status — hidden when collapsed */}
         {!isCollapsed && (
           <div className="flex-1 min-w-0">
-            <h1 className="text-[15px] font-bold text-foreground tracking-tight truncate">
+            <h1
+              className="text-sm font-semibold truncate text-foreground"
+              style={{ letterSpacing: '-0.01em' }}
+            >
               DealCell
             </h1>
-            <div className="flex items-center gap-1.5 mt-0.5">
+            <div className="flex items-center gap-1 mt-0.5">
               <span
                 className="block h-1.5 w-1.5 rounded-full"
-                style={{ background: 'hsl(var(--success))' }}
+                style={{
+                  background: 'hsl(var(--success))',
+                }}
               />
-              <span className="text-[10px] font-semibold tracking-wider" style={{ color: 'hsl(var(--success))' }}>
+              <span
+                className="text-[10px] font-semibold"
+                style={{ color: 'hsl(var(--success))', letterSpacing: '0.06em' }}
+              >
                 LIVE
               </span>
             </div>
           </div>
-        )}
-
-        {/* Collapse toggle — inside header for clean look */}
-        {!isCollapsed && (
-          <button
-            onClick={onToggleCollapse}
-            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-all duration-150 flex-shrink-0"
-            aria-label="כווץ תפריט"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
         )}
       </div>
 
       {/* ── Navigation ── */}
       <nav
         className={cn(
-          'flex flex-col gap-0.5 flex-1 overflow-y-auto scrollbar-hide py-3',
-          isCollapsed ? 'px-2 items-center' : 'px-3'
+          'flex flex-col gap-0.5 flex-1 overflow-y-auto scrollbar-hide',
+          isCollapsed ? 'px-2 py-3 items-center' : 'px-3 py-3'
         )}
       >
-        {/* Collapsed: expand button at top */}
-        {isCollapsed && (
-          <Tooltip delayDuration={0}>
-            <TooltipTrigger asChild>
-              <button
-                onClick={onToggleCollapse}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-all duration-150 mb-2"
-                aria-label="הרחב תפריט"
-              >
-                <ChevronRight className="h-4 w-4 rotate-180" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="left" sideOffset={8}>
-              <span className="text-xs">הרחב תפריט</span>
-            </TooltipContent>
-          </Tooltip>
-        )}
-
         {/* Main group */}
         <SectionLabel label="ראשי" isCollapsed={isCollapsed} />
         {mainItems.map((item) => (
@@ -342,49 +333,79 @@ export function AppSidebar({ onNavigate, isCollapsed = false, onToggleCollapse }
             ))}
           </>
         )}
+
+        {/* Collapse toggle button — at bottom of nav */}
+        <div className="mt-auto pt-3">
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+              <button
+                onClick={onToggleCollapse}
+                className={cn(
+                  'flex items-center justify-center rounded-lg h-8 transition-all duration-150 text-muted-foreground hover:text-foreground hover:bg-muted',
+                  isCollapsed ? 'w-8 mx-auto' : 'w-full'
+                )}
+                style={{ border: '1px solid transparent' }}
+                aria-label={isCollapsed ? 'הרחב תפריט' : 'כווץ תפריט'}
+              >
+                {isCollapsed ? (
+                  <PanelLeftOpen className="h-4 w-4" />
+                ) : (
+                  <div className="flex items-center gap-2 px-2 text-xs font-medium w-full">
+                    <PanelLeftClose className="h-4 w-4 flex-shrink-0" />
+                    <span>כווץ תפריט</span>
+                  </div>
+                )}
+              </button>
+            </TooltipTrigger>
+            {isCollapsed && (
+              <TooltipContent side="left" sideOffset={8}>
+                <span className="text-xs">הרחב תפריט</span>
+              </TooltipContent>
+            )}
+          </Tooltip>
+        </div>
       </nav>
 
       {/* ── Footer ── */}
       <div
-        className={cn(
-          'flex-shrink-0',
-          isCollapsed ? 'p-2 flex flex-col items-center gap-1.5' : 'p-3'
-        )}
+        className={cn('flex-shrink-0 p-3', isCollapsed && 'flex flex-col items-center gap-2')}
         style={{ borderTop: '1px solid hsl(var(--sidebar-border))' }}
       >
-        {/* User chip — expanded */}
-        {!isCollapsed && (
+        {/* User chip — hidden when collapsed, show avatar only */}
+        {!isCollapsed ? (
           <div
-            className="flex items-center gap-2.5 rounded-lg px-3 py-2 mb-2"
+            className="flex items-center gap-3 rounded-lg px-3 py-2.5 mb-2"
             style={{
               background: 'hsl(var(--muted))',
               border: '1px solid hsl(var(--border))',
             }}
           >
+            {/* Avatar */}
             <div
               className="flex h-7 w-7 items-center justify-center rounded-full flex-shrink-0 text-[11px] font-bold text-white"
-              style={{ background: 'var(--gradient-primary)' }}
+              style={{
+                background: 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)))',
+              }}
             >
-              {userInitials}
+              {user?.email?.slice(0, 2).toUpperCase() ?? 'YK'}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold truncate text-foreground">
+              <p className="text-xs font-medium truncate text-foreground/90">
                 {user?.email ?? 'admin'}
               </p>
               <p className="text-[10px] text-muted-foreground">Administrator</p>
             </div>
           </div>
-        )}
-
-        {/* Collapsed: avatar */}
-        {isCollapsed && (
+        ) : (
           <Tooltip delayDuration={0}>
             <TooltipTrigger asChild>
               <div
-                className="flex h-9 w-9 items-center justify-center rounded-full text-[11px] font-bold text-white cursor-default"
-                style={{ background: 'var(--gradient-primary)' }}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-bold text-white cursor-default"
+                style={{
+                  background: 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)))',
+                }}
               >
-                {userInitials}
+                {user?.email?.slice(0, 2).toUpperCase() ?? 'YK'}
               </div>
             </TooltipTrigger>
             <TooltipContent side="left" sideOffset={8}>
@@ -393,18 +414,20 @@ export function AppSidebar({ onNavigate, isCollapsed = false, onToggleCollapse }
           </Tooltip>
         )}
 
-        {/* Action row — expanded */}
+        {/* Action buttons */}
         {!isCollapsed ? (
-          <div className="flex items-center gap-1">
+          <div className="flex gap-1.5">
+            {/* Settings */}
             <Button
               variant="ghost"
-              className="flex-1 justify-start gap-2 text-xs h-8 rounded-lg text-muted-foreground hover:text-foreground px-2"
+              className="flex-1 justify-start gap-2 text-xs h-8 rounded-lg text-muted-foreground hover:text-foreground"
               onClick={() => setIsSettingsOpen(true)}
             >
-              <Settings className="h-3.5 w-3.5 flex-shrink-0" />
+              <Settings className="h-3.5 w-3.5" />
               הגדרות
             </Button>
 
+            {/* Theme toggle */}
             <Tooltip delayDuration={0}>
               <TooltipTrigger asChild>
                 <Button
@@ -413,7 +436,11 @@ export function AppSidebar({ onNavigate, isCollapsed = false, onToggleCollapse }
                   className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground flex-shrink-0"
                   onClick={toggleTheme}
                 >
-                  {theme === 'dark' ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+                  {theme === 'dark' ? (
+                    <Sun className="h-3.5 w-3.5" />
+                  ) : (
+                    <Moon className="h-3.5 w-3.5" />
+                  )}
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="top">
@@ -421,6 +448,7 @@ export function AppSidebar({ onNavigate, isCollapsed = false, onToggleCollapse }
               </TooltipContent>
             </Tooltip>
 
+            {/* Sign out */}
             <Tooltip delayDuration={0}>
               <TooltipTrigger asChild>
                 <Button
@@ -438,33 +466,58 @@ export function AppSidebar({ onNavigate, isCollapsed = false, onToggleCollapse }
             </Tooltip>
           </div>
         ) : (
-          /* Collapsed: icon stack */
+          /* Collapsed footer: stacked icon buttons */
           <>
             <Tooltip delayDuration={0}>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg text-muted-foreground hover:text-foreground" onClick={() => setIsSettingsOpen(true)}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground"
+                  onClick={() => setIsSettingsOpen(true)}
+                >
                   <Settings className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="left" sideOffset={8}><span className="text-xs">הגדרות</span></TooltipContent>
+              <TooltipContent side="left" sideOffset={8}>
+                <span className="text-xs">הגדרות</span>
+              </TooltipContent>
             </Tooltip>
 
             <Tooltip delayDuration={0}>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg text-muted-foreground hover:text-foreground" onClick={toggleTheme}>
-                  {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground"
+                  onClick={toggleTheme}
+                >
+                  {theme === 'dark' ? (
+                    <Sun className="h-4 w-4" />
+                  ) : (
+                    <Moon className="h-4 w-4" />
+                  )}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="left" sideOffset={8}><span className="text-xs">{theme === 'dark' ? 'מצב בהיר' : 'מצב כהה'}</span></TooltipContent>
+              <TooltipContent side="left" sideOffset={8}>
+                <span className="text-xs">{theme === 'dark' ? 'מצב בהיר' : 'מצב כהה'}</span>
+              </TooltipContent>
             </Tooltip>
 
             <Tooltip delayDuration={0}>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg text-muted-foreground hover:text-destructive" onClick={signOut}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-lg text-muted-foreground hover:text-destructive"
+                  onClick={signOut}
+                >
                   <LogOut className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="left" sideOffset={8}><span className="text-xs">התנתק</span></TooltipContent>
+              <TooltipContent side="left" sideOffset={8}>
+                <span className="text-xs">התנתק</span>
+              </TooltipContent>
             </Tooltip>
           </>
         )}
