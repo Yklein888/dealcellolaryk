@@ -1,5 +1,5 @@
 import { memo, useState, useMemo } from 'react';
-import { ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type SortDirection = 'asc' | 'desc' | null;
@@ -24,14 +24,6 @@ interface SortableTableProps<T> {
   noDataMessage?: string;
 }
 
-/**
- * Reusable Sortable Table Component
- * Supports:
- * - Click column headers to sort
- * - Visual indicators (arrows) for sort direction
- * - Custom render functions per column
- * - Keyboard accessibility
- */
 export const SortableTable = memo(function SortableTable<T>({
   columns,
   data,
@@ -46,76 +38,46 @@ export const SortableTable = memo(function SortableTable<T>({
   const [sortKey, setSortKey] = useState<keyof T | null>(defaultSort || null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(defaultSort ? defaultSortDirection : null);
 
-  // Handle column header click
   const handleSort = (columnKey: keyof T) => {
     const column = columns.find(c => c.key === columnKey);
     if (!column?.sortable) return;
 
     let newDirection: SortDirection = 'asc';
-
-    // Cycle through: asc → desc → no sort
     if (sortKey === columnKey) {
-      if (sortDirection === 'asc') {
-        newDirection = 'desc';
-      } else if (sortDirection === 'desc') {
-        newDirection = null;
-      }
+      if (sortDirection === 'asc') newDirection = 'desc';
+      else if (sortDirection === 'desc') newDirection = null;
     }
 
     setSortKey(newDirection ? columnKey : null);
     setSortDirection(newDirection);
-
-    if (onSort) {
-      onSort(columnKey, newDirection);
-    }
+    if (onSort) onSort(columnKey, newDirection);
   };
 
-  // Sort data
   const sortedData = useMemo(() => {
     if (!sortKey || !sortDirection) return data;
-
     return [...data].sort((a, b) => {
       const aValue = a[sortKey];
       const bValue = b[sortKey];
-
-      // Handle null/undefined
       if (aValue == null && bValue == null) return 0;
       if (aValue == null) return sortDirection === 'asc' ? 1 : -1;
       if (bValue == null) return sortDirection === 'asc' ? -1 : 1;
-
-      // Handle numbers
-      if (typeof aValue === 'number' && typeof bValue === 'number') {
+      if (typeof aValue === 'number' && typeof bValue === 'number')
         return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
-      }
-
-      // Handle dates
-      if (aValue instanceof Date && bValue instanceof Date) {
+      if (aValue instanceof Date && bValue instanceof Date)
         return sortDirection === 'asc' ? aValue.getTime() - bValue.getTime() : bValue.getTime() - aValue.getTime();
-      }
-
-      // Handle strings
       const aStr = String(aValue).toLowerCase();
       const bStr = String(bValue).toLowerCase();
       return sortDirection === 'asc' ? aStr.localeCompare(bStr, 'he') : bStr.localeCompare(aStr, 'he');
     });
   }, [data, sortKey, sortDirection]);
 
-  // Render sort indicator icon
-  const SortIcon = ({ columnKey }: { columnKey: keyof T }) => {
-    if (sortKey !== columnKey) {
-      return <ArrowUpDown className="h-4 w-4 text-muted-foreground/50" />;
-    }
-    return sortDirection === 'asc' ? (
-      <ArrowUp className="h-4 w-4 text-primary" />
-    ) : (
-      <ArrowDown className="h-4 w-4 text-primary" />
-    );
-  };
-
   if (sortedData.length === 0) {
     return (
-      <div className={cn('text-center py-8 text-muted-foreground', className)}>
-        {noDataMessage}
+      <div className={cn('flex flex-col items-center justify-center py-16 text-center', className)}>
+        <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-white/5 flex items-center justify-center mb-3">
+          <ChevronsUpDown className="h-5 w-5 text-gray-400" />
+        </div>
+        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{noDataMessage}</p>
       </div>
     );
   }
@@ -124,15 +86,15 @@ export const SortableTable = memo(function SortableTable<T>({
     <div className={cn('overflow-x-auto', className)}>
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-border/50 hover:bg-muted/50 transition-colors">
+          <tr style={{ borderBottom: '1px solid #F3F4F6' }}>
             {columns.map(column => (
               <th
                 key={String(column.key)}
                 onClick={() => handleSort(column.key)}
                 className={cn(
-                  'text-right px-4 py-3 font-semibold text-muted-foreground',
-                  column.sortable ? 'cursor-pointer hover:text-foreground hover:bg-muted/30' : '',
-                  column.className
+                  'text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 whitespace-nowrap',
+                  column.sortable ? 'cursor-pointer hover:text-gray-700 dark:hover:text-gray-300 select-none' : '',
+                  column.className,
                 )}
                 role={column.sortable ? 'button' : undefined}
                 tabIndex={column.sortable ? 0 : undefined}
@@ -143,27 +105,37 @@ export const SortableTable = memo(function SortableTable<T>({
                   }
                 }}
               >
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5">
                   <span>{column.label}</span>
-                  {column.sortable && <SortIcon columnKey={column.key} />}
+                  {column.sortable && (
+                    <span className="flex-shrink-0">
+                      {sortKey !== column.key ? (
+                        <ChevronsUpDown className="h-3 w-3 text-gray-300" />
+                      ) : sortDirection === 'asc' ? (
+                        <ArrowUp className="h-3 w-3 text-indigo-500" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3 text-indigo-500" />
+                      )}
+                    </span>
+                  )}
                 </div>
               </th>
             ))}
           </tr>
         </thead>
-        <tbody>
-          {sortedData.map((row, index) => (
+        <tbody className="divide-y divide-gray-50 dark:divide-white/5">
+          {sortedData.map((row) => (
             <tr
               key={keyExtractor(row)}
               className={cn(
-                'border-b border-border/20 hover:bg-muted/20 transition-colors',
-                rowClassName
+                'hover:bg-gray-50 dark:hover:bg-white/3 transition-colors duration-100',
+                rowClassName,
               )}
             >
               {columns.map(column => (
                 <td
                   key={String(column.key)}
-                  className={cn('px-4 py-3', column.className)}
+                  className={cn('px-4 py-3.5 text-sm text-gray-700 dark:text-gray-300', column.className)}
                 >
                   {column.render
                     ? column.render(row[column.key], row)
@@ -176,6 +148,6 @@ export const SortableTable = memo(function SortableTable<T>({
       </table>
     </div>
   );
-});
+}) as <T>(props: SortableTableProps<T>) => React.ReactElement;
 
-SortableTable.displayName = 'SortableTable';
+(SortableTable as any).displayName = 'SortableTable';

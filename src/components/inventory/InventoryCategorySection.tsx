@@ -59,25 +59,35 @@ export function InventoryCategorySection({
   }).length;
 
   return (
-    <div className="rounded-2xl border border-border/50 bg-card shadow-sm overflow-hidden">
+    <div style={{ background: '#FFFFFF', borderRadius: 16, border: '1px solid #F3F4F6', overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
       {/* Category Header */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className={`w-full flex items-center justify-between px-4 py-4 hover:bg-muted/50 transition-colors ${isExpanded ? 'bg-gradient-to-l from-primary/5 to-accent/5' : ''}`}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '14px 20px',
+          background: isExpanded ? '#F5F3FF' : '#FFFFFF',
+          border: 'none',
+          cursor: 'pointer',
+          transition: 'background 0.15s',
+        }}
       >
         <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-accent/10 text-xl shrink-0">{categoryIcons[category]}</span>
+          <span style={{ display: 'flex', width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 10, background: '#EEF2FF', fontSize: 20, flexShrink: 0 }}>{categoryIcons[category]}</span>
           <div className="text-right">
-            <h3 className="text-lg font-semibold text-foreground">
+            <h3 style={{ fontSize: 15, fontWeight: 700, color: '#111827', margin: 0 }}>
               {categoryLabels[category]}
             </h3>
-            <p className="text-sm text-muted-foreground">
+            <p style={{ fontSize: 12, color: '#6B7280', margin: 0 }}>
               {availableCount} זמינים מתוך {items.length}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-2xl font-extrabold bg-gradient-to-l from-primary to-accent bg-clip-text text-transparent">{items.length}</span>
+          <span style={{ fontSize: 24, fontWeight: 800, color: '#6366F1' }}>{items.length}</span>
           {isExpanded ? (
             <ChevronUp className="h-5 w-5 text-muted-foreground" />
           ) : (
@@ -88,13 +98,14 @@ export function InventoryCategorySection({
 
       {/* Items List */}
       {isExpanded && items.length > 0 && (
-        <div className="border-t border-border">
-          {items.map((item, index) => {
+        <div style={{ borderTop: '1px solid #F3F4F6' }}>
+          {items.map((item) => {
             const expired = isExpired(item);
             return (
-              <div 
+              <div
                 key={item.id}
-                className={`flex items-center gap-3 px-4 py-3 border-b border-border/60 last:border-b-0 hover:bg-primary/5 transition-colors ${expired ? 'bg-destructive/5' : ''}`}
+                style={{ background: expired ? '#FFF1F2' : 'transparent' }}
+                className={`flex items-center gap-3 px-4 py-3 border-b border-gray-50 last:border-b-0 hover:bg-indigo-50/40 transition-colors`}
               >
                 <div className="flex items-center gap-3 flex-1">
                   <div className="flex-1 min-w-0">

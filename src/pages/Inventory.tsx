@@ -434,19 +434,19 @@ export default function Inventory() {
       />
 
       {/* Filters */}
-      <div className="flex flex-col gap-3 sm:gap-4 mb-4 sm:mb-6">
+      <div style={{ background: '#FFFFFF', borderRadius: 14, padding: '14px 16px', marginBottom: 24, border: '1px solid #F3F4F6', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column' as const, gap: 10 }}>
         <div className="relative">
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="חיפוש לפי שם, מספר טלפון, מספר סים..."
-            className="pr-10"
+            className="pr-10 h-10 rounded-lg border-gray-200 focus-visible:ring-1 focus-visible:ring-indigo-400"
           />
         </div>
         <div className="flex gap-2">
           <Select value={filterCategory} onValueChange={setFilterCategory}>
-            <SelectTrigger className="flex-1">
+            <SelectTrigger className="flex-1 h-10 rounded-lg border-gray-200">
               <SelectValue placeholder="כל הקטגוריות" />
             </SelectTrigger>
             <SelectContent>
@@ -459,7 +459,7 @@ export default function Inventory() {
             </SelectContent>
           </Select>
           <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="flex-1">
+            <SelectTrigger className="flex-1 h-10 rounded-lg border-gray-200">
               <SelectValue placeholder="כל הסטטוסים" />
             </SelectTrigger>
             <SelectContent>

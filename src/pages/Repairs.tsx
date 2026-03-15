@@ -598,60 +598,59 @@ export default function Repairs() {
       </PageHeader>
 
       {/* Status Stats - Quick Access */}
-      <div className="grid grid-cols-3 gap-3 mb-6">
-        <button
-          onClick={() => setFilterStatus('in_lab')}
-          className={`stat-card p-4 text-center transition-all hover:border-warning/50 cursor-pointer ${filterStatus === 'in_lab' ? 'border-warning bg-warning/10' : ''}`}
-        >
-          <div className="flex items-center justify-center gap-2 mb-1">
-            <Wrench className="h-5 w-5 text-warning" />
-            <span className="text-2xl font-bold text-warning">
-              {repairs.filter(r => r.status === 'in_lab').length}
-            </span>
-          </div>
-          <p className="text-sm text-muted-foreground">במעבדה</p>
-        </button>
-        
-        <button
-          onClick={() => setFilterStatus('ready')}
-          className={`stat-card p-4 text-center transition-all hover:border-success/50 cursor-pointer ${filterStatus === 'ready' ? 'border-success bg-success/10' : ''}`}
-        >
-          <div className="flex items-center justify-center gap-2 mb-1">
-            <CheckCircle className="h-5 w-5 text-success" />
-            <span className="text-2xl font-bold text-success">
-              {repairs.filter(r => r.status === 'ready').length}
-            </span>
-          </div>
-          <p className="text-sm text-muted-foreground">מוכנים</p>
-        </button>
-        
-        <button
-          onClick={() => setFilterStatus('collected')}
-          className={`stat-card p-4 text-center transition-all hover:border-muted-foreground/50 cursor-pointer ${filterStatus === 'collected' ? 'border-muted-foreground bg-muted' : ''}`}
-        >
-          <div className="flex items-center justify-center gap-2 mb-1">
-            <Package className="h-5 w-5 text-muted-foreground" />
-            <span className="text-2xl font-bold text-muted-foreground">
-              {repairs.filter(r => r.status === 'collected').length}
-            </span>
-          </div>
-          <p className="text-sm text-muted-foreground">נאספו</p>
-        </button>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 20 }}>
+        {([
+          { status: 'in_lab',    label: 'במעבדה', Icon: Wrench,       bg: '#FFFBEB', iconBg: '#F59E0B', text: '#92400E', border: '#FDE68A' },
+          { status: 'ready',     label: 'מוכנים',  Icon: CheckCircle,  bg: '#F0FDF4', iconBg: '#22C55E', text: '#15803D', border: '#BBF7D0' },
+          { status: 'collected', label: 'נאספו',   Icon: Package,      bg: '#F8FAFC', iconBg: '#64748B', text: '#1E293B', border: '#E2E8F0' },
+        ] as const).map(({ status, label, Icon, bg, iconBg, text, border }) => (
+          <button
+            key={status}
+            onClick={() => setFilterStatus(filterStatus === status ? 'all' : status)}
+            style={{
+              background: filterStatus === status ? bg : '#FFFFFF',
+              border: `1px solid ${filterStatus === status ? border : '#F3F4F6'}`,
+              borderRadius: 16,
+              padding: '20px 12px',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              outline: 'none',
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-2px)';
+              (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 8px 20px ${iconBg}30`;
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.transform = '';
+              (e.currentTarget as HTMLButtonElement).style.boxShadow = '';
+            }}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+              <div style={{ background: iconBg, borderRadius: 10, padding: 10, display: 'inline-flex', boxShadow: `0 4px 12px ${iconBg}40` }}>
+                <Icon style={{ width: 20, height: 20, color: 'white' }} />
+              </div>
+              <span style={{ fontSize: 32, fontWeight: 800, color: text, lineHeight: 1, fontFamily: "'Inter', sans-serif" }}>
+                {repairs.filter(r => r.status === status).length}
+              </span>
+              <span style={{ fontSize: 12, color: '#6B7280', fontWeight: 600 }}>{label}</span>
+            </div>
+          </button>
+        ))}
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="relative flex-1">
+      <div style={{ background: '#FFFFFF', borderRadius: 14, padding: '12px 16px', marginBottom: 24, border: '1px solid #F3F4F6', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', display: 'flex', gap: 12, flexWrap: 'wrap' as const }}>
+        <div className="relative flex-1" style={{ minWidth: 200 }}>
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="חיפוש לפי שם, טלפון או סוג מכשיר..."
-            className="pr-10"
+            className="pr-10 h-10 rounded-lg border-gray-200 focus-visible:ring-1 focus-visible:ring-indigo-400"
           />
         </div>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-full md:w-48">
+          <SelectTrigger className="w-full md:w-44 h-10 rounded-lg border-gray-200">
             <SelectValue placeholder="כל הסטטוסים" />
           </SelectTrigger>
           <SelectContent>
@@ -686,18 +685,31 @@ export default function Repairs() {
         )
       ) : (
         <div className="space-y-4">
-          {filteredRepairs.map((repair, index) => (
-            <div 
+          {filteredRepairs.map((repair) => (
+            <div
               key={repair.id}
-              className="stat-card hover:border-primary/30 transition-all duration-200"
+              style={{
+                background: '#FFFFFF',
+                borderRadius: 16,
+                border: '1px solid #F3F4F6',
+                borderTop: `3px solid ${repair.status === 'in_lab' ? '#F59E0B' : repair.status === 'ready' ? '#22C55E' : '#94A3B8'}`,
+                padding: '20px',
+                transition: 'box-shadow 0.2s, transform 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)';
+                (e.currentTarget as HTMLDivElement).style.boxShadow = '0 8px 24px rgba(0,0,0,0.08)';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLDivElement).style.transform = '';
+                (e.currentTarget as HTMLDivElement).style.boxShadow = '';
+              }}
             >
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-start gap-4">
                   {/* Prominent Repair Number Badge */}
-                  <div className="flex flex-col items-center gap-1">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-white font-bold text-xl shadow-lg">
-                      {repair.repairNumber}
-                    </div>
+                  <div style={{ width: 60, height: 60, borderRadius: 14, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 800, fontSize: 22, boxShadow: '0 4px 14px rgba(99,102,241,0.35)', flexShrink: 0 }}>
+                    {repair.repairNumber}
                   </div>
                   <div>
                     <div className="flex items-center gap-3 mb-1">

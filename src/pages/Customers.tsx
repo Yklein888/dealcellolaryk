@@ -352,14 +352,16 @@ export default function Customers() {
       </PageHeader>
 
       {/* Search */}
-      <div className="relative mb-4 sm:mb-6">
-        <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="חיפוש לפי שם, טלפון או אימייל..."
-          className="h-12 rounded-xl border-border/70 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary shadow-sm pr-10"
-        />
+      <div style={{ background: '#FFFFFF', borderRadius: 14, padding: '12px 16px', marginBottom: 20, border: '1px solid #F3F4F6', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+        <div className="relative">
+          <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="חיפוש לפי שם, טלפון או אימייל..."
+            className="h-10 rounded-lg border-gray-200 focus-visible:ring-1 focus-visible:ring-indigo-400 pr-10"
+          />
+        </div>
       </div>
 
       {/* Customers Grid */}
@@ -386,13 +388,28 @@ export default function Customers() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {filteredCustomers.map((customer) => (
-            <div 
+            <div
               key={customer.id}
-              className="stat-card hover:border-primary/30 transition-all duration-200"
+              style={{
+                background: '#FFFFFF',
+                borderRadius: 16,
+                border: '1px solid #F3F4F6',
+                borderTop: `3px solid ${customer.hasPaymentToken ? '#22C55E' : '#6366F1'}`,
+                padding: '20px',
+                transition: 'box-shadow 0.2s, transform 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)';
+                (e.currentTarget as HTMLDivElement).style.boxShadow = '0 8px 24px rgba(99,102,241,0.12)';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLDivElement).style.transform = '';
+                (e.currentTarget as HTMLDivElement).style.boxShadow = '';
+              }}
             >
               <div className="flex items-start justify-between mb-3 sm:mb-4">
                 <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-white font-bold text-base sm:text-lg shadow-md">
+                  <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: 18, flexShrink: 0, boxShadow: '0 4px 12px rgba(99,102,241,0.3)' }}>
                     {customer.name.charAt(0)}
                   </div>
                   <div className="min-w-0">
@@ -432,7 +449,7 @@ export default function Customers() {
                 )}
               </div>
 
-              <div className="flex gap-2 pt-2 sm:pt-3 border-t border-border">
+              <div className="flex gap-2 pt-2 sm:pt-3" style={{ borderTop: '1px solid #F3F4F6' }}>
                 <Button 
                   variant="outline"
                   size="sm"

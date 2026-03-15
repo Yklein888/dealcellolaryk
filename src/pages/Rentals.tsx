@@ -592,64 +592,83 @@ export default function Rentals() {
 
       {/* Status Quick Access */}
       <div className="grid grid-cols-3 gap-3 mb-6">
-        <button
-          onClick={() => setFilterStatus(filterStatus === 'active' ? 'all' : 'active')}
-          className={`rounded-2xl border border-border/50 bg-card p-4 text-center transition-all duration-200 hover:shadow-md hover:border-primary/40 cursor-pointer shadow-sm ${filterStatus === 'active' ? 'border-primary bg-gradient-to-br from-primary/15 to-accent/5 shadow-md' : ''}`}
-        >
-          <div className="flex items-center justify-center gap-2 mb-1">
-            <ShoppingCart className="h-5 w-5 text-primary" />
-            <span className="text-2xl font-extrabold bg-gradient-to-l from-primary to-accent bg-clip-text text-transparent">
-              {rentals.filter(r => r.status === 'active').length}
-            </span>
-          </div>
-          <p className="text-sm text-muted-foreground">פעילות</p>
-        </button>
-        
-        <button
-          onClick={() => setFilterStatus(filterStatus === 'overdue' ? 'all' : 'overdue')}
-          className={`rounded-2xl border border-border/50 bg-card p-4 text-center transition-all duration-200 hover:shadow-md hover:border-destructive/40 cursor-pointer shadow-sm ${filterStatus === 'overdue' ? 'border-destructive bg-gradient-to-br from-destructive/15 to-red-500/5 shadow-md' : ''}`}
-        >
-          <div className="flex items-center justify-center gap-2 mb-1">
-            <AlertTriangle className="h-5 w-5 text-destructive" />
-            <span className="text-2xl font-extrabold text-destructive">
-              {rentals.filter(r => {
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                const endDate = parseISO(r.endDate);
-                return r.status === 'active' && isBefore(endDate, today);
-              }).length}
-            </span>
-          </div>
-          <p className="text-sm text-muted-foreground">באיחור</p>
-        </button>
-        
-        <button
-          onClick={() => setFilterStatus(filterStatus === 'returned' ? 'all' : 'returned')}
-          className={`rounded-2xl border border-border/50 bg-card p-4 text-center transition-all duration-200 hover:shadow-md hover:border-green-400/40 cursor-pointer shadow-sm ${filterStatus === 'returned' ? 'border-green-500 bg-gradient-to-br from-green-500/15 to-emerald-500/5 shadow-md' : ''}`}
-        >
-          <div className="flex items-center justify-center gap-2 mb-1">
-            <CheckCircle className="h-5 w-5 text-success" />
-            <span className="text-2xl font-extrabold text-green-600 dark:text-green-400">
-              {rentals.filter(r => r.status === 'returned').length}
-            </span>
-          </div>
-          <p className="text-sm text-muted-foreground">הוחזרו</p>
-        </button>
+        {[
+          {
+            key: 'active',
+            label: 'פעילות',
+            icon: ShoppingCart,
+            count: rentals.filter(r => r.status === 'active').length,
+            activeColor: { bg: '#EFF6FF', border: '#3B82F6', text: '#1D4ED8', iconBg: '#3B82F6' },
+            inactiveColor: { bg: '#FFFFFF', border: '#E5E7EB', text: '#374151', iconBg: '#F3F4F6' },
+          },
+          {
+            key: 'overdue',
+            label: 'באיחור',
+            icon: AlertTriangle,
+            count: rentals.filter(r => {
+              const today = new Date(); today.setHours(0,0,0,0);
+              return r.status === 'active' && isBefore(parseISO(r.endDate), today);
+            }).length,
+            activeColor: { bg: '#FFF1F2', border: '#EF4444', text: '#B91C1C', iconBg: '#EF4444' },
+            inactiveColor: { bg: '#FFFFFF', border: '#E5E7EB', text: '#374151', iconBg: '#F3F4F6' },
+          },
+          {
+            key: 'returned',
+            label: 'הוחזרו',
+            icon: CheckCircle,
+            count: rentals.filter(r => r.status === 'returned').length,
+            activeColor: { bg: '#F0FDF4', border: '#22C55E', text: '#15803D', iconBg: '#22C55E' },
+            inactiveColor: { bg: '#FFFFFF', border: '#E5E7EB', text: '#374151', iconBg: '#F3F4F6' },
+          },
+        ].map(({ key, label, icon: Icon, count, activeColor, inactiveColor }) => {
+          const isActive = filterStatus === key;
+          const c = isActive ? activeColor : inactiveColor;
+          return (
+            <button
+              key={key}
+              onClick={() => setFilterStatus(isActive ? 'all' : key)}
+              style={{
+                background: c.bg,
+                border: `1.5px solid ${c.border}`,
+                borderRadius: 14,
+                padding: '16px 12px',
+                cursor: 'pointer',
+                transition: 'all 0.18s',
+                textAlign: 'center',
+                boxShadow: isActive ? `0 4px 12px ${c.border}30` : '0 1px 3px rgba(0,0,0,0.06)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 6 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: c.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon style={{ width: 16, height: 16, color: 'white' }} />
+                </div>
+                <span style={{ fontSize: 28, fontWeight: 800, color: c.text, fontFamily: "'Inter', sans-serif", lineHeight: 1 }}>{count}</span>
+              </div>
+              <p style={{ fontSize: 12, fontWeight: 600, color: isActive ? c.text : '#6B7280', margin: 0 }}>{label}</p>
+            </button>
+          );
+        })}
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="relative flex-1">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      <div
+        style={{
+          display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 24,
+          padding: '14px 16px', background: '#FFFFFF', borderRadius: 14,
+          border: '1px solid #E5E7EB', boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+        }}
+      >
+        <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
+          <Search style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', width: 16, height: 16, color: '#9CA3AF' }} />
           <Input
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="חיפוש לפי שם לקוח או פריט..."
-            className="pr-10 h-12 rounded-xl border-border/70 focus-visible:ring-2 focus-visible:ring-primary/40 shadow-sm"
+            style={{ paddingRight: 40, height: 40, borderRadius: 10, fontSize: 14, border: '1px solid #E5E7EB', background: '#F9FAFB' }}
           />
         </div>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-full md:w-40 rounded-xl">
+          <SelectTrigger style={{ width: 160, height: 40, borderRadius: 10, fontSize: 14, border: '1px solid #E5E7EB', background: '#F9FAFB' }}>
             <SelectValue placeholder="כל הסטטוסים" />
           </SelectTrigger>
           <SelectContent>
@@ -660,7 +679,7 @@ export default function Rentals() {
           </SelectContent>
         </Select>
         <Select value={filterCategory} onValueChange={setFilterCategory}>
-          <SelectTrigger className="w-full md:w-44 rounded-xl">
+          <SelectTrigger style={{ width: 180, height: 40, borderRadius: 10, fontSize: 14, border: '1px solid #E5E7EB', background: '#F9FAFB' }}>
             <SelectValue placeholder="כל הקטגוריות" />
           </SelectTrigger>
           <SelectContent>
@@ -697,14 +716,23 @@ export default function Rentals() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredRentals.map((rental, index) => (
-            <div 
+            <div
               key={rental.id}
-              className={`stat-card hover:shadow-lg hover:border-primary/20 transition-all duration-200 p-5 flex flex-col min-h-[280px] border-r-4 ${
-                rental.status === 'active' ? 'border-r-primary' :
-                rental.status === 'overdue' ? 'border-r-destructive' :
-                'border-r-success'
-              }`}
-              style={{ animationDelay: `${index * 50}ms` }}
+              style={{
+                background: '#FFFFFF',
+                borderRadius: 14,
+                border: '1px solid #E5E7EB',
+                borderTop: `3px solid ${rental.status === 'active' ? '#6366F1' : rental.status === 'overdue' ? '#EF4444' : '#22C55E'}`,
+                padding: '18px 20px',
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: 280,
+                boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                transition: 'box-shadow 0.2s, transform 0.2s',
+                animationDelay: `${index * 50}ms`,
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 8px 24px rgba(0,0,0,0.09)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 1px 3px rgba(0,0,0,0.06)'; (e.currentTarget as HTMLDivElement).style.transform = ''; }}
             >
               {/* Header - Status, Edit and Delete */}
               <div className="flex items-center justify-between mb-4">
