@@ -15,55 +15,50 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ children }: AppLayoutProps) {
+  // Sync US SIM notifications when numbers become available
   useUSSimNotificationSync();
 
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
+  // Define keyboard shortcuts
   const shortcuts: KeyboardShortcut[] = [
-    { keys: ['Control', 'k'], description: 'חיפוש גלובלי', action: () => setIsSearchOpen(true) },
-    { keys: ['?'], description: 'עזרה ושוורטקטים', action: () => setIsHelpOpen(true) },
-    { keys: ['Escape'], description: 'סגור', action: () => { setIsHelpOpen(false); setIsSearchOpen(false); } },
+    {
+      keys: ['Control', 'k'],
+      description: 'חיפוש גלובלי',
+      action: () => setIsSearchOpen(true),
+    },
+    {
+      keys: ['?'],
+      description: 'עזרה ושוורטקטים',
+      action: () => setIsHelpOpen(true),
+    },
+    {
+      keys: ['Escape'],
+      description: 'סגור',
+      action: () => {
+        setIsHelpOpen(false);
+        setIsSearchOpen(false);
+      },
+    },
   ];
 
   useKeyboardShortcuts(shortcuts);
 
   return (
     <ConnectionStatusProvider>
-      <div
-        className="min-h-screen"
-        style={{ background: 'hsl(228 15% 5%)' }}
-      >
-        {/* Mobile Header */}
-        <header
-          className="lg:hidden fixed top-0 right-0 left-0 z-50 px-4 py-3 safe-area-top"
-          style={{
-            background: 'hsl(230 14% 7% / 0.97)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            borderBottom: '1px solid hsl(230 14% 11%)',
-          }}
-        >
+      <div className="min-h-screen bg-background">
+        {/* Mobile Header - Simplified */}
+        <header className="lg:hidden fixed top-0 right-0 left-0 z-50 glass-strong border-b border-white/20 px-4 py-3 safe-area-top">
           <div className="flex items-center justify-between">
             <ConnectionStatusIndicator />
             <div className="flex items-center gap-2">
-              <div
-                className="flex h-8 w-8 items-center justify-center rounded-xl"
-                style={{
-                  background: 'linear-gradient(135deg, hsl(252 85% 68%), hsl(268 80% 72%))',
-                  boxShadow: '0 2px 10px rgba(124,109,250,0.3)',
-                }}
-              >
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent">
                 <Smartphone className="h-4 w-4 text-white" />
               </div>
-              <h1
-                className="text-base font-semibold bg-clip-text text-transparent"
-                style={{ backgroundImage: 'linear-gradient(135deg, hsl(252 85% 78%), hsl(268 80% 82%))', letterSpacing: '-0.01em' }}
-              >
-                DealCell
-              </h1>
+              <h1 className="text-lg font-bold gradient-text">ניהול השכרות</h1>
             </div>
-            <div className="w-10" />
+            <div className="w-10" /> {/* Spacer for centering */}
           </div>
         </header>
 
@@ -77,9 +72,13 @@ export function AppLayout({ children }: AppLayoutProps) {
           {children}
         </main>
 
+        {/* Mobile Bottom Navigation */}
         <MobileBottomNav />
+
+        {/* PWA Install Prompt */}
         <PWAInstallPrompt />
 
+        {/* Keyboard Shortcuts Dialog */}
         <KeyboardShortcutsDialog
           open={isHelpOpen}
           onOpenChange={setIsHelpOpen}
@@ -90,7 +89,11 @@ export function AppLayout({ children }: AppLayoutProps) {
           ]}
         />
 
-        <GlobalSearch isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+        {/* Global Search */}
+        <GlobalSearch
+          isOpen={isSearchOpen}
+          onClose={() => setIsSearchOpen(false)}
+        />
       </div>
     </ConnectionStatusProvider>
   );

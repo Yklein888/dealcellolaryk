@@ -13,11 +13,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  LayoutDashboard,
-  Users,
-  Package,
-  ShoppingCart,
+import { 
+  LayoutDashboard, 
+  Users, 
+  Package, 
+  ShoppingCart, 
   Wrench,
   ChevronRight,
   Smartphone,
@@ -30,7 +30,6 @@ import {
   Fingerprint,
   Signal,
   Globe,
-  Circle,
 } from 'lucide-react';
 import { BiometricSettings } from '@/components/settings/BiometricSettings';
 import { NotificationSettings } from '@/components/NotificationSettings';
@@ -45,6 +44,7 @@ const navItems = [
   { path: '/rentals', label: 'השכרות', icon: ShoppingCart, permission: 'view_rentals' as PermissionKey },
   { path: '/customers', label: 'לקוחות', icon: Users, permission: 'view_customers' as PermissionKey },
   { path: '/inventory', label: 'מלאי', icon: Package, permission: 'view_inventory' as PermissionKey },
+  
   { path: '/repairs', label: 'תיקונים', icon: Wrench, permission: 'view_repairs' as PermissionKey },
   { path: '/cellstation', label: 'סימים אירופה', icon: Signal, permission: 'view_sim_cards' as PermissionKey },
   { path: '/sims', label: 'סימים ארה"ב', icon: Globe, permission: 'view_inventory' as PermissionKey },
@@ -67,227 +67,114 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
   const { hasPermission } = usePermissions();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
+  // Live badge counts for desktop nav
   const { rentals, repairs } = useRental();
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const overdueCount = rentals.filter(
     (r) => r.status === 'active' && isBefore(parseISO(r.endDate), today)
   ).length;
   const readyRepairsCount = repairs.filter((r) => r.status === 'ready').length;
-
-  const navBadges: Record<string, { count: number; variant: 'red' | 'green' | 'violet' }> = {
-    '/rentals': { count: overdueCount, variant: 'red' },
-    '/repairs': { count: readyRepairsCount, variant: 'green' },
+  const navBadges: Record<string, { count: number; activeColor: string; inactiveColor: string }> = {
+    '/rentals': { count: overdueCount, activeColor: 'bg-white/30 text-white', inactiveColor: 'bg-destructive text-white' },
+    '/repairs': { count: readyRepairsCount, activeColor: 'bg-white/30 text-white', inactiveColor: 'bg-green-500 text-white' },
   };
 
+  // Filter nav items by permission (admins see all)
   const visibleNavItems = navItems.filter(item => isAdmin || hasPermission(item.permission));
 
   return (
-    <aside
-      className="fixed right-0 top-0 z-40 h-screen w-64 flex flex-col"
-      style={{
-        background: 'hsl(230 14% 7%)',
-        borderLeft: '1px solid hsl(230 14% 11%)',
-      }}
-    >
-      {/* ── Logo ── */}
-      <div
-        className="flex items-center gap-3 p-5"
-        style={{ borderBottom: '1px solid hsl(230 14% 11%)' }}
-      >
-        {/* Gem icon */}
-        <div
-          className="flex h-10 w-10 items-center justify-center rounded-xl flex-shrink-0"
-          style={{
-            background: 'linear-gradient(135deg, hsl(252 85% 68%), hsl(268 80% 72%))',
-            boxShadow: '0 4px 18px rgba(124,109,250,0.38)',
-          }}
-        >
-          <Smartphone className="h-5 w-5 text-white" />
+    <aside className="fixed right-0 top-0 z-40 h-screen w-64 glass-strong border-l border-white/20 shadow-[var(--shadow-glass)]">
+      {/* Logo */}
+      <div className="flex items-center gap-3 p-6 border-b border-white/10">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-accent shadow-lg">
+          <Smartphone className="h-6 w-6 text-white" />
         </div>
-        <div className="flex-1 min-w-0">
-          <h1
-            className="text-sm font-semibold truncate"
-            style={{ color: 'hsl(225 20% 94%)', letterSpacing: '-0.01em' }}
-          >
-            DealCell
-          </h1>
-          {/* Live dot */}
-          <div className="flex items-center gap-1.5 mt-0.5">
-            <div
-              className="flex items-center gap-1 rounded-full px-1.5 py-0.5"
-              style={{
-                background: 'rgba(52,211,153,0.12)',
-                border: '1px solid rgba(52,211,153,0.22)',
-              }}
-            >
-              <span
-                className="block h-1.5 w-1.5 rounded-full"
-                style={{ background: 'rgb(52,211,153)', boxShadow: '0 0 6px rgb(52,211,153)' }}
-              />
-              <span style={{ fontSize: 10, color: 'rgb(52,211,153)', fontWeight: 600, letterSpacing: '0.06em' }}>
-                LIVE
-              </span>
-            </div>
-          </div>
+        <div>
+          <h1 className="text-lg font-bold text-foreground">ניהול השכרות</h1>
+          <p className="text-xs text-muted-foreground">מערכת מקצועית</p>
         </div>
       </div>
 
-      {/* ── Navigation ── */}
-      <nav className="flex flex-col gap-0.5 p-3 flex-1 overflow-y-auto scrollbar-hide">
-        {/* Main group */}
-        <p
-          className="px-3 pt-2 pb-1"
-          style={{ fontSize: 10, color: 'hsl(225 10% 30%)', textTransform: 'uppercase', letterSpacing: '0.09em', fontWeight: 600 }}
-        >
-          ראשי
-        </p>
-
-        {visibleNavItems.slice(0, 6).map((item) => {
+      {/* Navigation */}
+      <nav className="flex flex-col gap-1.5 p-4">
+        {visibleNavItems.map((item) => {
           const isActive = location.pathname === item.path;
           const Icon = item.icon;
-          const badge = navBadges[item.path];
-
+          
           return (
             <Link
               key={item.path}
               to={item.path}
               onClick={onNavigate}
               className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group',
-                'hover:text-foreground',
-                isActive ? 'nav-item-premium active' : 'nav-item-premium'
+                'flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300',
+                'hover:bg-primary/10 hover:shadow-sm group',
+                isActive
+                  ? 'bg-gradient-to-l from-primary to-accent text-white shadow-md scale-[1.01]'
+                  : ''
               )}
-              style={isActive ? {
-                background: 'linear-gradient(135deg, rgba(124,109,250,0.18), rgba(167,139,250,0.1))',
-                border: '1px solid rgba(124,109,250,0.22)',
-                color: 'hsl(225 20% 94%)',
-              } : {
-                border: '1px solid transparent',
-                color: 'hsl(225 10% 42%)',
-              }}
             >
-              {/* Icon container */}
-              <div
-                className="flex h-7 w-7 items-center justify-center rounded-lg flex-shrink-0 transition-all duration-200"
-                style={isActive ? {
-                  background: 'rgba(124,109,250,0.2)',
-                } : {
-                  background: 'transparent',
-                }}
-              >
-                <Icon
-                  className="h-4 w-4 transition-all duration-200"
-                  style={isActive
-                    ? { color: 'hsl(252 85% 78%)' }
-                    : { color: 'hsl(225 10% 38%)' }
-                  }
-                />
-              </div>
-
-              <span className="text-sm font-medium flex-1 text-right" style={{ letterSpacing: '0.005em' }}>
+              <Icon className={cn(
+                'h-5 w-5 transition-all duration-300',
+                isActive ? 'text-white' : 'text-muted-foreground group-hover:text-primary group-hover:scale-110'
+              )} />
+              <span className={cn(
+                'font-semibold transition-colors duration-300',
+                isActive ? 'text-white' : 'text-muted-foreground group-hover:text-foreground'
+              )}>
                 {item.label}
               </span>
-
-              {badge && badge.count > 0 ? (
-                <span
-                  className="text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center"
-                  style={badge.variant === 'red'
-                    ? { background: 'rgba(248,113,113,0.14)', color: 'rgb(248,113,113)', border: '1px solid rgba(248,113,113,0.22)' }
-                    : { background: 'rgba(52,211,153,0.14)', color: 'rgb(52,211,153)', border: '1px solid rgba(52,211,153,0.22)' }
-                  }
-                >
-                  {badge.count}
+              {navBadges[item.path]?.count > 0 && (
+                <span className={`mr-auto text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center ${
+                  isActive ? navBadges[item.path].activeColor : navBadges[item.path].inactiveColor
+                }`}>
+                  {navBadges[item.path].count}
                 </span>
-              ) : isActive ? (
-                <ChevronRight
-                  className="h-3.5 w-3.5"
-                  style={{ color: 'rgba(167,139,250,0.7)' }}
-                />
-              ) : null}
+              )}
+              {isActive && !navBadges[item.path]?.count && (
+                <ChevronRight className="h-4 w-4 mr-auto text-white/80" />
+              )}
             </Link>
           );
         })}
 
-        {/* Finance group */}
-        <p
-          className="px-3 pt-4 pb-1"
-          style={{ fontSize: 10, color: 'hsl(225 10% 30%)', textTransform: 'uppercase', letterSpacing: '0.09em', fontWeight: 600 }}
-        >
-          כספים
-        </p>
-
-        {visibleNavItems.slice(6).map((item) => {
-          const isActive = location.pathname === item.path;
-          const Icon = item.icon;
-
-          return (
-            <Link
-              key={item.path}
-              to={item.path}
-              onClick={onNavigate}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200"
-              style={isActive ? {
-                background: 'linear-gradient(135deg, rgba(124,109,250,0.18), rgba(167,139,250,0.1))',
-                border: '1px solid rgba(124,109,250,0.22)',
-                color: 'hsl(225 20% 94%)',
-              } : {
-                border: '1px solid transparent',
-                color: 'hsl(225 10% 42%)',
-              }}
-            >
-              <div
-                className="flex h-7 w-7 items-center justify-center rounded-lg flex-shrink-0"
-                style={isActive ? { background: 'rgba(124,109,250,0.2)' } : { background: 'transparent' }}
-              >
-                <Icon
-                  className="h-4 w-4"
-                  style={isActive ? { color: 'hsl(252 85% 78%)' } : { color: 'hsl(225 10% 38%)' }}
-                />
-              </div>
-              <span className="text-sm font-medium flex-1 text-right">{item.label}</span>
-              {isActive && <ChevronRight className="h-3.5 w-3.5" style={{ color: 'rgba(167,139,250,0.7)' }} />}
-            </Link>
-          );
-        })}
-
-        {/* Admin group */}
+        {/* Admin Section */}
         {isAdmin && (
           <>
-            <p
-              className="px-3 pt-4 pb-1"
-              style={{ fontSize: 10, color: 'hsl(225 10% 30%)', textTransform: 'uppercase', letterSpacing: '0.09em', fontWeight: 600 }}
-            >
-              ניהול
-            </p>
+            <div className="my-2 px-4">
+              <div className="h-px bg-white/20" />
+              <p className="text-xs text-muted-foreground mt-2 mb-1">ניהול</p>
+            </div>
             {adminNavItems.map((item) => {
               const isActive = location.pathname === item.path;
               const Icon = item.icon;
+
               return (
                 <Link
                   key={item.path}
                   to={item.path}
                   onClick={onNavigate}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200"
-                  style={isActive ? {
-                    background: 'linear-gradient(135deg, rgba(124,109,250,0.18), rgba(167,139,250,0.1))',
-                    border: '1px solid rgba(124,109,250,0.22)',
-                    color: 'hsl(225 20% 94%)',
-                  } : {
-                    border: '1px solid transparent',
-                    color: 'hsl(225 10% 42%)',
-                  }}
+                  className={cn(
+                    'flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300',
+                    'hover:bg-primary/10 hover:shadow-sm group',
+                    isActive
+                      ? 'bg-gradient-to-l from-primary to-accent text-white shadow-md scale-[1.01]'
+                      : ''
+                  )}
                 >
-                  <div
-                    className="flex h-7 w-7 items-center justify-center rounded-lg flex-shrink-0"
-                    style={isActive ? { background: 'rgba(124,109,250,0.2)' } : {}}
-                  >
-                    <Icon
-                      className="h-4 w-4"
-                      style={isActive ? { color: 'hsl(252 85% 78%)' } : { color: 'hsl(225 10% 38%)' }}
-                    />
-                  </div>
-                  <span className="text-sm font-medium flex-1 text-right">{item.label}</span>
-                  {isActive && <ChevronRight className="h-3.5 w-3.5" style={{ color: 'rgba(167,139,250,0.7)' }} />}
+                  <Icon className={cn(
+                    'h-5 w-5 transition-all duration-300',
+                    isActive ? 'text-white' : 'text-muted-foreground group-hover:text-primary group-hover:scale-110'
+                  )} />
+                  <span className={cn(
+                    'font-semibold transition-colors duration-300',
+                    isActive ? 'text-white' : 'text-muted-foreground group-hover:text-foreground'
+                  )}>
+                    {item.label}
+                  </span>
+                  {isActive && (
+                    <ChevronRight className="h-4 w-4 mr-auto text-white/80" />
+                  )}
                 </Link>
               );
             })}
@@ -295,66 +182,28 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
         )}
       </nav>
 
-      {/* ── Footer ── */}
-      <div
-        className="p-3"
-        style={{ borderTop: '1px solid hsl(230 14% 11%)' }}
-      >
-        {/* User chip */}
-        <div
-          className="flex items-center gap-3 rounded-xl px-3 py-2.5 mb-2 cursor-pointer transition-all duration-200"
-          style={{
-            background: 'hsl(230 14% 10%)',
-            border: '1px solid hsl(230 14% 14%)',
-          }}
-        >
-          {/* Avatar */}
-          <div
-            className="flex h-8 w-8 items-center justify-center rounded-full flex-shrink-0"
-            style={{
-              background: 'linear-gradient(135deg, hsl(252 85% 68%), hsl(268 80% 72%))',
-              fontSize: 12,
-              fontWeight: 700,
-              color: '#fff',
-            }}
-          >
-            {user?.email?.slice(0, 2).toUpperCase() ?? 'YK'}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p
-              className="text-xs font-medium truncate"
-              style={{ color: 'hsl(225 20% 85%)' }}
-            >
-              {user?.email ?? 'admin'}
-            </p>
-            <p
-              className="text-xs"
-              style={{ color: 'hsl(225 10% 35%)', fontSize: 10 }}
-            >
-              Administrator
-            </p>
-          </div>
+      {/* User & Settings */}
+      <div className="absolute bottom-0 right-0 left-0 p-4 border-t border-white/10">
+        <div className="rounded-xl glass-subtle p-3 mb-3">
+          <p className="text-xs text-muted-foreground">מחובר כ:</p>
+          <p className="text-sm font-medium text-foreground truncate">{user?.email}</p>
         </div>
-
-        {/* Action buttons */}
         <div className="flex gap-2">
           <Button
-            variant="ghost"
-            className="flex-1 justify-start gap-2 text-xs h-9 rounded-xl transition-all duration-200"
-            style={{ color: 'hsl(225 10% 42%)', background: 'transparent' }}
+            variant="outline"
+            className="flex-1 justify-start gap-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-300"
             onClick={() => setIsSettingsOpen(true)}
           >
-            <Settings className="h-3.5 w-3.5" />
+            <Settings className="h-4 w-4" />
             הגדרות
           </Button>
           <Button
-            variant="ghost"
+            variant="outline"
             size="icon"
-            className="h-9 w-9 rounded-xl transition-all duration-200"
-            style={{ color: 'hsl(225 10% 38%)', background: 'transparent' }}
+            className="text-muted-foreground hover:text-destructive hover:border-destructive/50 hover:bg-destructive/10 transition-all duration-300"
             onClick={signOut}
           >
-            <LogOut className="h-3.5 w-3.5" />
+            <LogOut className="h-4 w-4" />
           </Button>
         </div>
       </div>
