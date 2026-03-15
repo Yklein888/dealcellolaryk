@@ -32,12 +32,12 @@ const valueColor: Record<string, string> = {
   destructive: 'text-red-600 dark:text-red-400',
 };
 
-const accentBorderColor: Record<string, string> = {
-  default:     '#94A3B8',
-  primary:     '#3B82F6',
-  warning:     '#F59E0B',
-  success:     '#22C55E',
-  destructive: '#EF4444',
+const accentBar: Record<string, string> = {
+  default:     'from-slate-300 to-slate-400',
+  primary:     'from-blue-500 to-indigo-500',
+  warning:     'from-amber-400 to-orange-500',
+  success:     'from-emerald-400 to-green-500',
+  destructive: 'from-red-500 to-rose-500',
 };
 
 export const StatCard = memo(function StatCard({
@@ -63,7 +63,6 @@ export const StatCard = memo(function StatCard({
         'stat-card animate-fade-in group',
         isClickable && 'cursor-pointer'
       )}
-      style={{ borderLeftColor: accentBorderColor[variant] }}
       onClick={isClickable ? handleClick : undefined}
       role={isClickable ? 'button' : undefined}
       tabIndex={isClickable ? 0 : undefined}
@@ -73,15 +72,24 @@ export const StatCard = memo(function StatCard({
           : undefined
       }
     >
+      {/* Bottom accent bar */}
+      <div
+        className={cn(
+          'stat-bar bg-gradient-to-r',
+          accentBar[variant]
+        )}
+        aria-hidden="true"
+      />
+
       <div className="flex items-start justify-between gap-3 relative z-10">
-        {/* Icon — small colored square */}
+        {/* Icon */}
         <div
           className={cn(
-            'flex h-9 w-9 items-center justify-center rounded-lg flex-shrink-0',
+            'flex h-10 w-10 items-center justify-center rounded-xl flex-shrink-0 transition-transform duration-200 group-hover:scale-105',
             iconBg[variant]
           )}
         >
-          <Icon className="h-4 w-4" />
+          <Icon className="h-5 w-5" />
         </div>
 
         {/* Text */}

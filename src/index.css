@@ -46,14 +46,14 @@
 
     --radius: 0.625rem;
 
-    /* ── Sidebar — always dark even in light mode ── */
-    --sidebar-background:  222 47% 11%;   /* #0F172A — deep dark navy */
-    --sidebar-foreground:  210 40% 85%;   /* light text on dark bg */
+    /* ── Sidebar ── */
+    --sidebar-background:  0 0% 100%;
+    --sidebar-foreground:  222 47% 11%;
     --sidebar-primary:     217 91% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent:      222 40% 16%;   /* slightly lighter dark for hover */
-    --sidebar-accent-foreground: 210 40% 85%;
-    --sidebar-border:      222 40% 16%;   /* dark border */
+    --sidebar-accent:      210 40% 96%;
+    --sidebar-accent-foreground: 215 25% 52%;
+    --sidebar-border:      214 32% 91%;
     --sidebar-ring:        217 91% 60%;
     --sidebar-width: 256px;
     --sidebar-width-collapsed: 68px;
@@ -219,14 +219,20 @@
   .card-interactive:active { transform: translateY(0); }
 
   /* ────────────────────────────────
-     Stat card — white with colored left border
+     Stat card
      ──────────────────────────────── */
   .stat-card {
     @apply card-base relative overflow-hidden p-5;
-    border-left-width: 4px;
   }
   .stat-card .stat-shimmer { display: none; }
-  .stat-card .stat-bar { display: none; }
+  .stat-card .stat-bar {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--gradient-primary);
+    transform: scaleX(0); transform-origin: right;
+    transition: transform 0.22s ease;
+  }
+  .stat-card:hover .stat-bar { transform: scaleX(1); }
   .stat-card:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-md);
@@ -244,20 +250,20 @@
   }
 
   /* ────────────────────────────────
-     Sidebar nav links — dark sidebar context
+     Sidebar nav links
      ──────────────────────────────── */
   .sidebar-link {
     @apply flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150;
-    color: hsl(210 40% 65%);
+    color: hsl(var(--muted-foreground));
   }
   .sidebar-link:hover {
-    background: rgba(255,255,255,0.06);
-    color: hsl(210 40% 90%);
+    background: hsl(var(--muted));
+    color: hsl(var(--foreground));
   }
   .sidebar-link.active {
-    background: rgba(59,130,246,0.18);
-    color: hsl(217 91% 75%);
-    border-left: 3px solid hsl(var(--primary));
+    background: var(--brand-alpha-10);
+    color: hsl(var(--primary));
+    border: 1px solid var(--brand-border);
   }
   .sidebar-link.active .sidebar-icon { color: hsl(var(--primary)); }
 
@@ -265,16 +271,16 @@
   .nav-item-premium {
     @apply flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200;
     border: 1px solid transparent;
-    color: hsl(210 40% 65%);
+    color: hsl(var(--muted-foreground));
   }
   .nav-item-premium:hover {
-    background: rgba(255,255,255,0.06);
-    color: hsl(210 40% 90%);
+    background: hsl(var(--muted));
+    color: hsl(var(--foreground));
   }
   .nav-item-premium.active {
-    background: rgba(59,130,246,0.18);
-    border-color: rgba(59,130,246,0.30);
-    color: hsl(217 91% 75%);
+    background: var(--brand-alpha-10);
+    border-color: var(--brand-border);
+    color: hsl(var(--primary));
   }
 
   /* ────────────────────────────────
