@@ -359,7 +359,7 @@ export default function Customers() {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="חיפוש לפי שם, טלפון או אימייל..."
-            className="h-10 rounded-lg border-gray-200 focus-visible:ring-1 focus-visible:ring-indigo-400 pr-10"
+            className="h-10 rounded-lg border-gray-200 focus-visible:ring-1 focus-visible:ring-teal-400 pr-10"
           />
         </div>
       </div>
@@ -394,13 +394,13 @@ export default function Customers() {
                 background: '#FFFFFF',
                 borderRadius: 16,
                 border: '1px solid #F3F4F6',
-                borderTop: `3px solid ${customer.hasPaymentToken ? '#22C55E' : '#6366F1'}`,
+                borderTop: `3px solid ${customer.hasPaymentToken ? '#22C55E' : '#0D9488'}`,
                 padding: '20px',
                 transition: 'box-shadow 0.2s, transform 0.2s',
               }}
               onMouseEnter={(e) => {
                 (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)';
-                (e.currentTarget as HTMLDivElement).style.boxShadow = '0 8px 24px rgba(99,102,241,0.12)';
+                (e.currentTarget as HTMLDivElement).style.boxShadow = '0 8px 24px rgba(13,148,136,0.12)';
               }}
               onMouseLeave={(e) => {
                 (e.currentTarget as HTMLDivElement).style.transform = '';
@@ -409,7 +409,7 @@ export default function Customers() {
             >
               <div className="flex items-start justify-between mb-3 sm:mb-4">
                 <div className="flex items-center gap-2 sm:gap-3">
-                  <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: 18, flexShrink: 0, boxShadow: '0 4px 12px rgba(99,102,241,0.3)' }}>
+                  <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(135deg,#0D9488,#06B6D4)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: 18, flexShrink: 0, boxShadow: '0 4px 12px rgba(13,148,136,0.3)' }}>
                     {customer.name.charAt(0)}
                   </div>
                   <div className="min-w-0">

@@ -441,7 +441,7 @@ export default function Inventory() {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="חיפוש לפי שם, מספר טלפון, מספר סים..."
-            className="pr-10 h-10 rounded-lg border-gray-200 focus-visible:ring-1 focus-visible:ring-indigo-400"
+            className="pr-10 h-10 rounded-lg border-gray-200 focus-visible:ring-1 focus-visible:ring-teal-400"
           />
         </div>
         <div className="flex gap-2">

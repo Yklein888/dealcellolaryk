@@ -25,7 +25,7 @@ const colorMap = {
   red:    { bg: '#FFF1F2', iconBg: '#EF4444', text: '#B91C1C', sub: '#FCA5A5', border: '#FECACA' },
   green:  { bg: '#F0FDF4', iconBg: '#22C55E', text: '#15803D', sub: '#4ADE80', border: '#BBF7D0' },
   amber:  { bg: '#FFFBEB', iconBg: '#F59E0B', text: '#92400E', sub: '#FCD34D', border: '#FDE68A' },
-  violet: { bg: '#F5F3FF', iconBg: '#8B5CF6', text: '#5B21B6', sub: '#A78BFA', border: '#DDD6FE' },
+  violet: { bg: '#F0FDFA', iconBg: '#06B6D4', text: '#5B21B6', sub: '#A78BFA', border: '#DDD6FE' },
   slate:  { bg: '#F8FAFC', iconBg: '#64748B', text: '#1E293B', sub: '#94A3B8', border: '#E2E8F0' },
 };
 

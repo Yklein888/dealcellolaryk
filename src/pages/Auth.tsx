@@ -66,7 +66,7 @@ export default function Auth() {
 
   const features = [
     { icon: ShoppingCart, label: 'השכרות',   color: '#3B82F6' },
-    { icon: Signal,       label: 'SIM ניהול', color: '#8B5CF6' },
+    { icon: Signal,       label: 'SIM ניהול', color: '#06B6D4' },
     { icon: Wrench,       label: 'תיקונים',   color: '#F59E0B' },
     { icon: Wifi,         label: 'מלאי',       color: '#22C55E' },
   ];
@@ -84,7 +84,7 @@ export default function Auth() {
       <div
         style={{
           flex: 1,
-          background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 50%, #4F46E5 100%)',
+          background: 'linear-gradient(135deg, #0D9488 0%, #06B6D4 50%, #0F766E 100%)',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',
@@ -160,10 +160,10 @@ export default function Auth() {
         <div className="lg:hidden" style={{ textAlign: 'center', marginBottom: 32 }}>
           <div style={{
             width: 60, height: 60, borderRadius: 16,
-            background: 'linear-gradient(135deg,#6366F1,#8B5CF6)',
+            background: 'linear-gradient(135deg,#0D9488,#06B6D4)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             margin: '0 auto 12px',
-            boxShadow: '0 4px 16px rgba(99,102,241,0.35)',
+            boxShadow: '0 4px 16px rgba(13,148,136,0.35)',
           }}>
             <Smartphone style={{ width: 28, height: 28, color: 'white' }} />
           </div>
@@ -235,7 +235,7 @@ export default function Auth() {
               style={{
                 height: 48,
                 borderRadius: 12,
-                background: loading ? '#A5B4FC' : 'linear-gradient(135deg,#6366F1,#8B5CF6)',
+                background: loading ? '#A5B4FC' : 'linear-gradient(135deg,#0D9488,#06B6D4)',
                 color: 'white',
                 fontSize: 15,
                 fontWeight: 700,
@@ -245,7 +245,7 @@ export default function Auth() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 8,
-                boxShadow: loading ? 'none' : '0 4px 14px rgba(99,102,241,0.4)',
+                boxShadow: loading ? 'none' : '0 4px 14px rgba(13,148,136,0.4)',
                 transition: 'all 0.2s',
                 marginTop: 4,
               }}
@@ -276,42 +276,42 @@ export default function Auth() {
                   width: '100%',
                   height: 56,
                   borderRadius: 14,
-                  border: '2px solid #E0E7FF',
-                  background: 'linear-gradient(135deg, #F5F3FF 0%, #EEF2FF 100%)',
+                  border: '2px solid #CCFBF1',
+                  background: 'linear-gradient(135deg, #F0FDFA 0%, #F0FDFA 100%)',
                   cursor: biometricLoading ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: 12,
                   transition: 'all 0.2s',
-                  boxShadow: '0 2px 8px rgba(99,102,241,0.12)',
+                  boxShadow: '0 2px 8px rgba(13,148,136,0.12)',
                   opacity: biometricLoading ? 0.7 : 1,
                 }}
                 onMouseEnter={(e) => {
                   if (!biometricLoading) {
-                    (e.currentTarget as HTMLButtonElement).style.borderColor = '#818CF8';
-                    (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 16px rgba(99,102,241,0.25)';
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = '#2DD4BF';
+                    (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 16px rgba(13,148,136,0.25)';
                     (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.borderColor = '#E0E7FF';
-                  (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 2px 8px rgba(99,102,241,0.12)';
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = '#CCFBF1';
+                  (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 2px 8px rgba(13,148,136,0.12)';
                   (e.currentTarget as HTMLButtonElement).style.transform = '';
                 }}
               >
                 {biometricLoading ? (
-                  <Loader2 style={{ width: 24, height: 24, color: '#6366F1', animation: 'spin 1s linear infinite' }} />
+                  <Loader2 style={{ width: 24, height: 24, color: '#0D9488', animation: 'spin 1s linear infinite' }} />
                 ) : (
-                  <div style={{ width: 40, height: 40, borderRadius: 12, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 4px 10px rgba(99,102,241,0.35)' }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 12, background: 'linear-gradient(135deg,#0D9488,#06B6D4)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 4px 10px rgba(13,148,136,0.35)' }}>
                     <Fingerprint style={{ width: 22, height: 22, color: 'white' }} />
                   </div>
                 )}
                 <div style={{ textAlign: 'right' }}>
-                  <p style={{ fontSize: 15, fontWeight: 700, color: '#4F46E5', margin: 0, lineHeight: 1.2 }}>
+                  <p style={{ fontSize: 15, fontWeight: 700, color: '#0F766E', margin: 0, lineHeight: 1.2 }}>
                     {biometricLoading ? 'מאמת...' : 'כניסה מהירה'}
                   </p>
-                  <p style={{ fontSize: 11, color: '#818CF8', margin: 0, marginTop: 2 }}>טביעת אצבע / Face ID</p>
+                  <p style={{ fontSize: 11, color: '#2DD4BF', margin: 0, marginTop: 2 }}>טביעת אצבע / Face ID</p>
                 </div>
               </button>
             </div>
@@ -322,7 +322,7 @@ export default function Auth() {
             <button
               type="button"
               onClick={() => setIsLogin(!isLogin)}
-              style={{ color: '#6366F1', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 13 }}
+              style={{ color: '#0D9488', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 13 }}
             >
               {isLogin ? 'הרשמה כאן' : 'התחבר כאן'}
             </button>

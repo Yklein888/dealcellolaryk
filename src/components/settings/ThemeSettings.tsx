@@ -14,9 +14,9 @@ export function ThemeSettings() {
       setTheme(saved);
       applyTheme(saved);
     } else {
-      // Detect system preference
-      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      applyTheme(isDark ? 'dark' : 'light');
+      // Default to light mode
+      setTheme('light');
+      applyTheme('light');
     }
   }, []);
 

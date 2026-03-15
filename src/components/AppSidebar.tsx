@@ -61,17 +61,17 @@ function NavItem({ to, label, icon: Icon, isActive, isCollapsed, badge, onClick 
         'group relative flex items-center rounded-lg transition-all duration-150 select-none',
         isCollapsed ? 'justify-center w-10 h-10 mx-auto' : 'gap-3 px-3 py-2.5 w-full',
         isActive
-          ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-semibold'
+          ? 'bg-teal-50 dark:bg-teal-500/10 text-teal-700 dark:text-teal-400 font-semibold'
           : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-gray-100',
       )}
     >
       {isActive && !isCollapsed && (
-        <span className="absolute right-0 top-2 bottom-2 w-0.5 rounded-full bg-indigo-500" aria-hidden />
+        <span className="absolute right-0 top-2 bottom-2 w-0.5 rounded-full bg-teal-500" aria-hidden />
       )}
       <Icon className={cn(
         'flex-shrink-0 transition-colors duration-150',
         isCollapsed ? 'h-5 w-5' : 'h-4 w-4',
-        isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300',
+        isActive ? 'text-teal-600 dark:text-teal-400' : 'text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300',
       )} />
       {!isCollapsed && <span className="flex-1 text-sm text-right truncate">{label}</span>}
       {!isCollapsed && badge && badge.count > 0 && (
@@ -79,7 +79,7 @@ function NavItem({ to, label, icon: Icon, isActive, isCollapsed, badge, onClick 
           'text-[11px] font-bold tabular-nums min-w-[20px] px-1.5 py-0.5 rounded-full text-center',
           badge.variant === 'red' ? 'bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-400'
             : badge.variant === 'green' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400'
-            : 'bg-indigo-100 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-400',
+            : 'bg-teal-100 text-teal-600 dark:bg-teal-500/15 dark:text-teal-400',
         )}>{badge.count}</span>
       )}
       {isCollapsed && badge && badge.count > 0 && (
@@ -147,7 +147,7 @@ export function AppSidebar({ onNavigate, isCollapsed = false, onToggleCollapse }
       )}>
         <div
           className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl"
-          style={{ background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', boxShadow: '0 4px 12px rgba(99,102,241,0.35)' }}
+          style={{ background: 'linear-gradient(135deg,#0D9488,#06B6D4)', boxShadow: '0 4px 12px rgba(13,148,136,0.35)' }}
         >
           <Smartphone className="h-5 w-5 text-white" />
         </div>
@@ -239,7 +239,7 @@ export function AppSidebar({ onNavigate, isCollapsed = false, onToggleCollapse }
           <div className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/5">
             <div
               className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-[12px] font-bold text-white"
-              style={{ background: 'linear-gradient(135deg,#6366F1,#8B5CF6)' }}
+              style={{ background: 'linear-gradient(135deg,#0D9488,#06B6D4)' }}
             >
               {userInitials}
             </div>
@@ -280,7 +280,7 @@ export function AppSidebar({ onNavigate, isCollapsed = false, onToggleCollapse }
           <>
             <Tooltip delayDuration={0}>
               <TooltipTrigger asChild>
-                <div className="flex h-9 w-9 items-center justify-center rounded-full text-[11px] font-bold text-white cursor-default" style={{ background: 'linear-gradient(135deg,#6366F1,#8B5CF6)' }}>
+                <div className="flex h-9 w-9 items-center justify-center rounded-full text-[11px] font-bold text-white cursor-default" style={{ background: 'linear-gradient(135deg,#0D9488,#06B6D4)' }}>
                   {userInitials}
                 </div>
               </TooltipTrigger>

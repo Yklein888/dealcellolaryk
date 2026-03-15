@@ -18,7 +18,7 @@
     --popover:           0 0% 100%;
     --popover-foreground: 220 39% 11%;
 
-    --primary:           243 75% 59%;   /* #6366F1 — indigo */
+    --primary:           172 85% 36%;   /* #0D9488 — teal */
     --primary-foreground: 0 0% 100%;
 
     --secondary:         220 14% 94%;
@@ -27,7 +27,7 @@
     --muted:             220 14% 94%;
     --muted-foreground:  220 9% 46%;   /* #6B7280 */
 
-    --accent:            243 75% 59%;
+    --accent:            197 100% 42%; /* #06B6D4 — cyan */
     --accent-foreground: 0 0% 100%;
 
     --destructive:       0 72% 51%;
@@ -41,7 +41,7 @@
 
     --border:            220 13% 91%;
     --input:             220 13% 91%;
-    --ring:              243 75% 59%;
+    --ring:              172 85% 36%;
     --radius: 0.75rem;
 
     /* ── Sidebar — white ── */

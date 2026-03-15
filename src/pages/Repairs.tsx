@@ -646,7 +646,7 @@ export default function Repairs() {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="חיפוש לפי שם, טלפון או סוג מכשיר..."
-            className="pr-10 h-10 rounded-lg border-gray-200 focus-visible:ring-1 focus-visible:ring-indigo-400"
+            className="pr-10 h-10 rounded-lg border-gray-200 focus-visible:ring-1 focus-visible:ring-teal-400"
           />
         </div>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
@@ -708,7 +708,7 @@ export default function Repairs() {
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-start gap-4">
                   {/* Prominent Repair Number Badge */}
-                  <div style={{ width: 60, height: 60, borderRadius: 14, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 800, fontSize: 22, boxShadow: '0 4px 14px rgba(99,102,241,0.35)', flexShrink: 0 }}>
+                  <div style={{ width: 60, height: 60, borderRadius: 14, background: 'linear-gradient(135deg,#0D9488,#06B6D4)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 800, fontSize: 22, boxShadow: '0 4px 14px rgba(13,148,136,0.35)', flexShrink: 0 }}>
                     {repair.repairNumber}
                   </div>
                   <div>

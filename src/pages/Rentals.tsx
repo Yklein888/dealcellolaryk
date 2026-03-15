@@ -722,7 +722,7 @@ export default function Rentals() {
                 background: '#FFFFFF',
                 borderRadius: 14,
                 border: '1px solid #E5E7EB',
-                borderTop: `3px solid ${rental.status === 'active' ? '#6366F1' : rental.status === 'overdue' ? '#EF4444' : '#22C55E'}`,
+                borderTop: `3px solid ${rental.status === 'active' ? '#0D9488' : rental.status === 'overdue' ? '#EF4444' : '#22C55E'}`,
                 padding: '18px 20px',
                 display: 'flex',
                 flexDirection: 'column',

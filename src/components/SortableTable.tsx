@@ -112,9 +112,9 @@ export const SortableTable = memo(function SortableTable<T>({
                       {sortKey !== column.key ? (
                         <ChevronsUpDown className="h-3 w-3 text-gray-300" />
                       ) : sortDirection === 'asc' ? (
-                        <ArrowUp className="h-3 w-3 text-indigo-500" />
+                        <ArrowUp className="h-3 w-3 text-teal-500" />
                       ) : (
-                        <ArrowDown className="h-3 w-3 text-indigo-500" />
+                        <ArrowDown className="h-3 w-3 text-teal-500" />
                       )}
                     </span>
                   )}
