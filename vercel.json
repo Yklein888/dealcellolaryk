@@ -1,29 +1,28 @@
 {
-  "functions": {
-    "api/*.js": {
-      "maxDuration": 60,
-      "memory": 1024
-    },
-    "api/cellstation.js": {
-      "maxDuration": 300,
-      "memory": 1024
-    },
-    "api/process-overdue.js": {
-      "maxDuration": 300,
-      "memory": 1024
-    }
-  },
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html",
-      "status": 200
-    }
-  ],
   "buildCommand": "npm run build",
-  "outputDirectory": "dist"
+  "outputDirectory": "dist",
+  "functions": {
+    "api/cellstation.js": { "maxDuration": 300 },
+    "api/yemot-call.js": { "maxDuration": 60 },
+    "api/yemot-callback.js": { "maxDuration": 30 },
+    "api/exchange-rate.js": { "maxDuration": 30 },
+    "api/send-whatsapp.js": { "maxDuration": 30 },
+    "api/generate-calling-instructions.js": { "maxDuration": 60 },
+    "api/generate-invoice.js": { "maxDuration": 30 },
+    "api/pelecard-pay.js": { "maxDuration": 60 },
+    "api/notify-us-sim-ready.js": { "maxDuration": 60 },
+    "api/process-overdue.js": { "maxDuration": 300 },
+    "api/sim-activation-request.js": { "maxDuration": 30 },
+    "api/sim-activation-callback.js": { "maxDuration": 30 }
+  },
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
 }
