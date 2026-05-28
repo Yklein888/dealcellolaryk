@@ -1,5 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 
+export const config = {
+  maxDuration: 120,
+};
+
 const supabase = createClient(
   process.env.MAIN_SUPABASE_URL,
   process.env.MAIN_SUPABASE_SERVICE_KEY
