@@ -1,4 +1,6 @@
 {
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
   "functions": {
     "api/cellstation.js": {
       "maxDuration": 300
@@ -6,7 +8,7 @@
     "api/yemot-call.js": {
       "maxDuration": 60
     },
-"api/yemot-callback.js": {
+    "api/yemot-callback.js": {
       "maxDuration": 30
     },
     "api/exchange-rate.js": {
@@ -36,5 +38,11 @@
     "api/sim-activation-callback.js": {
       "maxDuration": 30
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
 }
