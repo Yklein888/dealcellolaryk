@@ -35,6 +35,9 @@
     },
     "api/sim-activation-callback.js": {
       "maxDuration": 30
+    },
+    "api/export-all-data.js": {
+      "maxDuration": 120
     }
   }
 }
