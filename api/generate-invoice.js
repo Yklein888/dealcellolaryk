@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { getSupabaseConfig } from '../lib/supabase-server-config.js';
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {

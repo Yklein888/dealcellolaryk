@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { getSupabaseConfig } from '../lib/supabase-server-config.js';
 
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx7HRL6ythPzBINoQDir2PreXod3FNtQJJwfrev3z84xQb-84X8-PHPwb1XFzc750j5/exec';
 
@@ -9,8 +10,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const supabaseUrl = process.env.MAIN_SUPABASE_URL;
-    const supabaseServiceKey = process.env.MAIN_SUPABASE_SERVICE_KEY;
+    const { url: supabaseUrl, serviceKey: supabaseServiceKey } = getSupabaseConfig();
 
     if (!supabaseUrl || !supabaseServiceKey) {
       return res.status(500).json({ error: 'Supabase configuration missing' });

@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { getSupabaseConfig } from '../lib/supabase-server-config.js';
 
 // Merged from process-overdue-calls.js + process-overdue-charges.js
 // Use ?type=calls or ?type=charges to select action
@@ -271,8 +272,7 @@ export default async function handler(req, res) {
       });
     }
 
-    const supabaseUrl = process.env.MAIN_SUPABASE_URL;
-    const supabaseServiceKey = process.env.MAIN_SUPABASE_SERVICE_KEY;
+    const { url: supabaseUrl, serviceKey: supabaseServiceKey } = getSupabaseConfig();
 
     if (!supabaseUrl || !supabaseServiceKey) {
       return res.status(500).json({ error: 'Supabase service key not configured' });

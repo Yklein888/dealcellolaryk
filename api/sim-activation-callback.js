@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { getSupabaseConfig } from '../lib/supabase-server-config.js';
 
 const API_KEY = process.env.SIM_ACTIVATION_API_KEY || 'sim-activation-secret-key';
 
@@ -15,8 +16,7 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const supabaseUrl = process.env.MAIN_SUPABASE_URL;
-    const supabaseServiceKey = process.env.MAIN_SUPABASE_SERVICE_KEY;
+    const { url: supabaseUrl, serviceKey: supabaseServiceKey } = getSupabaseConfig();
 
     if (!supabaseUrl || !supabaseServiceKey) {
       return res.status(500).json({ error: 'Supabase configuration missing' });

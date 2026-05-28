@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { getSupabaseConfig } from '../lib/supabase-server-config.js';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -60,12 +61,10 @@ export default async function handler(req, res) {
     console.log('Yemot response:', yemotResult);
 
     // Try to log to Supabase (optional - failure won't break the call)
-    if (process.env.MAIN_SUPABASE_URL && process.env.MAIN_SUPABASE_SERVICE_KEY) {
-      try {
-        const supabase = createClient(
-          process.env.MAIN_SUPABASE_URL,
-          process.env.MAIN_SUPABASE_SERVICE_KEY
-        );
+    try {
+      const { url, serviceKey } = getSupabaseConfig();
+      if (url && serviceKey) {
+        const supabase = createClient(url, serviceKey);
 
         await supabase.from('call_logs').insert({
           entity_type: entityType || null,
@@ -76,10 +75,10 @@ export default async function handler(req, res) {
           campaign_id: campaignId,
           call_message: message,
         });
-      } catch (logError) {
-        console.error('Failed to log call:', logError);
-        // Don't fail the request
       }
+    } catch (logError) {
+      console.error('Failed to log call:', logError);
+      // Don't fail the request
     }
 
     return res.status(200).json({

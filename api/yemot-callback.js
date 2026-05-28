@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { getSupabaseConfig } from '../lib/supabase-server-config.js';
 
 function mapYemotStatus(yemotStatus) {
   const statusLower = (yemotStatus || '').toLowerCase();
@@ -26,8 +27,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const supabaseUrl = process.env.MAIN_SUPABASE_URL;
-    const supabaseServiceKey = process.env.MAIN_SUPABASE_SERVICE_KEY;
+    const { url: supabaseUrl, serviceKey: supabaseServiceKey } = getSupabaseConfig();
 
     if (!supabaseUrl || !supabaseServiceKey) {
       return res.status(500).json({ error: 'Supabase credentials not configured' });
