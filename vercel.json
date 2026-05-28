@@ -1,0 +1,29 @@
+{
+  "functions": {
+    "api/*.js": {
+      "maxDuration": 60,
+      "memory": 1024
+    },
+    "api/cellstation.js": {
+      "maxDuration": 300,
+      "memory": 1024
+    },
+    "api/process-overdue.js": {
+      "maxDuration": 300,
+      "memory": 1024
+    }
+  },
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html",
+      "status": 200
+    }
+  ],
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist"
+}
