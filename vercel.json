@@ -36,12 +36,5 @@
     "api/sim-activation-callback.js": {
       "maxDuration": 30
     }
-  },
-  "cleanUrls": true,
-  "rewrites": [
-    {
-      "source": "/(?!api)",
-      "destination": "/index.html"
-    }
-  ]
+  }
 }
