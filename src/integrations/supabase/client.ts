@@ -1,4 +1,5 @@
 // Supabase client - YOUR NEW INDEPENDENT PROJECT
+// Updated to disconnect from Lovable and use independent Supabase
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
