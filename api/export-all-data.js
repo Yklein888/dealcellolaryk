@@ -1,13 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
+import { getSupabaseConfig } from '../lib/supabase-server-config.js';
 
 export const config = {
   maxDuration: 120,
 };
-
-const supabase = createClient(
-  process.env.MAIN_SUPABASE_URL,
-  process.env.MAIN_SUPABASE_SERVICE_KEY
-);
 
 // List of all tables to export
 const TABLES_TO_EXPORT = [
@@ -32,6 +28,9 @@ export default async function handler(req, res) {
   }
 
   try {
+    const { url, serviceKey } = getSupabaseConfig();
+    const supabase = createClient(url, serviceKey);
+
     const exportData = {};
     const errors = [];
 

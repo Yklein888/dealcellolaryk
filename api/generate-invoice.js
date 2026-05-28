@@ -8,8 +8,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const supabaseUrl = process.env.MAIN_SUPABASE_URL;
-    const supabaseServiceKey = process.env.MAIN_SUPABASE_SERVICE_KEY;
+    const { url: supabaseUrl, serviceKey: supabaseServiceKey } = getSupabaseConfig();
 
     if (!supabaseUrl || !supabaseServiceKey) {
       return res.status(500).json({ error: 'Missing Supabase configuration' });

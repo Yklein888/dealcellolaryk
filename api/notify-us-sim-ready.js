@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { getSupabaseConfig } from '../lib/supabase-server-config.js';
 
 export const config = {
   maxDuration: 60,
@@ -11,8 +12,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const mainUrl = process.env.MAIN_SUPABASE_URL;
-    const mainKey = process.env.MAIN_SUPABASE_SERVICE_KEY;
+    const { url: mainUrl, serviceKey: mainKey } = getSupabaseConfig();
     const simUrl = process.env.SIM_MANAGER_SUPABASE_URL;
     const simKey = process.env.SIM_MANAGER_SUPABASE_KEY;
     const mainAnonKey = process.env.MAIN_SUPABASE_ANON_KEY;

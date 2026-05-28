@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { getSupabaseConfig } from '../lib/supabase-server-config.js';
 
 function maskSensitive(data) {
   const masked = { ...data };
@@ -19,8 +20,7 @@ export default async function handler(req, res) {
     const terminal = process.env.PELECARD_TERMINAL;
     const user = process.env.PELECARD_USER;
     const password = process.env.PELECARD_PASSWORD;
-    const supabaseUrl = process.env.MAIN_SUPABASE_URL;
-    const supabaseServiceKey = process.env.MAIN_SUPABASE_SERVICE_KEY;
+    const { url: supabaseUrl, serviceKey: supabaseServiceKey } = getSupabaseConfig();
     const supabaseAnonKey = process.env.MAIN_SUPABASE_ANON_KEY;
 
     if (!terminal || !user || !password) {
