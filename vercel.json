@@ -1,6 +1,12 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/:path*",
+      "destination": "/index.html"
+    }
+  ],
   "functions": {
     "api/cellstation.js": { "maxDuration": 300 },
     "api/yemot-call.js": { "maxDuration": 60 },
