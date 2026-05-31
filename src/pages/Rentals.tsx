@@ -7,7 +7,7 @@ import { InventoryItem } from '@/types/rental';
 import { PACKAGE_LABELS, USSimPackage } from '@/types/rental';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
-import { CallHistoryBadge } from '@/components/CallHistoryBadge';
+
 import { NewRentalDialog } from '@/components/rentals/NewRentalDialog';
 import { EditRentalDialog } from '@/components/rentals/EditRentalDialog';
 import { PaymentConfirmationDialog } from '@/components/rentals/PaymentConfirmationDialog';
@@ -36,7 +36,7 @@ import {
   RotateCcw,
   Calendar,
   User,
-  Phone,
+  
   CreditCard,
   Loader2,
   Trash2,
@@ -90,7 +90,7 @@ export default function Rentals() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingRental, setEditingRental] = useState<Rental | null>(null);
 
-  const [callingRentalId, setCallingRentalId] = useState<string | null>(null);
+  
   const [downloadingInstructions, setDownloadingInstructions] = useState<string | null>(null);
   const [payingRentalId, setPayingRentalId] = useState<string | null>(null);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
@@ -114,66 +114,6 @@ export default function Rentals() {
   const [extendNewEndDate, setExtendNewEndDate] = useState<Date | null>(null);
   const [isExtending, setIsExtending] = useState(false);
 
-
-  // Notify customer about rental return reminder
-  const notifyRentalCustomer = async (rental: Rental) => {
-    const customer = customers.find(c => c.id === rental.customerId);
-    const customerPhone = customer?.phone;
-
-    if (!customerPhone) {
-      toast({
-        title: 'שגיאה',
-        description: 'אין מספר טלפון ללקוח זה',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setCallingRentalId(rental.id);
-
-    try {
-      const message = `שלום ${rental.customerName}, תזכורת להחזרת הציוד המושכר. תאריך ההחזרה הוא ${format(parseISO(rental.endDate), 'dd/MM/yyyy', { locale: he })}. תודה רבה.`;
-      
-      const response = await fetch(
-        `/api/yemot-call`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            phone: customerPhone,
-            message,
-            campaignType: 'rental_reminder',
-            entityType: 'rental',
-            entityId: rental.id,
-            customerId: rental.customerId,
-            callType: 'manual',
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (data.success) {
-        toast({
-          title: 'ההודעה נשלחה',
-          description: `שיחה יוצאת ל-${customerPhone}`,
-        });
-      } else {
-        throw new Error(data.error || 'שגיאה בשליחת ההודעה');
-      }
-    } catch (error) {
-      console.error('Error calling customer:', error);
-      toast({
-        title: 'שגיאה',
-        description: 'לא ניתן לשלוח הודעה ללקוח',
-        variant: 'destructive',
-      });
-    } finally {
-      setCallingRentalId(null);
-    }
-  };
 
   // Open payment dialog
   const openPaymentDialog = (rental: Rental) => {
@@ -1002,22 +942,6 @@ export default function Rentals() {
                         </>
                       )}
                     </Button>
-                    <div className="flex items-center">
-                      <Button 
-                        variant="outline"
-                        size="sm"
-                        onClick={() => notifyRentalCustomer(rental)}
-                        disabled={callingRentalId === rental.id}
-                        className="rounded-l-none border-r-0"
-                      >
-                        <Phone className="h-4 w-4" />
-                      </Button>
-                      <CallHistoryBadge 
-                        entityType="rental" 
-                        entityId={rental.id}
-                        className="rounded-r-none border border-input bg-background"
-                      />
-                    </div>
                   </div>
                   <div className="flex justify-center gap-2">
                     <Button 
