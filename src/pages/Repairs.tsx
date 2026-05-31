@@ -5,7 +5,7 @@ import { PageLoadingSkeleton } from '@/components/PageLoadingSkeleton';
 import { EmptyState } from '@/components/EmptyState';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
-import { CallHistoryBadge } from '@/components/CallHistoryBadge';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,7 +35,6 @@ import {
   Download,
   Trash2,
   Shield,
-  Phone,
   RotateCcw
 } from 'lucide-react';
 import { Repair, repairStatusLabels } from '@/types/rental';
@@ -54,7 +53,7 @@ export default function Repairs() {
   const [timeFilter, setTimeFilter] = useState<string>('all');
   const [warrantyFilter, setWarrantyFilter] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [callingRepairId, setCallingRepairId] = useState<string | null>(null);
+  
 
   // Read URL params on mount
   useEffect(() => {
@@ -66,59 +65,6 @@ export default function Repairs() {
     }
   }, []);
 
-  const notifyCustomer = async (repair: Repair) => {
-    if (!repair.customerPhone) {
-      toast({
-        title: 'שגיאה',
-        description: 'אין מספר טלפון ללקוח זה',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setCallingRepairId(repair.id);
-
-    try {
-      const message = `שלום ${repair.customerName}, המכשיר שלך מספר ${repair.repairNumber} מוכן לאיסוף. תודה רבה.`;
-      
-      const response = await fetch(
-        `/api/yemot-call`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            phone: repair.customerPhone,
-            message,
-            entityType: 'repair',
-            entityId: repair.id,
-            callType: 'manual',
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (data.success) {
-        toast({
-          title: 'ההודעה נשלחה',
-          description: `שיחה יוצאת ל-${repair.customerPhone}`,
-        });
-      } else {
-        throw new Error(data.error || 'שגיאה בשליחת ההודעה');
-      }
-    } catch (error) {
-      console.error('Error calling customer:', error);
-      toast({
-        title: 'שגיאה',
-        description: 'לא ניתן לשלוח הודעה ללקוח',
-        variant: 'destructive',
-      });
-    } finally {
-      setCallingRepairId(null);
-    }
-  };
 
   // Calculate next repair number automatically
   const nextRepairNumber = useMemo(() => {
@@ -827,21 +773,6 @@ export default function Repairs() {
                   )}
                   {repair.status === 'ready' && (
                     <>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => notifyCustomer(repair)}
-                          disabled={callingRepairId === repair.id}
-                        >
-                          <Phone className="h-4 w-4" />
-                          {callingRepairId === repair.id ? 'מתקשר...' : 'הודע ללקוח'}
-                        </Button>
-                        <CallHistoryBadge
-                          entityType="repair"
-                          entityId={repair.id}
-                        />
-                      </div>
                       <Button
                         variant="outline"
                         size="sm"

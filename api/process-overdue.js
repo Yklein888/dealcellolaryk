@@ -29,102 +29,6 @@ async function isShabbatOrHoliday() {
   }
 }
 
-async function processCalls(supabase, todayStr, yemotSystemNumber, yemotPassword) {
-  const { data: overdueRentals, error: rentalsError } = await supabase
-    .from('rentals')
-    .select('id, customer_id, customer_name, end_date')
-    .eq('status', 'active')
-    .lt('end_date', todayStr);
-
-  if (rentalsError) throw new Error(`Error fetching overdue rentals: ${rentalsError.message}`);
-
-  if (!overdueRentals || overdueRentals.length === 0) {
-    return { processed: 0, message: 'No overdue rentals to process' };
-  }
-
-  console.log(`Found ${overdueRentals.length} overdue active rentals`);
-  const results = [];
-
-  for (const rental of overdueRentals) {
-    try {
-      const { data: rentalItems, error: itemsError } = await supabase
-        .from('rental_items')
-        .select('item_category')
-        .eq('rental_id', rental.id);
-
-      if (itemsError) { results.push({ rentalId: rental.id, success: false, error: itemsError.message }); continue; }
-
-      const hasSim = rentalItems?.some(
-        (item) => item.item_category === 'sim_european' || item.item_category === 'sim_american'
-      );
-
-      if (!hasSim) { results.push({ rentalId: rental.id, success: true, error: 'No SIM cards in rental' }); continue; }
-
-      const { data: existingCalls } = await supabase
-        .from('call_logs')
-        .select('id')
-        .eq('entity_type', 'rental')
-        .eq('entity_id', rental.id)
-        .eq('call_type', 'automatic')
-        .gte('created_at', todayStr);
-
-      if (existingCalls && existingCalls.length > 0) {
-        results.push({ rentalId: rental.id, success: true, error: 'Already called today' });
-        continue;
-      }
-
-      let customerPhone = null;
-      if (rental.customer_id) {
-        const { data: customer } = await supabase
-          .from('customers').select('phone').eq('id', rental.customer_id).single();
-        customerPhone = customer?.phone;
-      }
-
-      if (!customerPhone) { results.push({ rentalId: rental.id, success: false, error: 'No phone number' }); continue; }
-
-      const cleanPhone = customerPhone.replace(/\D/g, '');
-      const message = `שלום ${rental.customer_name}, זוהי תזכורת ממערכת דיל סלולר. מועד ההחזרה של הציוד המושכר עבר.`;
-
-      const yemotUrl = new URL('https://www.call2all.co.il/ym/api/RunCampaign');
-      yemotUrl.searchParams.set('token', `${yemotSystemNumber}:${yemotPassword}`);
-      yemotUrl.searchParams.set('phones', cleanPhone);
-      yemotUrl.searchParams.set('tts', message);
-      yemotUrl.searchParams.set('templateId', '1267261');
-
-      const yemotResponse = await fetch(yemotUrl.toString());
-      const yemotText = await yemotResponse.text();
-
-      let yemotResult;
-      let campaignId = null;
-      try {
-        yemotResult = JSON.parse(yemotText);
-        campaignId = yemotResult.campaignId || yemotResult.campaign_id || null;
-      } catch {
-        yemotResult = { raw: yemotText };
-      }
-
-      const isSuccess = yemotResult.responseStatus === 'OK' || yemotResult.success !== undefined;
-
-      await supabase.from('call_logs').insert({
-        entity_type: 'rental',
-        entity_id: rental.id,
-        customer_id: rental.customer_id,
-        customer_phone: cleanPhone,
-        call_status: 'pending',
-        campaign_id: campaignId,
-        call_type: 'automatic',
-        call_message: message,
-      });
-
-      results.push({ rentalId: rental.id, success: isSuccess });
-    } catch (error) {
-      results.push({ rentalId: rental.id, success: false, error: error.message });
-    }
-  }
-
-  const successCount = results.filter((r) => r.success).length;
-  return { processed: results.length, successful: successCount, message: `Processed ${results.length} overdue rentals` };
-}
 
 async function processCharges(supabase, todayStr) {
   const today = new Date();
@@ -256,12 +160,6 @@ export default async function handler(req, res) {
     return res.status(200).send('ok');
   }
 
-  const type = req.query.type || req.body?.type;
-
-  if (!type || (type !== 'calls' && type !== 'charges')) {
-    return res.status(400).json({ error: 'Missing or invalid type. Use ?type=calls or ?type=charges' });
-  }
-
   try {
     if (await isShabbatOrHoliday()) {
       return res.status(200).json({
@@ -278,33 +176,18 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Supabase service key not configured' });
     }
 
-    if (type === 'calls') {
-      const yemotSystemNumber = process.env.YEMOT_SYSTEM_NUMBER;
-      const yemotPassword = process.env.YEMOT_PASSWORD;
-      if (!yemotSystemNumber || !yemotPassword) {
-        return res.status(500).json({ error: 'Yemot credentials not configured' });
-      }
-    }
-
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayStr = today.toISOString().split('T')[0];
 
-    console.log(`Processing overdue ${type} for today: ${todayStr}`);
+    console.log(`Processing overdue charges for today: ${todayStr}`);
 
-    let result;
-    if (type === 'calls') {
-      const yemotSystemNumber = process.env.YEMOT_SYSTEM_NUMBER;
-      const yemotPassword = process.env.YEMOT_PASSWORD;
-      result = await processCalls(supabase, todayStr, yemotSystemNumber, yemotPassword);
-    } else {
-      result = await processCharges(supabase, todayStr);
-    }
+    const result = await processCharges(supabase, todayStr);
 
     return res.status(200).json({ success: true, ...result });
   } catch (error) {
-    console.error(`Error in process-overdue (${type}):`, error);
+    console.error('Error in process-overdue:', error);
     return res.status(500).json({ error: error.message });
   }
 }
