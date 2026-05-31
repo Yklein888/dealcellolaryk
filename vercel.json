@@ -11,8 +11,6 @@
   ],
   "functions": {
     "api/cellstation.js": { "maxDuration": 300 },
-    "api/yemot-call.js": { "maxDuration": 60 },
-    "api/yemot-callback.js": { "maxDuration": 30 },
     "api/exchange-rate.js": { "maxDuration": 30 },
     "api/send-whatsapp.js": { "maxDuration": 30 },
     "api/generate-calling-instructions.js": { "maxDuration": 60 },
